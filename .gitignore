@@ -1,0 +1,19 @@
+.DS_Store
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+ios/Pods/
+
+# IDE
+.idea/
+.vscode/
