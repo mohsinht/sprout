@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "name": "Sprout Coin Mascot",
+  "description": "Canonical color tokens for the Sprout coin mascot. These mirror apps/mobile/lib/src/theme/sprout_tokens.dart and packages/design_tokens. Do not introduce off-palette colors in any mascot asset.",
+  "palette": {
+    "coinGold": "#F7C84B",
+    "coinGoldLight": "#FFE9A8",
+    "coinGoldDeep": "#E8A82E",
+    "coinShadowGold": "#DDA52E",
+    "coinRim": "#C8881A",
+    "coinOutline": "#B97818",
+    "leafGreen": "#45B96A",
+    "leafDarkGreen": "#2F8D4D",
+    "leafVein": "#2F8D4D",
+    "stemGreen": "#167A4A",
+    "eyeDark": "#1F2937",
+    "eyeWhite": "#FFFFFF",
+    "cheekBlush": "#F7A8A8",
+    "mouthInner": "#8B3A1A",
+    "mouthWarm": "#E05252",
+    "shadowSoft": "rgba(23, 32, 27, 0.12)",
+    "highlightWhite": "rgba(255, 255, 255, 0.55)"
+  },
+  "usage": {
+    "coinGold": "Primary coin body fill (use as gradient mid-stop).",
+    "coinGoldLight": "Top-left body gradient stop and hand/foot highlight.",
+    "coinGoldDeep": "Bottom-right body gradient stop for depth.",
+    "coinShadowGold": "Inner rim shadow on the coin body.",
+    "coinRim": "Inner engraved rim stroke.",
+    "coinOutline": "Outer body outline stroke.",
+    "leafGreen": "Leaf gradient start (top).",
+    "leafDarkGreen": "Leaf gradient end (bottom) and vein stroke.",
+    "stemGreen": "Sprout stem stroke.",
+    "eyeDark": "Pupil and eye outline.",
+    "eyeWhite": "Sclera and pupil sparkle.",
+    "cheekBlush": "Optional soft cheek tint on happy/celebrate states.",
+    "mouthInner": "Open mouth fill on celebrate state.",
+    "mouthWarm": "Inner mouth warm tint on celebrate state.",
+    "shadowSoft": "Drop shadow under the mascot.",
+    "highlightWhite": "Glossy body highlight."
+  },
+  "contrast": {
+    "notes": "Eye/mouth strokes use eyeDark on coinGold for AA contrast. Never use pure black; eyeDark is the brand-approved ink."
+  }
+}

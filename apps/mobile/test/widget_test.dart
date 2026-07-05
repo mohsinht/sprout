@@ -9,8 +9,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.text('Salaam, Mohsin! 👋'), findsOneWidget);
-    expect(find.text('Great job! 🌱'), findsOneWidget);
+    expect(find.text('Salaam, Mohsin 👋'), findsOneWidget);
+    expect(find.text('Garden Health'), findsOneWidget);
+    expect(find.text('Plant it now'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

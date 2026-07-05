@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../theme/sprout_tokens.dart';
+import '../../theme/sprout_theme.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({required this.child, super.key});
@@ -11,16 +12,17 @@ class AppShell extends StatelessWidget {
 
   static const _tabs = [
     _SproutTab('Today', Icons.wb_sunny_rounded, '/today'),
-    _SproutTab('Budget', Icons.account_balance_wallet_rounded, '/budget'),
-    _SproutTab('Grow', Icons.spa_rounded, '/grow'),
+    _SproutTab('Add', Icons.add_circle_rounded, '/add'),
+    _SproutTab('Money', Icons.account_balance_wallet_rounded, '/money'),
     _SproutTab('Learn', Icons.school_rounded, '/learn'),
-    _SproutTab('Profile', Icons.person_rounded, '/profile'),
+    _SproutTab('Settings', Icons.settings_rounded, '/settings'),
   ];
 
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
     final currentIndex = _tabs.indexWhere((tab) => tab.path == location);
+    final colors = SproutColorScheme.of(context);
 
     return Scaffold(
       body: SafeArea(child: child),
@@ -30,11 +32,11 @@ class AppShell extends StatelessWidget {
           margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
-            color: SproutColors.surface,
-            borderRadius: BorderRadius.circular(28),
+            color: colors.surface,
+            borderRadius: BorderRadius.circular(SproutRadius.hero),
             boxShadow: [
               BoxShadow(
-                color: SproutColors.ink.withValues(alpha: 0.1),
+                color: colors.ink.withValues(alpha: 0.1),
                 blurRadius: 26,
                 offset: const Offset(0, 12),
               ),
@@ -72,6 +74,9 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reducedMotion = MediaQuery.of(context).disableAnimations;
+    final colors = SproutColorScheme.of(context);
+    final selectedColor = SproutColors.seed;
+    final idleColor = colors.muted;
     final item = SproutButtonPress(
       onTap: onTap,
       scale: 0.9,
@@ -80,17 +85,17 @@ class _NavItem extends StatelessWidget {
         curve: SproutCurves.button,
         padding: const EdgeInsets.symmetric(vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? SproutColors.mint : Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
+          color: selected ? colors.mint : Colors.transparent,
+          borderRadius: BorderRadius.circular(SproutRadius.tile),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (selected && tab.label == 'Today')
-              const Icon(Icons.eco_rounded, size: 10, color: SproutColors.seed),
+              Icon(Icons.eco_rounded, size: 10, color: selectedColor),
             Icon(
               tab.icon,
-              color: selected ? SproutColors.leaf : const Color(0xFF3F4A43),
+              color: selected ? selectedColor : idleColor,
               size: selected ? 25 : 23,
               fill: selected ? 1 : 0,
             ),
@@ -100,9 +105,7 @@ class _NavItem extends StatelessWidget {
               child: Text(
                 tab.label,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: selected
-                          ? SproutColors.leaf
-                          : const Color(0xFF3F4A43),
+                      color: selected ? selectedColor : idleColor,
                       fontSize: 12,
                       fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                     ),

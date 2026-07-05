@@ -8,6 +8,8 @@
     "build": "pnpm -r build",
     "check": "pnpm -r build && pnpm -r typecheck",
     "dev:api": "pnpm --filter @sprout/api dev",
+    "dev:web": "cd apps/mobile && flutter run -d chrome --web-port=8080",
+    "dev:web:hot": "cd apps/mobile && flutter run -d web-server --web-port=8080 --web-hostname=0.0.0.0",
     "format": "prettier --write .",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"

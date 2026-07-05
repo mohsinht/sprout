@@ -1,85 +1,15 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
+import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
-import '../../widgets/coin_sprout_mascot.dart';
-
-enum SproutMascotMood {
-  happy,
-  thumbsUp,
-  thinking,
-  supportive,
-  celebrating,
-  peek,
-  reading,
-}
-
-class SproutMascot extends StatelessWidget {
-  const SproutMascot({
-    required this.mood,
-    this.size = 72,
-    super.key,
-  });
-
-  final SproutMascotMood mood;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final reducedMotion = MediaQuery.of(context).disableAnimations;
-    final mascot = Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CoinSproutMascot(size: size),
-        Positioned(
-          right: -4,
-          bottom: mood == SproutMascotMood.peek ? -2 : 2,
-          child: _MoodBadge(mood: mood),
-        ),
-      ],
-    );
-
-    if (reducedMotion) return mascot;
-    return mascot.sproutMascotIdle();
-  }
-}
-
-class _MoodBadge extends StatelessWidget {
-  const _MoodBadge({required this.mood});
-
-  final SproutMascotMood mood;
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = switch (mood) {
-      SproutMascotMood.thumbsUp => Icons.thumb_up_alt_rounded,
-      SproutMascotMood.thinking => Icons.psychology_alt_rounded,
-      SproutMascotMood.supportive => Icons.favorite_rounded,
-      SproutMascotMood.celebrating => Icons.celebration_rounded,
-      SproutMascotMood.peek => Icons.visibility_rounded,
-      SproutMascotMood.reading => Icons.menu_book_rounded,
-      SproutMascotMood.happy => Icons.eco_rounded,
-    };
-
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: SproutColors.ink.withValues(alpha: 0.12),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Icon(icon, size: 15, color: SproutColors.seed),
-    );
-  }
-}
+import '../../theme/sprout_theme.dart';
+import '../../widgets/sprout_mascot.dart';
+import '../../widgets/sprout_mascot_state.dart';
 
 class StreakPill extends StatelessWidget {
   const StreakPill({required this.days, super.key});
@@ -119,10 +49,18 @@ class StreakPill extends StatelessWidget {
 }
 
 class AnimatedScoreRing extends StatelessWidget {
-  const AnimatedScoreRing({required this.score, this.size = 106, super.key});
+  const AnimatedScoreRing({
+    required this.score,
+    this.size = 106,
+    this.foregroundColor = Colors.white,
+    this.trackColor,
+    super.key,
+  });
 
   final int score;
   final double size;
+  final Color foregroundColor;
+  final Color? trackColor;
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +83,8 @@ class AnimatedScoreRing extends StatelessWidget {
                 value: value,
                 strokeWidth: 10,
                 color: SproutColors.gold,
-                backgroundColor: Colors.white.withValues(alpha: 0.24),
+                backgroundColor:
+                    trackColor ?? Colors.white.withValues(alpha: 0.24),
                 strokeCap: StrokeCap.round,
               ),
               Center(
@@ -157,17 +96,16 @@ class AnimatedScoreRing extends StatelessWidget {
                     children: [
                       Text(
                         animatedScore.round().toString(),
-                        style:
-                            Theme.of(context).textTheme.displaySmall?.copyWith(
-                                  color: Colors.white,
-                                  fontSize: size >= 100 ? 34 : 30,
-                                  height: 1,
-                                ),
+                        style: SproutType.scoreValue(
+                          color: foregroundColor,
+                          size: size >= 100 ? 34 : 30,
+                          weight: FontWeight.w800,
+                        ),
                       ),
                       Text(
-                        'score',
+                        SproutStrings.scoreLabel,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.78),
+                              color: foregroundColor.withValues(alpha: 0.7),
                               fontSize: 12,
                             ),
                       ),
@@ -251,10 +189,11 @@ class SnapshotTile extends StatelessWidget {
       child: SproutButtonPress(
         onTap: onTap,
         scale: 0.94,
+        semanticLabel: '$label: $value. Tap for details.',
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(SproutRadius.card),
             boxShadow: [
               BoxShadow(
                 color: SproutColors.ink.withValues(alpha: 0.04),
@@ -302,8 +241,10 @@ class DailyQuestCard extends StatefulWidget {
 }
 
 class _DailyQuestCardState extends State<DailyQuestCard>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _pulseController;
+  late final AnimationController _completeController;
+  late final Animation<double> _completeScale;
 
   @override
   void initState() {
@@ -314,11 +255,31 @@ class _DailyQuestCardState extends State<DailyQuestCard>
       lowerBound: 0.985,
       upperBound: 1,
     )..repeat(reverse: true);
+
+    _completeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _completeScale = Tween<double>(begin: 1, end: 1.06).animate(
+      CurvedAnimation(
+        parent: _completeController,
+        curve: SproutCurves.playful,
+      ),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant DailyQuestCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.completed && widget.completed) {
+      _completeController.forward();
+    }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _completeController.dispose();
     super.dispose();
   }
 
@@ -330,9 +291,9 @@ class _DailyQuestCardState extends State<DailyQuestCard>
         gradient: LinearGradient(
           colors: widget.completed
               ? [SproutColors.gold, const Color(0xFFFFCA68)]
-              : [const Color(0xFF41C368), const Color(0xFF2E9E4C)],
+              : [SproutColors.heroGreenStart, SproutColors.heroGreenEnd],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(SproutRadius.card),
         boxShadow: [
           const BoxShadow(
             color: Color(0xFF248A3F),
@@ -350,19 +311,20 @@ class _DailyQuestCardState extends State<DailyQuestCard>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         child: Row(
           children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                widget.completed
-                    ? Icons.check_rounded
-                    : Icons.track_changes_rounded,
-                color: Colors.white,
-                size: 30,
+            // Mascot in the icon slot — celebrates when complete.
+            SizedBox(
+              width: 56,
+              height: 56,
+              child: Center(
+                child: widget.completed
+                    ? const SproutMascot(
+                        size: 52,
+                        state: SproutMascotState.celebrate,
+                      )
+                    : const SproutMascot(
+                        size: 48,
+                        state: SproutMascotState.happy,
+                      ),
               ),
             ),
             const SizedBox(width: SproutSpacing.md),
@@ -371,7 +333,7 @@ class _DailyQuestCardState extends State<DailyQuestCard>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'DAILY QUEST',
+                    SproutStrings.dailyQuest,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: Colors.white.withValues(alpha: 0.9),
                           letterSpacing: 0.4,
@@ -382,7 +344,9 @@ class _DailyQuestCardState extends State<DailyQuestCard>
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      widget.completed ? 'Quest complete' : 'Save PKR 10K',
+                      widget.completed
+                          ? SproutStrings.questPlanted
+                          : SproutStrings.plantPkr10k,
                       maxLines: 1,
                       style: Theme.of(context)
                           .textTheme
@@ -390,15 +354,24 @@ class _DailyQuestCardState extends State<DailyQuestCard>
                           ?.copyWith(color: Colors.white, fontSize: 23),
                     ),
                   ),
+                  if (widget.completed) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '+3 Health',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(width: SproutSpacing.sm),
-            const _QuestRewardBadge(text: '+20 XP'),
+            _QuestRewardBadge(text: '+20 XP', completed: widget.completed),
             IconButton(
               onPressed: () => SproutBottomSheet.show(
                 context,
-                title: 'Why this quest?',
+                title: SproutStrings.whyThisQuest,
                 rows: const [
                   SheetInfoRow(
                     icon: Icons.lightbulb_rounded,
@@ -420,7 +393,7 @@ class _DailyQuestCardState extends State<DailyQuestCard>
               ),
               icon: const Icon(Icons.info_outline_rounded),
               color: Colors.white,
-              tooltip: 'Why this quest?',
+              tooltip: SproutStrings.whyThisQuest,
             ),
           ],
         ),
@@ -433,7 +406,19 @@ class _DailyQuestCardState extends State<DailyQuestCard>
       child: card,
     );
 
-    if (reducedMotion || widget.completed) return pressed;
+    if (reducedMotion) return pressed;
+
+    // Completion bounce takes priority over idle pulse.
+    if (widget.completed && _completeController.isAnimating) {
+      return AnimatedBuilder(
+        animation: _completeScale,
+        builder: (context, child) =>
+            Transform.scale(scale: _completeScale.value, child: child),
+        child: pressed,
+      );
+    }
+
+    if (widget.completed) return pressed;
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, child) => Transform.scale(
@@ -446,25 +431,39 @@ class _DailyQuestCardState extends State<DailyQuestCard>
 }
 
 class _QuestRewardBadge extends StatelessWidget {
-  const _QuestRewardBadge({required this.text});
+  const _QuestRewardBadge({required this.text, this.completed = false});
 
   final String text;
+  final bool completed;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+        color: Colors.white.withValues(alpha: completed ? 0.3 : 0.2),
+        borderRadius: BorderRadius.circular(SproutRadius.pill),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: completed ? 0.6 : 0.4),
+          width: completed ? 1.5 : 1,
+        ),
+        boxShadow: completed
+            ? [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: Text(
         text,
-        style: Theme.of(context)
-            .textTheme
-            .labelLarge
-            ?.copyWith(color: Colors.white),
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
       ),
     );
   }
@@ -482,26 +481,29 @@ class SourceStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: SproutColors.mint,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: SproutColors.seed.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(width: 6),
-          Icon(
-            connected
-                ? Icons.check_circle_rounded
-                : Icons.radio_button_unchecked,
-            color: connected ? SproutColors.seed : SproutColors.muted,
-            size: 17,
-          ),
-        ],
+    return Semantics(
+      label: '$label: ${connected ? 'connected' : 'not connected'}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: SproutColors.mint,
+          borderRadius: BorderRadius.circular(SproutRadius.pill),
+          border: Border.all(color: SproutColors.seed.withValues(alpha: 0.18)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(width: 6),
+            Icon(
+              connected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked,
+              color: connected ? SproutColors.seed : SproutColors.muted,
+              size: 17,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -524,34 +526,71 @@ class QuickActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 102,
+      height: 112,
       child: SproutButtonPress(
-        onTap: onTap,
-        scale: 0.92,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        scale: 0.9,
+        semanticLabel: label,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(22),
-            border:
-                Border.all(color: SproutColors.line.withValues(alpha: 0.55)),
+            color: _quickActionRim(color),
+            borderRadius: BorderRadius.circular(24),
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 10),
-            child: Column(
-              children: [
-                Icon(icon, color: SproutColors.leaf),
-                const SizedBox(height: 6),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(label,
-                      style: Theme.of(context).textTheme.labelLarge),
+            padding: const EdgeInsets.only(bottom: 5),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: _quickActionOutline(color),
+                  width: 2,
                 ),
-              ],
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+                child: Column(
+                  children: [
+                    Icon(icon, color: SproutColors.leaf, size: 28),
+                    const SizedBox(height: 9),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Color _quickActionRim(Color color) {
+    if (color == SproutColors.tintWarm) return const Color(0xFFE0B66D);
+    if (color == SproutColors.tintSky) return const Color(0xFF9DBFEF);
+    if (color == SproutColors.tintMint) return const Color(0xFF9FD8B7);
+    if (color == SproutColors.tintLilac) return const Color(0xFFC3AAF0);
+    return SproutColors.line;
+  }
+
+  Color _quickActionOutline(Color color) {
+    if (color == SproutColors.tintWarm) return const Color(0xFFF0C77E);
+    if (color == SproutColors.tintSky) return const Color(0xFFB8D2F5);
+    if (color == SproutColors.tintMint) return const Color(0xFFB7E6C9);
+    if (color == SproutColors.tintLilac) return const Color(0xFFD5C2F6);
+    return SproutColors.line;
   }
 }
 
@@ -570,11 +609,14 @@ class SproutBottomSheet extends StatelessWidget {
     required String title,
     required List<SheetInfoRow> rows,
   }) {
+    final colors = SproutColorScheme.of(context);
     return showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
+      useRootNavigator: true,
       useSafeArea: true,
-      backgroundColor: SproutColors.surface,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -584,19 +626,25 @@ class SproutBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: SproutSpacing.lg),
-          for (final row in rows) ...[
-            row,
-            const SizedBox(height: SproutSpacing.md),
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.78;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + bottomInset),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: SproutSpacing.lg),
+            for (final row in rows) ...[
+              row,
+              const SizedBox(height: SproutSpacing.md),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -658,7 +706,7 @@ class _XpRewardAnimationState extends State<XpRewardAnimation>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: SproutDurations.xpReward,
+      duration: const Duration(milliseconds: 1100),
     )..forward();
   }
 
@@ -673,13 +721,19 @@ class _XpRewardAnimationState extends State<XpRewardAnimation>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final curved = Curves.easeOutCubic.transform(_controller.value);
+        // Pop in (0-0.25) then float up and fade (0.25-1).
+        final t = _controller.value;
+        final popIn = (t / 0.25).clamp(0.0, 1.0).toDouble();
+        final floatT = ((t - 0.25) / 0.75).clamp(0.0, 1.0).toDouble();
+        final popScale = Curves.easeOutBack.transform(popIn);
+        final floatCurve = Curves.easeOutCubic.transform(floatT);
+
         return Opacity(
-          opacity: 1 - curved,
+          opacity: 1 - floatCurve * 0.9,
           child: Transform.translate(
-            offset: Offset(0, -46 * curved),
+            offset: Offset(0, -80 * floatCurve),
             child: Transform.scale(
-              scale: 0.9 + curved * 0.2,
+              scale: 0.7 + popScale * 0.4,
               child: child,
             ),
           ),
@@ -687,24 +741,38 @@ class _XpRewardAnimationState extends State<XpRewardAnimation>
       },
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
           decoration: BoxDecoration(
-            color: SproutColors.gold,
-            borderRadius: BorderRadius.circular(999),
+            gradient: const LinearGradient(
+              colors: [SproutColors.gold, Color(0xFFFFCA68)],
+            ),
+            borderRadius: BorderRadius.circular(SproutRadius.pill),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.5),
+              width: 2,
+            ),
             boxShadow: [
               BoxShadow(
-                color: SproutColors.gold.withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
+                color: SproutColors.gold.withValues(alpha: 0.45),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
-          child: Text(
-            widget.text,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: Colors.white),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                widget.text,
+                style: SproutType.metricValue(
+                  color: Colors.white,
+                  size: 22,
+                  weight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         ),
       ),

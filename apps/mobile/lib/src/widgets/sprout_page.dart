@@ -22,7 +22,12 @@ class SproutPage extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(
+            SproutSpacing.pageHorizontal,
+            SproutSpacing.pageTop,
+            SproutSpacing.pageHorizontal,
+            SproutSpacing.pageBottom,
+          ),
           sliver: SliverList.list(
             children: [
               Row(

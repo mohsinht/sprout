@@ -33,6 +33,29 @@ flutter pub get
 flutter run
 ```
 
+### Run the app in Chrome (web)
+
+For quick local testing in a browser, run the Flutter app in Chrome:
+
+```bash
+pnpm dev:web
+```
+
+This runs `flutter run -d chrome --web-port=8080` from `apps/mobile` and opens the app at `http://localhost:8080`.
+
+Prerequisites:
+
+- Flutter SDK with web support enabled (`flutter config --enable-web`)
+- Chrome browser installed
+
+Other useful web commands:
+
+```bash
+cd apps/mobile
+flutter run -d web-server --web-port=8080   # run in any browser via http://localhost:8080
+flutter build web                            # production build into apps/mobile/build/web
+```
+
 ## Current MVP Scope
 
 - Today screen only
