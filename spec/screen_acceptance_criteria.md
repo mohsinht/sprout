@@ -1,10 +1,19 @@
 # Screen Acceptance Criteria
 
+> **Realignment note (2026-07-09):** Today criteria are replaced with
+> wealth-health criteria: total wealth + today/MTD change, every movement
+> has a "why," "what happened" events reference prior days, one goal-relative
+> next-step, breakdown/trend/provenance reachable on tap, wealth-down day
+> stays calm, stale price/FX is labelled, opening the app never changes
+> health. Money criteria are updated to include holdings breakdown and
+> trend depth. AI Briefing criteria are updated for WealthSnapshot and
+> provenance.
+
 ## App-Level
 
 - A new user can complete onboarding without connecting any external account.
 - Today is populated after onboarding.
-- The daily action can be completed in under 30 seconds.
+- The daily action can be completed in under 20 seconds.
 - Manual entry works offline.
 - Money data shows source, freshness, or confidence.
 - Every important insight has an explanation.
@@ -14,28 +23,39 @@
 - No v0 feature moves funds, stores value, initiates payments, or enables merchant acceptance.
 - Real captured transactions include parser version and dedupe fingerprint.
 - The app remains smooth on low-end Android.
+- **Total wealth is always the Today hero.**
+- **Opening the app never changes the health score.**
 
 ## Today
 
 - Opens as the default landing screen.
 - Shows streak, XP, greeting, mascot, summary, health score, recommended action, and glance tiles.
+- **Shows total wealth with today's change and MTD change** as the hero number.
+- **Every movement has a "why"** — no change shown without its driver.
+- **"What happened" events reference prior days** to form a story, not a snapshot.
+- **One goal-relative next-step** is shown (not an empty ritual).
+- **Breakdown, trend, and provenance are reachable on tap** (depth, not forced).
 - Mascot is the largest visual element.
 - Score animates on first reveal unless reduce-motion is enabled.
 - Completing the action triggers celebration, XP, streak feedback, and sign-off.
-- Bad-news state is calm and still protects the check-in streak.
+- **Wealth-down day stays calm** — no alarm, no shame, no red-faced mascot.
+- **Stale price/FX is labelled** with the as-of date, never silently trusted.
+- **Opening the app never changes health.**
 - Empty/first-run state works with zero connections.
 - Market tile appears only when personally relevant; otherwise a more relevant context tile appears.
-- Every tile, score factor, and finding opens Sprout Explains.
+- Every tile, score factor, event, and finding opens Sprout Explains.
 
 ## Money
 
+- Shows holdings with per-holding value, source, freshness, and provenance.
+- **6-day wealth trend chart is available as a depth element.**
 - Shows accounts with balances and freshness.
 - Shows safe-to-spend or budget summary.
-- Shows goals with progress and next step.
+- Shows goals with progress, remaining-to-target, and next step.
 - Shows transactions with source and confidence/review state.
 - Uncertain transactions are confirmable in one tap.
 - Offline cached data is visible.
-- Stale balances are labeled.
+- Stale balances and **stale prices/FX are labelled.**
 - The screen remains quiet and un-gamified.
 
 ## Quick Add
@@ -101,9 +121,14 @@
 - Job failure falls back to local data.
 - Severity determines ordering, mascot mood, and visual treatment.
 - Every finding has severity, confidence, category, and why detail.
-- Recommended action is singular, small, and completable.
+- Recommended action is singular, small, concrete, **goal-relative**, and completable.
 - Score and action follow the deterministic scoring model.
 - Parser drift and low-confidence capture affect findings transparently.
+- **WealthSnapshot includes total, change vs yesterday, change MTD, main reason, and interpretation.**
+- **Every WealthEvent has a plain-language "why."**
+- **Every holding valuation exposes dated price/FX provenance.**
+- **Stale prices/FX are labelled, never silently trusted.**
+- **No "check-in" action is ever selected.**
 
 ## Design System
 

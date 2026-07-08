@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { calculateFinancialHealthScore } from "@sprout/domain";
-import { mockTodayResponse, TodayResponseSchema } from "@sprout/shared";
+import { mockTodayResponse, TodayResponseSchema, mockWealthBriefing, WealthBriefingSchema } from "@sprout/shared";
 import { budgetRoute } from "./routes/budget.js";
 import { profileRoute } from "./routes/profile.js";
 import { learnRoute } from "./routes/learn.js";
@@ -52,6 +52,11 @@ app.get("/v1/today", (c) => {
     },
   });
 
+  return c.json(response);
+});
+
+app.get("/v1/wealth", (c) => {
+  const response = WealthBriefingSchema.parse(mockWealthBriefing);
   return c.json(response);
 });
 

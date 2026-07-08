@@ -2,44 +2,57 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sprout_mobile/src/presentation/today/today_screen.dart';
-import 'package:sprout_mobile/src/presentation/today/today_widgets.dart';
 import 'package:sprout_mobile/src/theme/sprout_theme.dart';
 
 void main() {
-  testWidgets('daily ritual completes and persists for the session',
+  testWidgets('Today shows wealth hero, holdings, goals, and provenance',
       (tester) async {
     await _pumpToday(tester);
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump(const Duration(seconds: 2));
 
+    // Greeting
     expect(find.text('Salaam, Mohsin 👋'), findsOneWidget);
-    expect(find.text('78'), findsOneWidget);
-    expect(find.text('Garden Health'), findsOneWidget);
-    expect(find.text('Your money'), findsOneWidget);
-    expect(find.text('Ready Wallet'), findsOneWidget);
+
+    // Wealth hero label
+    expect(find.text('TOTAL WEALTH'), findsOneWidget);
+
+    // One step
+    expect(find.text('Add PKR 25k → only 2 lakh to your car'), findsOneWidget);
+
+    // Streak
     expect(find.text('12'), findsOneWidget);
-    expect(find.text('Plant it now'), findsOneWidget);
 
-    await tester.tap(find.text('Plant it now'));
-    await tester.pump();
+    // Scroll down to reveal below-fold content.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
+    await tester.pumpAndSettle();
 
-    expect(find.text('Quest planted! 🌱'), findsOneWidget);
-    expect(find.text('13'), findsOneWidget);
-    expect(find.byType(ConfettiBurst), findsOneWidget);
-    expect(find.text('+20 XP'), findsWidgets);
+    // Holdings section
+    expect(find.text('Your holdings'), findsOneWidget);
+    expect(find.text('Al Meezan funds'), findsOneWidget);
+    expect(find.text('Wise EUR cash'), findsOneWidget);
+    expect(find.text('Wise USD cash'), findsOneWidget);
+    expect(find.text('PKR cash'), findsOneWidget);
 
-    await tester.pump(const Duration(milliseconds: 900));
-    expect(find.text('81'), findsOneWidget);
+    // Why it moved
+    expect(find.text('Why it moved today'), findsOneWidget);
 
-    await tester.pump(const Duration(milliseconds: 1000));
-    expect(find.byType(ConfettiBurst), findsNothing);
+    // Scroll more for goals.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
+    await tester.pumpAndSettle();
 
-    await _pumpToday(tester);
-    await tester.pump(const Duration(milliseconds: 250));
+    // Goals
+    expect(find.text('Your goals'), findsOneWidget);
+    expect(find.text('Car fund'), findsOneWidget);
+    expect(find.text('Emergency fund'), findsOneWidget);
 
-    expect(find.text('Quest planted! 🌱'), findsOneWidget);
-    expect(find.text('81'), findsOneWidget);
-    expect(find.text('13'), findsOneWidget);
+    // Scroll more for learn later.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    // Learn later
+    expect(find.text('Learn later'), findsOneWidget);
+    expect(find.text('Why did my funds dip today?'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

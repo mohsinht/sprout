@@ -1,5 +1,10 @@
 # Navigation and Information Architecture
 
+> **Realignment note (2026-07-09):** Money tab is confirmed as the holdings
+> + trend + provenance depth surface — where the 6-day chart, per-fund
+> detail, and dated price/FX provenance live. Today links into it. The
+> 3-tab + center "+" shell is unchanged.
+
 ## Target Shell
 
 Sprout uses a three-tab shell plus a center quick-add action:
@@ -60,13 +65,14 @@ Exit points:
 
 Primary job:
 
+- **Inspect holdings, wealth trend, and provenance depth.**
 - Inspect accounts, safe-to-spend, goals, and transactions.
 - Confirm uncertain transactions.
 
 Entry points:
 
 - Bottom tab.
-- Today tile tap.
+- Today tile tap (holdings, trend, or goal tile).
 - Sprout Explains related action.
 
 Exit points:
@@ -74,6 +80,7 @@ Exit points:
 - Quick Add.
 - Transaction confirm flow.
 - Settings data source control.
+- Sprout Explains (provenance detail, learn-later thread).
 
 ## Settings
 
@@ -124,6 +131,7 @@ Behavior:
 - App launch lands on Today.
 - Quick Add is reachable from every primary tab.
 - Quick Add is not represented as a destination tab.
+- **Money is the holdings + trend + provenance depth surface** (6-day chart, per-fund detail, dated price/FX).
 - Money is quieter than Today and never competes with the daily loop.
 - Settings is the trust surface.
 - Every insight path has a return path.

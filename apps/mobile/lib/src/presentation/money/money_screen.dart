@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../data/mock_sprout_data.dart';
 import '../../domain/sprout_models.dart';
@@ -9,6 +8,7 @@ import '../../theme/sprout_tokens.dart';
 import '../../widgets/sprout_panel.dart';
 import '../../widgets/sprout_page.dart';
 import '../../widgets/sprout_states.dart';
+import '../today/today_screen.dart' show QuickActionGrid;
 import 'money_widgets.dart';
 
 /// Money — a calm overview of the user's financial picture.
@@ -45,7 +45,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
             title: 'You can start manually. No bank connection needed.',
             subtitle: 'Add one chai, fuel, or grocery spend and Sprout builds a calm overview from there.',
             actionLabel: 'Add first transaction',
-            onAction: () => context.go('/add'),
+            onAction: () => QuickActionGrid.openQuickAdd(context),
           ),
         ],
       );

@@ -1,5 +1,13 @@
 # Copy and Tone Guide
 
+> **Realignment note (2026-07-09):** Examples are added in the wealth
+> automation's voice: movement + reason + reassurance. The rule "state
+> today's and MTD change together; end on calm; never hype a gain or alarm
+> a dip" is added. Goal-relative step phrasing and provenance phrasing are
+> added. "Check-in" as a health-changing concept is removed from copy —
+> showing up keeps the streak, but health only moves when wealth moves or a
+> real action is taken.
+
 ## Voice
 
 Sprout sounds like a calm, practical companion. It is warm but not childish, clear but not clinical, and honest without being harsh.
@@ -32,6 +40,78 @@ Sprout sounds like a calm, practical companion. It is warm but not childish, cle
 - "Nice check-in. Your money garden has enough shade for the week."
 - "You're on track. One small review will make today's picture clearer."
 - "Your emergency fund is doing its job."
+
+## Summary Sentence Rule (Today Screen)
+
+The summary sentence is the emotional landing of the daily check-in. Structure matters:
+
+- **Lead with reassurance.** Start the sentence with the positive state (e.g., "You're on track").
+- **Tuck caveats as an aside.** If there is a minor concern, add it as a secondary clause or aside, not as the sentence's conclusion (e.g., " — spending's just a little quick today" is better than "but spending is fast").
+- **End on calm.** The last few words the user reads should reinforce the safe state, not introduce worry. The user carries the ending with them after they close the app.
+
+**Do:**
+- "You're on track — spending's just a little quick today."
+- "Calm today. One review would make it clearer."
+- "You're steady. Salary is 4 days out."
+
+**Don't:**
+- "You are on track, but today's spending is slightly fast." (ends on worry)
+- "Spending is faster than usual, but you're still okay." (worry before reassurance)
+- "Your balance is dropping, though it's still fine." (ends on the concern)
+
+## Wealth Movement Rule (Today Screen)
+
+The wealth movement sentence is the *interpretation layer* — the thing that makes it a health tracker with an analyst, not a number. It follows the automation's voice: movement + reason + reassurance.
+
+**Rules:**
+
+- **State today's change and MTD change together.** Never show one without the other. "Down PKR 38k today, still up PKR 15k this month."
+- **Every movement has a "why."** Never show a change without its driver. "Main reason: NAV movement." "EUR/PKR moved." "You added to savings."
+- **End on calm.** A dip is "a tea break, not a crash." A gain is noted without hype.
+- **Never hype a gain or alarm a dip.** No exclamation marks on gains. No red alarm on dips. The mascot stays calm (watchful at most).
+- **Reference prior days for continuity.** "Al Meezan pulled back after yesterday's jump." Events form a story, not a snapshot.
+
+**Do:**
+- "Down PKR 38k today — Al Meezan took a tea break after yesterday's jump, not a crash."
+- "Up PKR 15k this month, mostly from EUR/PKR moving in your favour."
+- "Steady today. Your funds are flat and your cash is unchanged."
+- "Al Meezan pulled back after yesterday's jump (equity NAV correction). Wise EUR helped slightly but didn't offset the fund dip. Still ~PKR 13.67M — not a crash, just a tea break."
+
+**Don't:**
+- "Your wealth dropped PKR 38,000!" (alarm + hype)
+- "Down today." (no reason)
+- "Great news! Your wealth is up!" (hype)
+- "Your fund is down. You should worry." (alarm + shame)
+
+## Goal-Relative Step Phrasing
+
+Next-steps are framed against the user's goals and holdings. Honest, never hype, never guaranteed returns, never FOMO.
+
+**Do:**
+- "PKR 2 lakh to your car goal."
+- "MIF is lagging your other funds — consider directing your next contribution there."
+- "Only PKR 200k left before your emergency fund hits 6 months."
+- "Your EUR cash is 23% of total wealth — that's a healthy spread."
+
+**Don't:**
+- "Invest now to maximize returns!" (FOMO + advice)
+- "You're guaranteed to reach your goal." (certainty)
+- "Buy MIF before it goes up." (investment pressure)
+
+## Provenance Phrasing
+
+Provenance is the trust. State where the number came from, with dates, in plain language. It appears on tap, never hidden.
+
+**Do:**
+- "Al Meezan prices valid 7 Jul 2026. Units reconciled with your statement."
+- "FX from Xe: USD/PKR 277.992, EUR/PKR 317.536."
+- "NAV updated 3 days ago — labelled stale."
+- "Wise balances imported today."
+
+**Don't:**
+- "Data is up to date." (vague)
+- "Prices may vary." (hedge without specifics)
+- Hide the source or date behind a settings menu.
 
 ## Bad-Day Examples
 
@@ -102,3 +182,8 @@ Example:
 - No unsupported certainty.
 - Clear next step.
 - Honest data confidence.
+- **Today's change and MTD change are stated together.**
+- **Every movement has a "why."**
+- **A wealth-down day ends on calm, never alarm.**
+- **Provenance is stated with dates and sources, not vague hedges.**
+- **Opening the app is never framed as a health-changing action.**

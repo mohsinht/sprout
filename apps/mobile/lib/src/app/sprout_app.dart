@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../presentation/add/add_screen.dart';
 import '../presentation/learn/learn_screen.dart';
 import '../presentation/mascot_lab/mascot_lab_screen.dart';
 import '../presentation/money/money_screen.dart';
+import '../presentation/onboarding/onboarding_screen.dart';
 import '../presentation/settings/settings_screen.dart';
 import '../presentation/shell/app_shell.dart';
 import '../presentation/today/today_screen.dart';
@@ -15,23 +15,26 @@ import 'theme_mode_controller.dart';
 final _router = GoRouter(
   initialLocation: '/today',
   routes: [
+    // Dev-only mascot lab — not part of the product shell.
     GoRoute(
       path: '/mascot-lab',
       pageBuilder: (context, state) =>
           const NoTransitionPage(child: MascotLabScreen()),
     ),
+    // Onboarding — one-question-per-screen conversation, ends on Today.
+    GoRoute(
+      path: '/onboarding',
+      pageBuilder: (context, state) =>
+          const NoTransitionPage(child: OnboardingScreen()),
+    ),
     ShellRoute(
       builder: (context, state, child) => AppShell(child: child),
       routes: [
+        // Three primary tabs per spec: Today, Money, Settings.
         GoRoute(
           path: '/today',
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: TodayScreen()),
-        ),
-        GoRoute(
-          path: '/add',
-          pageBuilder: (context, state) =>
-              const NoTransitionPage(child: AddScreen()),
         ),
         GoRoute(
           path: '/money',
@@ -39,14 +42,16 @@ final _router = GoRouter(
               const NoTransitionPage(child: MoneyScreen()),
         ),
         GoRoute(
-          path: '/learn',
-          pageBuilder: (context, state) =>
-              const NoTransitionPage(child: LearnScreen()),
-        ),
-        GoRoute(
           path: '/settings',
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: SettingsScreen()),
+        ),
+        // Learn is reachable by deep-link but is NOT a shell tab.
+        // Learning content folds into Sprout Explains per spec.
+        GoRoute(
+          path: '/learn',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: LearnScreen()),
         ),
       ],
     ),

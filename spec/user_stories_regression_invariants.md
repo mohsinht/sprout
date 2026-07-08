@@ -1,5 +1,16 @@
 # Sprout User Stories, Personas, and Regression Invariants
 
+> **Realignment note (2026-07-09):** A new primary persona is added: **P7 —
+> Mohsin, the Multi-Currency Investor** (Al Meezan funds + Wise USD/EUR + PKR
+> cash). New invariants are added: total wealth is always the Today hero;
+> no movement is ever shown without a reason; opening the app never changes
+> the score; every valuation exposes dated price/FX provenance on tap; a
+> wealth-down day never uses alarm/shame; goals always show remaining-to-
+> target. A "learn later" thread invariant is added: an event flagged for
+> learning is retrievable later, not lost. Manual expense logging (Bilal,
+> the cash guy) is preserved as first-class — killing it would breach
+> existing invariants.
+
 ## Purpose
 
 This is the permanent behavioral contract for Sprout. Every story below is an invariant: it must hold in every release. New features may not regress any of them.
@@ -94,6 +105,24 @@ Stresses:
 - No-shame guarantees.
 - Streak protection under hardship.
 - Dignity.
+
+### P7 — Mohsin, The Multi-Currency Investor
+
+Wealth-health primary persona.
+
+Tech professional, holds Al Meezan mutual funds (AMMF/MIF/MSF/MDIP/MFPF-AAP), Wise USD cash, Wise EUR cash, and PKR cash. Total wealth ~PKR 13.67M. Checks wealth every morning. Cares about movement, why, and goal progress (car goal).
+
+Stresses:
+
+- Total wealth as the Today hero (not a wallet balance).
+- Multi-currency holdings (PKR, USD, EUR) with dated NAV/FX provenance.
+- Movement + plain-language "why" (NAV movement, FX moves).
+- Yesterday-continuity in events ("pulled back after yesterday's jump").
+- Goal-relative next-steps ("PKR 2 lakh to your car goal").
+- Wealth-down day stays calm (not alarm).
+- Stale price/FX labelling.
+- Learn-later thread retrievability.
+- 6-day trend as a depth element.
 
 ## Onboarding And Identity Stories
 
@@ -301,6 +330,97 @@ Must always:
 - Consent is explicit and scoped.
 - Disconnect and delete are reachable from Settings.
 
+### S20 — Total Wealth Is The Today Hero
+
+As Mohsin, I open the app, so that I see my total net wealth and how it moved — not a wallet balance or a budget bar.
+
+Given a populated Today screen, when it renders, then the hero number is total wealth across all holdings (funds + multi-currency cash + PKR cash) with today's change and MTD change.
+
+Must always:
+
+- Total wealth is always the largest numeric figure on Today.
+- Today's change and MTD change are shown together.
+- The hero is never a single account balance or a budget bar.
+
+### S21 — Every Movement Has A Why
+
+As Mohsin, I see a wealth change, so that I understand what drove it.
+
+Given any wealth movement shown on Today (today's change, MTD change, or a WealthEvent), when it renders, then it is accompanied by a plain-language driver ("NAV movement," "EUR/PKR moved," "you added to savings").
+
+Must always:
+
+- No change is ever shown without a reason.
+- The "why" is plain language, not jargon.
+
+### S22 — Opening The App Never Changes Health
+
+As any user, I open the app, so that my health score reflects my wealth reality, not my attendance.
+
+Given a health score, when the user opens the app or checks in, then the score does not change. The score changes only when wealth moves, a goal advances, an action is taken, or a bill is handled.
+
+Must always:
+
+- Opening the app / checking in never changes the score or awards XP.
+- The score reflects wealth reality, not attendance.
+- Streak is preserved as a separate habit mechanic.
+
+### S23 — Provenance Is Visible On Tap
+
+As Mohsin, I tap a holding valuation, so that I see where the number came from.
+
+Given any holding valuation on Today or Money, when the user taps it, then the dated price/FX source is shown (NAV value, as-of date, source label; FX rate, as-of date, source label).
+
+Must always:
+
+- Every valuation exposes dated price/FX provenance on tap.
+- Stale prices/FX are labelled with the as-of date, never silently trusted.
+
+### S24 — Wealth-Down Day Stays Calm
+
+As Mohsin, my wealth drops PKR 38k in a day, so that I see the dip calmly without alarm.
+
+Given a wealth-down day, when Today renders, then the mascot is watchful (never angry/red-faced), the sentence ends on calm, and there is no shame or panic.
+
+Must always:
+
+- A wealth-down day never uses alarm, shame, or a red-faced mascot.
+- The sentence ends on calm ("not a crash, just a tea break").
+
+### S25 — Goals Always Show Remaining-To-Target
+
+As Mohsin, I check my car goal, so that I see how far I have to go.
+
+Given any goal displayed on Today or Money, when it renders, then it shows remaining-to-target ("PKR 2 lakh to go") and a pace note.
+
+Must always:
+
+- Goals always show remaining-to-target.
+- The pace note is plain language.
+
+### S26 — Learn-Later Thread Is Retrievable
+
+As Mohsin, I see a WealthEvent flagged for learning ("why do fund NAVs move?"), so that I can learn about it later without losing it.
+
+Given a WealthEvent with a `learnMoreId`, when the user taps "learn more" or returns to Money later, then the LearnThread is retrievable — it is not lost.
+
+Must always:
+
+- An event flagged for learning is retrievable later, not lost.
+- The LearnThread is accessible from the event and from the depth surface.
+
+### S27 — Manual Expense Logging Stays First-Class
+
+As Bilal, the cash guy, I log a cash expense via Quick Add, so that my cash use case is not broken by the wealth realignment.
+
+Given the wealth realignment, when Bilal opens Quick Add, then manual expense logging works exactly as before — first-class, offline, fast.
+
+Must always:
+
+- Manual expense logging is not deleted or broken.
+- Quick Add works for the cash use case.
+- The cash persona (Bilal) is not regressed.
+
 ## Cross-Cutting Invariants
 
 ### Trust And Privacy
@@ -358,6 +478,18 @@ Must always:
 - `I33`: Today has exactly one primary recommended action.
 - `I34`: Design uses existing tokens only; no arbitrary color, spacing, radius, or type scale.
 
+### Wealth Health
+
+- `I35`: Total wealth is always the Today hero — the largest numeric figure, with today's change and MTD change shown together.
+- `I36`: No movement is ever shown without a plain-language reason.
+- `I37`: Opening the app / checking in never changes the health score or awards XP.
+- `I38`: Every valuation exposes dated price/FX provenance on tap.
+- `I39`: A wealth-down day never uses alarm, shame, or a red-faced mascot.
+- `I40`: Goals always show remaining-to-target and a pace note.
+- `I41`: An event flagged for learning (learnMoreId) is retrievable later, not lost.
+- `I42`: Manual expense logging remains first-class for the cash use case (not deleted or broken by the wealth realignment).
+- `I43`: Stale prices/FX are labelled with the as-of date, never silently trusted.
+
 ## Regression Discipline
 
 - Every `S` story maps to at least one e2e or integration test.
@@ -369,13 +501,14 @@ Must always:
 
 ## Coverage Matrix
 
-| Persona | Trust | Info Gathering | Data | Resilience | Dignity | A11y/Perf |
-| --- | --- | --- | --- | --- | --- | --- |
-| P1 Ayesha | I1-I5 | I7-I12 | I12 | I18-I19 | | |
-| P2 Bilal | | I7-I10 | I13-I14 | I18-I19 | | I27-I29 |
-| P3 Mahnoor | I3-I5 | I7-I10 | I15-I17 | I20-I22 | | |
-| P4 Usman | | I10 | I13 | I18 | I26 | |
-| P5 Fatima | | I12 | I13 | | I25 | |
-| P6 Sara | | | | I20 | I23-I26 | |
+| Persona | Trust | Info Gathering | Data | Resilience | Dignity | A11y/Perf | Wealth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| P1 Ayesha | I1-I5 | I7-I12 | I12 | I18-I19 | | | I35-I37 |
+| P2 Bilal | | I7-I10 | I13-I14, I42 | I18-I19 | | I27-I29 | I42 |
+| P3 Mahnoor | I3-I5 | I7-I10 | I15-I17 | I20-I22 | | | I35-I36 |
+| P4 Usman | | I10 | I13 | I18 | I26 | | I38 |
+| P5 Fatima | | I12 | I13 | | I25 | | |
+| P6 Sara | | | | I20 | I23-I26 | | I39 |
+| P7 Mohsin | | | I38, I43 | | I39 | | I35-I41 |
 
 Any invariant with no persona exercising it needs a synthetic test case.

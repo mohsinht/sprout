@@ -4,17 +4,17 @@ import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
+import '../today/today_screen.dart' show QuickActionGrid;
 
 class AppShell extends StatelessWidget {
   const AppShell({required this.child, super.key});
 
   final Widget child;
 
+  // Navigation per spec: only three tabs visible in the shell.
   static const _tabs = [
     _SproutTab('Today', Icons.wb_sunny_rounded, '/today'),
-    _SproutTab('Add', Icons.add_circle_rounded, '/add'),
     _SproutTab('Money', Icons.account_balance_wallet_rounded, '/money'),
-    _SproutTab('Learn', Icons.school_rounded, '/learn'),
     _SproutTab('Settings', Icons.settings_rounded, '/settings'),
   ];
 
@@ -28,7 +28,10 @@ class AppShell extends StatelessWidget {
       body: SafeArea(child: child),
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Container(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
           margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           decoration: BoxDecoration(
@@ -54,6 +57,36 @@ class AppShell extends StatelessWidget {
                 ),
             ],
           ),
+            ),
+
+            // Center Quick Add button (not a tab) — a confident saturated
+            // green circle, the Duolingo-style bold center action.
+            Positioned(
+              bottom: 18,
+              child: SproutButtonPress(
+                onTap: () => QuickActionGrid.openQuickAdd(context),
+                scale: 0.9,
+                semanticLabel: 'Quick Add',
+                child: Container(
+                  height: 64,
+                  width: 64,
+                  decoration: BoxDecoration(
+                    color: SproutColors.seed,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: SproutColors.seed.withValues(alpha: 0.35),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.add_rounded,
+                      color: Colors.white, size: 36),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -96,8 +129,8 @@ class _NavItem extends StatelessWidget {
             Icon(
               tab.icon,
               color: selected ? selectedColor : idleColor,
-              size: selected ? 25 : 23,
-              fill: selected ? 1 : 0,
+              size: selected ? 27 : 25,
+              fill: selected ? 1.0 : 0.4,
             ),
             const SizedBox(height: 3),
             FittedBox(
@@ -107,7 +140,7 @@ class _NavItem extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: selected ? selectedColor : idleColor,
                       fontSize: 12,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                      fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
                     ),
               ),
             ),

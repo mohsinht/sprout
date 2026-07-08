@@ -10,8 +10,8 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Salaam, Mohsin 👋'), findsOneWidget);
-    expect(find.text('Garden Health'), findsOneWidget);
-    expect(find.text('Plant it now'), findsOneWidget);
+    expect(find.text('TOTAL WEALTH'), findsOneWidget);
+    expect(find.text('Add PKR 25k → only 2 lakh to your car'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

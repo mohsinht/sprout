@@ -1,14 +1,24 @@
 # Sprout Application Screen Guidance
 
+> **Realignment note (2026-07-09):** The Today section is updated to the
+> three-questions structure (wealth + movement + why + one goal-relative
+> step) and the glance/depth contract. Required states are expanded to
+> include wealth-down day (calm, not alarm), flat day, thin-data/first-run,
+> and stale-price/stale-FX day. The rule "no movement shown without a why"
+> is added. The Money section is updated to include holdings breakdown and
+> trend depth. Manual expense logging remains first-class via Quick Add.
+
 ## Purpose
 
 This document defines the minimum requirements every Sprout application screen must meet before deeper iteration begins. It is intentionally screen-focused: each screen should have a clear job, a minimum content set, required states, and acceptance criteria.
 
 Use this as the baseline before writing detailed feature specs, design tickets, or implementation prompts.
 
+For the shared visual language, motion rules, and component usage contract, also refer to [design_language_spec.md](design_language_spec.md).
+
 ## Product Anchor
 
-Sprout is the 30-second daily money check-in for Pakistani earners. It should make a user feel calmer, informed, and gently nudged toward one small useful action.
+Sprout is the 20-second daily wealth-health check-in for Pakistani earners. It should make a user feel calmer, informed, and gently nudged toward one goal-relative next step.
 
 The application must remain useful with no connected accounts. Manual entry, cached data, and realistic mock states are first-class parts of the product, not fallbacks.
 
@@ -54,62 +64,94 @@ Each screen spec should answer:
 
 ### Today
 
-Purpose: deliver the daily check-in as a fast emotional arc that ends with closure.
+Purpose: deliver the daily wealth-health check-in as a fast emotional arc that answers three questions and ends with closure.
+
+**The three questions, in order:**
+
+1. What is my total wealth, and how did it move? (today, and month-to-date)
+2. Why did it move? (plain-language interpretation of the drivers)
+3. What's my one next step toward my goals? (an AI suggestion, not empty ritual)
 
 Minimum content:
 
 - Prominent streak and XP.
 - Greeting by name.
-- Large reactive Sprout mascot with a visible mood.
-- One clear sentence in Sprout's voice.
-- Garden-health score with count-up and ring animation.
+- Large reactive Sprout mascot with a visible mood — the largest visual element, never competed for by other UI.
+- **Total wealth figure** (large, Inter font) with an up/down movement chip showing today's change and MTD change — the hero number the user opens the app for.
+- One clear sentence in Sprout's voice, leading with the movement + reason + reassurance (e.g. "Down PKR 38k today — Al Meezan took a tea break after yesterday's jump, not a crash").
+- **"What happened" event set** — dated events with yesterday-continuity, each with a plain-language "why." Mix good and not-good honestly.
+- **One goal-relative AI next-step** as the main call to action — visible but recessed, so the reading order is: face → wealth figure → sentence → events → score → action.
+- Garden-health score in trustworthy Inter font (mono/tabular), with count-up and ring animation.
 - Tap-through explanation for the score and its factors.
-- One recommended action as the main call to action.
-- Tappable glance tiles for wallet, goal, last night's scan, and the most relevant context tile. Market appears only when personally relevant; otherwise use bill, salary, cash runway, or data-quality context.
+- Tappable glance tiles with recognizable icons: holdings, goal, trend, and the most relevant context tile (review items, salary countdown, bills, or data quality). Market appears only when personally relevant.
+- **Provenance on tap:** every valuation exposes its dated price/FX source.
+- **The trend sparkline/chart is a depth element, not a Today-hero element.** It lives one tap down.
 
-Required states:
+**Required states:**
 
+- Normal (wealth up): calm celebration, not exuberance.
+- **Wealth-down day:** calm, not alarm. Mascot is watchful (never angry/red-faced). The sentence ends on calm. No shame.
+- **Flat day:** "steady" framing. No false excitement, no worry.
+- **Thin-data / first-run:** few or no holdings. Today still works with manual entry and a starter next-step.
+- **Stale-price / stale-FX day:** holdings with stale valuations are labelled with the as-of date. The wealth figure notes "some prices are from [date]."
 - Not completed.
 - Completed with celebration.
-- Bad-news or needs-attention state.
-- Empty or first-run state with no connected accounts.
 - Offline cached state.
 - Briefing unavailable state.
+
+**Rule: no movement shown without a "why."** Every change (today's change, MTD change, per-event magnitude) must be accompanied by its driver — "main reason: NAV movement," "EUR/PKR moved," "you added to savings." This is the interpretation layer that makes it a health tracker *with an analyst*, not a number.
 
 Acceptance criteria:
 
 - Today is the default landing screen.
-- The mascot is the largest visual element.
+- The mascot is the largest visual element and the emotional hero of the screen.
+- Reading order is clear: greeting → mascot/mood signal → wealth figure + movement → summary sentence → events → score number → action card → glance tiles.
+- The wealth figure uses Inter font for trustworthiness.
+- The action card does not visually compete with the mascot for prominence; it sits below the score, not above it.
+- The score number uses Inter font for trustworthiness; count-up animation respects tabular figures.
+- All money values in tiles (e.g., PKR amounts) use Inter, never playful display fonts.
+- **Every movement has a "why"** — no change shown without its driver.
+- **"What happened" events reference prior days** to form a story, not a snapshot.
+- **One goal-relative next-step** is shown, not an empty ritual.
+- **Breakdown, trend, and provenance are reachable on tap** (depth, not forced).
+- **A wealth-down day stays calm** — no alarm, no shame, no red-faced mascot.
+- **Stale price/FX is labelled** with the as-of date, never silently trusted.
+- **Opening the app never changes health** — the score reflects wealth reality, not attendance.
 - The user can complete the recommended action and receive closure through celebration, streak/XP feedback, and a sign-off.
-- Every score, tile, or finding opens a plain-language explanation.
+- Every score, tile, event, or finding opens a plain-language explanation.
 - Market appears only when personally relevant.
 - The screen is useful with no connected accounts.
-- The full check-in can be completed in under 30 seconds.
+- The full check-in can be completed in under 20 seconds.
 
 ### Money
 
-Purpose: provide a calm, trustworthy place to inspect money details without turning it into a game.
+Purpose: provide a calm, trustworthy place to inspect wealth and money details without turning it into a game.
 
 Minimum content:
 
+- **Holdings breakdown** with per-holding value, source, freshness, and provenance (dated NAV/FX on tap).
+- **6-day wealth trend** chart (depth element showing per-holding columns).
 - Account balances with source and freshness.
 - Safe-to-spend or monthly budget summary.
-- Goals with progress and next step.
+- Goals with progress, remaining-to-target, and next step.
 - Recent transactions with category, source, and confidence.
 - One-tap confirmation for uncertain transactions.
-- A short Sprout line that summarizes the money state calmly.
+- A short Sprout line that summarizes the wealth state calmly.
 
 Required states:
 
-- Populated accounts and transactions.
-- No connected accounts.
+- Populated holdings and transactions.
+- No connected accounts (manual-only).
 - Offline cached data.
 - Transactions needing review.
 - Balance unavailable or stale.
+- **Stale price/FX on a holding** (labelled with as-of date).
 
 Acceptance criteria:
 
 - The user can see what is current, stale, uncertain, and confirmed.
+- **Holdings show per-holding value with dated price/FX provenance on tap.**
+- **The 6-day trend chart is available as a depth element.**
 - Safe-to-spend is understandable at a glance.
 - Uncertain transactions can be confirmed in one tap.
 - The screen does not duplicate the Today hero treatment.
@@ -245,18 +287,21 @@ Acceptance criteria:
 
 All screens should read from shared domain models rather than one-off local shapes. At minimum, the application should define stable contracts for:
 
-- Daily briefing.
+- Daily briefing (carrying WealthSnapshot, WealthEvents, and goal-relative recommended action).
+- Holding (with PriceQuote/FxRate provenance).
+- WealthSnapshot.
+- WealthEvent.
 - Finding.
 - Account.
 - Transaction.
-- Goal.
+- Goal (with remainingToTarget and paceNote).
 - Optional market snapshot, only when personally relevant.
 - User profile.
 - Data source.
 
 AI output must be treated as structured product data, not free-form UI copy. The nightly briefing should provide severity, explanation, action, and confidence signals so screens can render deterministic states.
 
-When data is thin, stale, or unavailable, the app should say so and continue with local/manual value.
+When data is thin, stale, or unavailable, the app should say so and continue with local/manual value. **Stale prices/FX are labelled, never silently trusted.**
 
 ## Motion and Feedback Guidance
 

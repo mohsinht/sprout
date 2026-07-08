@@ -1,20 +1,26 @@
 # Market Personalization Spec
 
+> **Realignment note (2026-07-09):** Market/news context is sharpened: it
+> appears **only** to explain the user's own holding movement or goal impact.
+> No feed. No generic headlines. Every market appearance must tie to a
+> `WealthEvent` or goal. If it doesn't move *your* wealth or *your* goal, it
+> doesn't appear on Today.
+
 ## Purpose
 
-Market context should answer "does this affect me?" It must not become decorative KSE filler or investment pressure.
+Market context should answer "does this affect me?" It must not become decorative KSE filler, investment pressure, or a news feed.
 
 ## Product Decision
 
-Market is a Phase 2 personalized insight, not a mandatory Phase 1 Today tile.
+Market is a Phase 2 personalized insight, not a mandatory Phase 1 Today tile. **It appears only to explain the user's own holding movement or goal impact — never as a feed.**
 
 Today may show a market tile only when at least one of these is true:
 
-- The user has a tracked investment, mutual fund, or long-term bucket affected by market movement.
+- The user has a tracked investment, mutual fund, or long-term bucket affected by market movement **and** that movement explains a visible change in the user's tracked holding value (a `WealthEvent` of kind `nav_move` or `news_context`).
 - The user has selected a goal where inflation or market context changes the explanation.
 - The market move is large enough to explain a visible change in the user's tracked investment value.
 
-If none of these are true, replace the market tile with a more relevant tile such as bill, salary, cash runway, or scan summary.
+If none of these are true, replace the market tile with a more relevant tile such as bill, salary, cash runway, or scan summary. **No generic headlines. If it doesn't move *your* wealth or *your* goal, it doesn't appear on Today.**
 
 ## Data Source
 
@@ -104,7 +110,9 @@ Label internal/demo environments clearly. Production UI must not present mock ma
 ## Acceptance
 
 - Market tile is hidden when it is not personally relevant.
-- Every market explanation names why it matters to this user.
+- **Every market explanation names why it matters to this user.**
+- **Every market appearance ties to a WealthEvent or goal** — no generic headlines.
 - Market insight never recommends "buy", "sell", or "invest now".
 - Data source and freshness are visible in Sprout Explains.
 - Missing market data does not block the daily check-in.
+- **Market context never appears as a feed.**

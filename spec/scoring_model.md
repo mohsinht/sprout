@@ -1,5 +1,14 @@
 # Scoring and Finding Model
 
+> **Realignment note (2026-07-09):** The garden-health score is redefined to
+> reflect **wealth health**, not attendance. The "Check-in consistency" factor
+> is removed — opening the app / checking in no longer changes the score. New
+> factors measure goal pace, buffer months, diversification/concentration,
+> contribution consistency, and volatility-adjusted trend. The score now
+> answers "is my wealth healthy and on track for my goals?" not "did I show
+> up?" Streak is preserved as a separate habit mechanic (showing up keeps the
+> streak) but is decoupled from the health score.
+
 ## Purpose
 
 The garden-health score must be explainable, deterministic, and actionable. This v0 model defines how the score, findings, and recommended action are chosen before any AI language is generated.
@@ -26,32 +35,65 @@ Mascot mood:
 
 ## V0 Factor Weights
 
-The score is the rounded sum of these weighted factors:
+The score is the rounded sum of these weighted factors. The model reflects
+**wealth health**: is the user's net wealth on track for their goals, with
+adequate buffer, reasonable diversification, and consistent contributions?
 
 | Factor | Weight | What It Measures |
 | --- | ---: | --- |
-| Cash buffer | 25 | Emergency buffer or available-cash runway. |
-| Spending pace | 20 | Month-to-date spend against expected pace. |
-| Savings and goal pace | 15 | Progress against active goals. |
-| Debt or fixed commitments | 10 | Debt/required payment pressure, if present. |
+| Goal pace | 25 | Progress against active goals (remaining-to-target trajectory). |
+| Cash buffer | 20 | Emergency buffer or available-cash runway in months. |
+| Contribution consistency | 15 | Regular contributions to goals/holdings over recent weeks. |
+| Diversification / concentration | 10 | Spread across asset types and currencies; penalty for single-holding dominance. |
+| Volatility-adjusted trend | 10 | Wealth trend stability over recent days (reward steady, penalize sharp swings). |
 | Bill coverage | 10 | Upcoming bills covered by available cash. |
-| Salary/income timing | 5 | Near-term income timing without prediction. |
-| Investment/long-term bucket freshness | 5 | Whether long-term buckets are tracked and fresh. |
-| Data confidence | 5 | How many important items need confirmation. |
-| Check-in consistency | 5 | Honest daily check-in and goal review rhythm. |
+| Debt or fixed commitments | 5 | Debt/required payment pressure, if present. |
+| Data confidence | 5 | How many important items need confirmation / stale prices. |
 
 Total: 100.
 
+> **Removed:** "Spending pace" (20) and "Salary/income timing" (5) and
+> "Investment/long-term bucket freshness" (5) and "Check-in consistency" (5)
+> are removed as standalone factors. Spending pace and bill coverage are
+> still relevant for the cash use case but are no longer the hero — they
+> fold into "Bill coverage" and "Cash buffer." Income timing remains a
+> *finding* (not a score factor) when a confirmed income date is missing.
+> **Opening the app / checking in does not change the score.**
+
 ## Factor Calculations
 
-### Cash Buffer, 25 points
+### Goal Pace, 25 points
+
+Input: `goalPaceRatio` — the weighted average of `currentAmount / targetAmount`
+across active goals, adjusted for deadline proximity. For goals without a
+deadline, use raw progress ratio.
+
+Formula:
+
+```text
+goalPacePoints = clamp(goalPaceRatio, 0, 1) * 25
+```
+
+Finding thresholds:
+
+- `>= 0.75`: all good.
+- `>= 0.50`: heads up.
+- `>= 0.25`: worth doing.
+- `< 0.25`: needs attention.
+
+Explanation examples:
+
+- Positive: "Your car goal is 48% funded — PKR 2 lakh to go."
+- Attention: "Your emergency fund is below 25% of target."
+
+### Cash Buffer, 20 points
 
 Input: `emergencyBufferMonths`.
 
 Formula:
 
 ```text
-cashBufferPoints = clamp(emergencyBufferMonths / 3, 0, 1) * 25
+cashBufferPoints = clamp(emergencyBufferMonths / 3, 0, 1) * 20
 ```
 
 Explanation examples:
@@ -59,53 +101,63 @@ Explanation examples:
 - Positive: "Emergency buffer covers 3.2 months."
 - Attention: "Emergency fund is below one month of expenses."
 
-### Spending Pace, 20 points
+### Contribution Consistency, 15 points
 
-Input: `spendingPaceRatio`.
-
-`1.0` means spending is exactly on expected month-to-date pace.
+Input: `contributionConsistencyRatio` — fraction of the last N weeks (v0: 4
+weeks) in which the user made at least one contribution to a goal or
+holding. This measures the *habit of adding to wealth*, not the amount.
 
 Formula:
 
 ```text
-spendingPoints = clamp((1.30 - spendingPaceRatio) / 0.35, 0, 1) * 20
+contributionPoints = clamp(contributionConsistencyRatio, 0, 1) * 15
 ```
 
 Finding thresholds:
 
-- `<= 1.00`: all good.
-- `> 1.00` and `<= 1.15`: heads up.
-- `> 1.15` and `<= 1.30`: worth doing.
-- `> 1.30`: needs attention.
+- `>= 0.75`: all good.
+- `>= 0.50`: heads up.
+- `>= 0.25`: worth doing.
+- `< 0.25`: needs attention.
 
-### Savings and Goal Pace, 15 points
+### Diversification / Concentration, 10 points
 
-Input: `savingsProgressRatio`.
+Input: `diversificationRatio` — 1 minus the share of total wealth in the
+single largest holding. `1.0` means perfectly spread; `0.0` means one
+holding is 100% of wealth.
 
 Formula:
 
 ```text
-savingsPoints = clamp(savingsProgressRatio, 0, 1) * 15
+diversificationPoints = clamp(diversificationRatio, 0, 1) * 10
 ```
 
 Finding thresholds:
 
-- `>= 0.90`: all good.
-- `>= 0.70`: heads up.
-- `>= 0.45`: worth doing.
-- `< 0.45`: needs attention.
+- `>= 0.60`: all good.
+- `>= 0.40`: heads up.
+- `>= 0.25`: worth doing.
+- `< 0.25`: needs attention.
 
-### Debt or Fixed Commitments, 10 points
+Explanation example: "MIF is lagging your other funds — consider directing
+your next contribution there." (This is informational, never investment
+advice — see guardrails.)
 
-Input: `debtPaymentRatio`.
+### Volatility-Adjusted Trend, 10 points
 
-This is required debt or fixed repayment as a share of monthly income. If the user has no tracked debt, use `0`.
+Input: `trendStabilityRatio` — a 0..1 measure of how steady the wealth trend
+is over the last N days (v0: 6 days). Computed as
+`1 - (absStdDevOfDailyChanges / absTotalChange)`, clamped to 0..1. A steady
+climb scores high; a single sharp swing scores lower.
 
 Formula:
 
 ```text
-debtPoints = clamp(1 - debtPaymentRatio / 0.35, 0, 1) * 10
+trendPoints = clamp(trendStabilityRatio, 0, 1) * 10
 ```
+
+This factor is informational. It must never produce alarm — a volatile day
+is context, not a crisis. The mascot stays calm (watchful at most).
 
 ### Bill Coverage, 10 points
 
@@ -124,40 +176,27 @@ Finding thresholds:
 - `>= 0.60`: worth doing.
 - `< 0.60`: needs attention.
 
-### Salary / Income Timing, 5 points
+### Debt or Fixed Commitments, 5 points
 
-Input: `daysUntilExpectedIncome`.
+Input: `debtPaymentRatio`.
 
-For salaried users, use configured salary date. For irregular income users, use confirmed expected inflows only. Do not predict unconfirmed income.
-
-Formula:
-
-```text
-incomeTimingPoints = clamp((7 - daysUntilExpectedIncome) / 7, 0, 1) * 5
-```
-
-If no confirmed inflow exists, score this factor as `0` and create an `income_outlook` finding that asks for confirmation only when useful.
-
-### Investment / Long-Term Bucket Freshness, 5 points
-
-Input: `freshLongTermBuckets`.
+This is required debt or fixed repayment as a share of monthly income. If the user has no tracked debt, use `0`.
 
 Formula:
 
 ```text
-investmentFreshnessPoints = clamp(freshLongTermBuckets / 3, 0, 1) * 5
+debtPoints = clamp(1 - debtPaymentRatio / 0.35, 0, 1) * 5
 ```
-
-This factor is informational. It must never produce investment pressure.
 
 ### Data Confidence, 5 points
 
-Input: `unconfirmedImportantTransactions`.
+Input: `unconfirmedImportantTransactions` plus `stalePriceCount` (holdings
+with stale NAV/FX).
 
 Formula:
 
 ```text
-dataConfidencePoints = clamp(1 - unconfirmedImportantTransactions / 8, 0, 1) * 5
+dataConfidencePoints = clamp(1 - (unconfirmedImportantTransactions + stalePriceCount) / 8, 0, 1) * 5
 ```
 
 Finding thresholds:
@@ -167,19 +206,11 @@ Finding thresholds:
 - `3-5`: worth doing.
 - `6+`: needs attention.
 
-### Check-In Consistency, 5 points
-
-Input: `goalConsistencyRatio`.
-
-This measures honest check-ins and goal reviews, not financial performance.
-
-Formula:
-
-```text
-consistencyPoints = clamp(goalConsistencyRatio, 0, 1) * 5
-```
-
-Hardship must not reduce this factor when the user checks in honestly.
+> **What does NOT change the score:** Opening the app, checking in, viewing
+> a screen, or tapping a tile. The score reflects **wealth reality** — goal
+> progress, buffer, diversification, contribution habit, trend stability,
+> bill coverage, debt pressure, and data confidence — not attendance.
+> Streak is a separate habit mechanic and is unaffected by the score.
 
 ## Finding Detection Rules
 
@@ -203,23 +234,25 @@ Each finding must include:
 
 ## Recommended Action Selection
 
-Choose exactly one action.
+Choose exactly one action. Actions are now **goal-relative and concrete**
+(per realignment §2.6): framed against the user's goals and holdings.
 
 Priority order:
 
 1. `needs_attention` bill coverage or cash runway.
-2. `needs_attention` data quality that blocks the score.
-3. `worth_doing` confirmation or manual cash logging.
-4. `worth_doing` small goal/savings action.
-5. `heads_up` spending pace review.
-6. `all_good` check-in completion.
+2. `needs_attention` data quality that blocks the score (stale prices/FX or unconfirmed transactions).
+3. `worth_doing` goal contribution ("PKR 2 lakh to your car goal").
+4. `worth_doing` rebalance suggestion ("MIF is lagging your other funds — consider directing your next contribution there").
+5. `heads_up` confirmation or manual cash logging.
+6. `all_good` review today's wealth movement.
 
 Tie breakers:
 
-- Prefer actions completable inside the app.
+- Prefer actions completable inside the app or in one step outside.
 - Prefer actions under 30 seconds.
 - Prefer actions that improve data confidence before actions that move money.
-- Never select an action that pressures investment or spending.
+- Never select an action that pressures investment, implies guaranteed returns, or uses FOMO.
+- Never select a "check-in" action — opening the app is not an action.
 
 ## Action XP
 
@@ -228,7 +261,9 @@ Tie breakers:
 - `worth_doing`: 15-25 XP
 - `needs_attention`: 20-30 XP
 
-XP rewards completion of the check-in behavior, not financial wealth.
+XP rewards completing a **real action** (confirming a transaction, logging
+cash, contributing to a goal, reviewing a holding), not attendance. Opening
+the app awards no XP.
 
 ## Score Explanation Requirements
 
@@ -248,4 +283,6 @@ No UI may show a score without a path to these factors.
 - Every point contribution maps to a named factor.
 - Every finding is traceable to a rule.
 - The AI cannot change scores, thresholds, or action ranking.
-- Bad financial state does not break check-in consistency or streak by itself.
+- Opening the app / checking in does not change the score or award XP.
+- A wealth-down day never produces alarm, shame, or a red-faced mascot.
+- Bad financial state does not break the streak by itself.
