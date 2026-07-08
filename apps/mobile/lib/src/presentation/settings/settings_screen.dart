@@ -33,6 +33,9 @@ class _SettingsStrings {
   // Data sources
   static const dataSources = 'Data sources';
   static const notConnected = 'Not connected';
+  static const on = 'On';
+  static const connect = 'Connect';
+  static const soon = 'Soon';
   static const disconnect = 'Disconnect';
   static const disconnectConfirmTitle = 'Disconnect this source?';
   static String disconnectConfirmBody(String label) =>
@@ -46,6 +49,10 @@ class _SettingsStrings {
   static const emptySourcesSubtitle =
       'Sprout works fully with manual entries. Add a source only if you want to.';
   static const manageSources = 'Manage sources';
+  static const sourceDetailDisconnect = 'Disconnect this source';
+  static const sourceDetailDelete = 'Delete imported data';
+  static const sourceDetailAlwaysOn = 'Manual entries are always on and cannot be disconnected.';
+  static const sourceDetailSoon = 'This source is coming soon. You will be able to enable it here.';
 
   // Privacy
   static const privacy = 'Privacy';
@@ -56,12 +63,12 @@ class _SettingsStrings {
   static const notifications = 'Notifications';
   static const dailyReminder = 'Daily check-in reminder';
   static const billReminder = 'Bill reminder';
-  static const salaryReminder = 'Salary reminder';
   static const weeklySummary = 'Weekly summary';
 
   // Currency
-  static const currency = 'Currency';
-  static const currencySubtitle = 'Used across amounts and budgets.';
+  static const currency = 'Display currency';
+  static const currencySubtitle =
+      'Show your wealth and amounts in this currency.';
   static const pkr = 'PKR';
   static const pkrLabel = 'Pakistani Rupee';
   static const usd = 'USD';
@@ -109,7 +116,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final Map<String, bool> _notifications = {
     _SettingsStrings.dailyReminder: true,
     _SettingsStrings.billReminder: true,
-    _SettingsStrings.salaryReminder: false,
     _SettingsStrings.weeklySummary: true,
   };
 
@@ -148,7 +154,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           value: mockProfile.salaryDate,
         ),
         SheetInfoRow(
-          icon: Icons.edit_calendar_rounded,
+          icon: Icons.work_outline_rounded,
           label: _SettingsStrings.freelanceIncome,
           value: _freelanceIncome ? 'On' : 'Off',
         ),
@@ -196,11 +202,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   label: s.label,
                   detail: _SettingsStrings.notConnected,
                   connected: false,
+                  comingSoon: s.comingSoon,
                 )
               : s)
           .toList();
     });
     _showSnack(_SettingsStrings.disconnectedSnack(source.label));
+  }
+
+  Future<void> _openSourceSheet(SproutDataSource source) async {
+    final isManual = source.id == 'manual';
+    await SproutBottomSheet.show(
+      context,
+      title: source.label,
+      rows: [
+        SheetInfoRow(
+          icon: Icons.info_outline_rounded,
+          label: 'Status',
+          value: source.detail,
+        ),
+        if (isManual)
+          SheetInfoRow(
+            icon: Icons.lock_rounded,
+            label: 'Always on',
+            value: _SettingsStrings.sourceDetailAlwaysOn,
+          )
+        else if (source.comingSoon)
+          SheetInfoRow(
+            icon: Icons.hourglass_top_rounded,
+            label: 'Coming soon',
+            value: _SettingsStrings.sourceDetailSoon,
+          )
+        else if (source.connected)
+          SheetInfoRow(
+            icon: Icons.link_off_rounded,
+            label: _SettingsStrings.sourceDetailDisconnect,
+            value: 'Tap below to disconnect. Manual entries stay.',
+          )
+        else
+          SheetInfoRow(
+            icon: Icons.link_rounded,
+            label: 'Connect',
+            value: 'Tap below to connect this source.',
+          ),
+      ],
+    );
   }
 
   Future<void> _confirmDelete() async {
@@ -281,75 +327,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _profileSection(SproutColorScheme colors) {
     return SettingsSection(
       header: _SettingsStrings.profile,
-      child: Column(
-        children: [
-          SproutButtonPress(
-            onTap: _openProfileSheet,
-            semanticLabel: _SettingsStrings.viewProfile,
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: colors.mint,
-                  child: const Icon(Icons.person_rounded,
-                      color: SproutColors.leaf, size: 22),
-                ),
-                const SizedBox(width: SproutSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mockProfile.name,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(color: colors.ink),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${SproutFormat.currency(mockProfile.monthlyIncome)} / month',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: colors.muted),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded,
-                    color: colors.muted, size: 24),
-              ],
+      child: SproutButtonPress(
+        onTap: _openProfileSheet,
+        semanticLabel: _SettingsStrings.viewProfile,
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: colors.mint,
+              child: const Icon(Icons.person_rounded,
+                  color: SproutColors.leaf, size: 22),
             ),
-          ),
-          const SizedBox(height: SproutSpacing.md),
-          _ReadOnlyRow(
-            label: _SettingsStrings.salaryDate,
-            value: mockProfile.salaryDate,
-          ),
-          const SizedBox(height: SproutSpacing.sm),
-          const Divider(height: 1),
-          const SizedBox(height: SproutSpacing.sm),
-          PreferenceToggle(
-            label: _SettingsStrings.freelanceIncome,
-            value: _freelanceIncome,
-            icon: Icons.work_outline_rounded,
-            onChanged: (v) => setState(() => _freelanceIncome = v),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 36, top: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _SettingsStrings.freelanceHint,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: colors.muted),
+            const SizedBox(width: SproutSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    mockProfile.name,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(color: colors.ink),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${SproutFormat.currency(mockProfile.monthlyIncome)} / month',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: colors.muted),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Icon(Icons.chevron_right_rounded,
+                color: colors.muted, size: 24),
+          ],
+        ),
       ),
     );
   }
@@ -363,7 +378,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           for (final source in _sources) ...[
             _DataSourceRow(
               source: source,
-              onDisconnect: () => _confirmDisconnect(source),
+              onTap: () => _openSourceSheet(source),
             ),
             if (source.id != _sources.last.id) ...[
               const SizedBox(height: SproutSpacing.sm),
@@ -383,40 +398,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       Icons.delete_outline_rounded,
       Icons.verified_user_rounded,
     ];
-    return SettingsSection(
-      header: _SettingsStrings.privacy,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            _SettingsStrings.privacyIntro,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: colors.muted),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SettingsSectionHeader(label: _SettingsStrings.privacy),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.mint.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(SproutRadius.card),
+            border: Border.all(
+              color: SproutColors.seed.withValues(alpha: 0.16),
+            ),
           ),
-          const SizedBox(height: SproutSpacing.sm),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Text(
-              _SettingsStrings.youAreInControl,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: SproutColors.leaf,
-                    fontWeight: FontWeight.w800,
+          child: Padding(
+            padding: const EdgeInsets.all(SproutSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _SettingsStrings.youAreInControl,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: SproutColors.leaf,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: SproutSpacing.sm),
+                Text(
+                  _SettingsStrings.privacyIntro,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: colors.muted),
+                ),
+                const SizedBox(height: SproutSpacing.md),
+                for (var i = 0; i < mockPrivacyStatements.length; i++) ...[
+                  TrustBadge(
+                    label: mockPrivacyStatements[i],
+                    icon: icons[i % icons.length],
                   ),
+                  if (i != mockPrivacyStatements.length - 1)
+                    const SizedBox(height: SproutSpacing.md),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: SproutSpacing.md),
-          for (var i = 0; i < mockPrivacyStatements.length; i++) ...[
-            TrustBadge(
-              label: mockPrivacyStatements[i],
-              icon: icons[i % icons.length],
-            ),
-            if (i != mockPrivacyStatements.length - 1)
-              const SizedBox(height: SproutSpacing.md),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -424,7 +451,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final labels = [
       _SettingsStrings.dailyReminder,
       _SettingsStrings.billReminder,
-      _SettingsStrings.salaryReminder,
       _SettingsStrings.weeklySummary,
     ];
     return SettingsSection(
@@ -585,88 +611,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-class _ReadOnlyRow extends StatelessWidget {
-  const _ReadOnlyRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = SproutColorScheme.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: colors.ink),
-          ),
-        ),
-        Text(
-          value,
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: colors.muted),
-        ),
-      ],
-    );
-  }
-}
-
 class _DataSourceRow extends StatelessWidget {
-  const _DataSourceRow({required this.source, required this.onDisconnect});
+  const _DataSourceRow({required this.source, required this.onTap});
 
   final SproutDataSource source;
-  final VoidCallback onDisconnect;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
     final isManual = source.id == 'manual';
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                source.label,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colors.ink,
-                    ),
+    final isActive = source.connected || isManual;
+
+    return SproutButtonPress(
+      onTap: source.comingSoon ? null : onTap,
+      semanticLabel: source.label,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  source.label,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colors.ink,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  source.detail,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.muted,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: SproutSpacing.md),
+          _SourceControl(
+            isActive: isActive,
+            comingSoon: source.comingSoon,
+          ),
+          if (!source.comingSoon) ...[
+            const SizedBox(width: SproutSpacing.sm),
+            Icon(Icons.chevron_right_rounded,
+                color: colors.muted, size: 24),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Consistent right-side control for a data source row.
+///
+/// - Active sources (connected or always-on manual): green "On" pill.
+/// - Available but not connected: "Connect" label.
+/// - Coming soon: calm "Soon" pill.
+class _SourceControl extends StatelessWidget {
+  const _SourceControl({
+    required this.isActive,
+    required this.comingSoon,
+  });
+
+  final bool isActive;
+  final bool comingSoon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+
+    if (comingSoon) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: SproutColors.gold.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(SproutRadius.pill),
+        ),
+        child: Text(
+          _SettingsStrings.soon,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: SproutColors.goldInk,
+                fontWeight: FontWeight.w800,
               ),
-              const SizedBox(height: 4),
-              Text(
-                source.detail,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.muted,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              SourceConnectionPill(
-                connected: source.connected,
-                alwaysOn: isManual,
-              ),
-            ],
+        ),
+      );
+    }
+
+    if (isActive) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: colors.mint,
+          borderRadius: BorderRadius.circular(SproutRadius.pill),
+          border: Border.all(
+            color: SproutColors.seed.withValues(alpha: 0.18),
           ),
         ),
-        if (source.connected && !isManual) ...[
-          const SizedBox(width: SproutSpacing.md),
-          TextButton(
-            style: TextButton.styleFrom(
-              minimumSize: const Size(44, 44),
-              foregroundColor: SproutColors.tomato,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_rounded, color: SproutColors.leaf, size: 13),
+            const SizedBox(width: 5),
+            Text(
+              _SettingsStrings.on,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: SproutColors.leaf,
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
-            onPressed: onDisconnect,
-            child: const Text(_SettingsStrings.disconnect),
+          ],
+        ),
+      );
+    }
+
+    return Text(
+      _SettingsStrings.connect,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: SproutColors.leaf,
+            fontWeight: FontWeight.w800,
           ),
-        ],
-      ],
     );
   }
 }

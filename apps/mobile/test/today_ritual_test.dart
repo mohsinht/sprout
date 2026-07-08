@@ -23,6 +23,9 @@ void main() {
     // Streak
     expect(find.text('12'), findsOneWidget);
 
+    // What's happening tiles
+    expect(find.text("What's happening"), findsOneWidget);
+
     // Scroll down to reveal below-fold content.
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
     await tester.pumpAndSettle();

@@ -10,7 +10,7 @@ import '../../theme/sprout_theme.dart';
 import '../../widgets/sprout_mascot.dart';
 import '../../widgets/sprout_mascot_state.dart';
 import '../../widgets/sprout_states.dart';
-import '../add/add_screen.dart';
+import '../add/quick_add_sheet.dart';
 import 'today_controller.dart';
 import 'today_widgets.dart';
 
@@ -88,18 +88,31 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
           '20 seconds · one tap closer',
           style: SproutType.body(
             color: SproutColorScheme.of(context).muted,
-            size: 12,
+            size: SproutTypeScale.s14,
             weight: FontWeight.w500,
-            height: 1.2,
+            height: 1.4,
           ),
         ),
+      ),
+
+      // ── What's happening — the heart of the page ──
+      // A small set of tiles: fund moves, FX gains, goal proximity, learn later.
+      // Good and bad shown honestly, read instantly by color and icon.
+      // Green = good, amber = watchful, never red alarm.
+      const SizedBox(height: SproutSpacing.xxl),
+      _WhatsHappening(
+        events: data.wealthEvents,
+        goals: data.goals,
+        learnThreads: data.learnThreads,
       ),
 
       // ── Grey divider band ──
       const SizedBox(height: SproutSpacing.xxl),
       _DividerBand(),
 
-      // ── Below-fold: full detail in text ──
+      // ── Below-fold: quiet door to depth ──
+      // Full detail in text for when the user wants it. Everything deep lives
+      // here, never on the surface. Calm text, thin dividers, muted labels.
 
       // Holdings breakdown
       const SizedBox(height: SproutSpacing.xl),
@@ -170,7 +183,7 @@ class _TodayHeader extends StatelessWidget {
           SproutStrings.todayTitle,
           style: SproutType.playfulLabel(
             color: colors.ink,
-            size: 17,
+            size: SproutTypeScale.s18,
             weight: FontWeight.w500,
             height: 1.2,
           ),
@@ -192,7 +205,7 @@ class _TodayHeader extends StatelessWidget {
                 '${data.user.dayStreak}',
                 style: SproutType.metricValue(
                   color: SproutColors.goldInk,
-                  size: 13,
+                  size: SproutTypeScale.s14,
                   weight: FontWeight.w500,
                 ),
               ),
@@ -218,7 +231,7 @@ class _Greeting extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       style: SproutType.body(
         color: colors.muted,
-        size: 14,
+        size: SproutTypeScale.s14,
         weight: FontWeight.w500,
         height: 1.3,
       ),
@@ -288,7 +301,7 @@ class _WealthHero extends StatelessWidget {
             'TOTAL WEALTH',
             style: SproutType.body(
               color: colors.muted,
-              size: 12,
+              size: SproutTypeScale.s14,
               weight: FontWeight.w500,
               height: 1.2,
             ).copyWith(letterSpacing: 0.6),
@@ -362,7 +375,7 @@ class _MovementChip extends StatelessWidget {
         '$arrow $formatted $label',
         style: SproutType.metricValue(
           color: color,
-          size: 12,
+          size: SproutTypeScale.s14,
           weight: FontWeight.w500,
         ),
       ),
@@ -387,7 +400,7 @@ class _SproutRead extends StatelessWidget {
         text,
         style: SproutType.body(
           color: SproutColors.leaf,
-          size: 14,
+          size: SproutTypeScale.s14,
           weight: FontWeight.w500,
           height: 1.45,
         ),
@@ -418,7 +431,7 @@ class _OneStep extends StatelessWidget {
             'YOUR ONE STEP',
             style: SproutType.body(
               color: SproutColors.leaf.withValues(alpha: 0.85),
-              size: 11,
+              size: SproutTypeScale.s14,
               weight: FontWeight.w500,
               height: 1.2,
             ).copyWith(letterSpacing: 0.5),
@@ -444,7 +457,7 @@ class _OneStep extends StatelessWidget {
               textAlign: TextAlign.center,
               style: SproutType.body(
                 color: Colors.white,
-                size: 15,
+                size: SproutTypeScale.s18,
                 weight: FontWeight.w500,
                 height: 1.2,
               ),
@@ -452,6 +465,330 @@ class _OneStep extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// What's happening — the heart of the page
+// ──────────────────────────────────────────────────────────────
+
+/// A small set of tiles: fund moves, FX gains, goal proximity, learn later.
+/// Good and bad shown honestly, read instantly by color and icon.
+/// Green = good, amber = watchful, never red alarm. No more than a handful.
+class _WhatsHappening extends StatelessWidget {
+  const _WhatsHappening({
+    required this.events,
+    required this.goals,
+    required this.learnThreads,
+  });
+
+  final List<WealthEvent> events;
+  final List<Goal> goals;
+  final List<LearnThread> learnThreads;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    final tiles = <_HappeningTileData>[];
+
+    // One tile per wealth event — the day's movers.
+    for (final event in events) {
+      tiles.add(_eventToTile(context, event));
+    }
+
+    // Goal proximity tile — the closest active goal.
+    final activeGoals = goals.where((g) => g.status == 'active').toList();
+    if (activeGoals.isNotEmpty) {
+      final closest = activeGoals.first;
+      tiles.add(_HappeningTileData(
+        icon: Icons.flag_rounded,
+        title: 'Car goal',
+        value: '2 lakh to go',
+        detail: 'Closest goal',
+        color: SproutColors.tintLilac,
+        iconColor: SproutColors.lilac,
+        severity: 'all_good',
+        onTap: () => SproutBottomSheet.show(
+          context,
+          title: closest.name,
+          rows: [
+            SheetInfoRow(
+              icon: Icons.flag_rounded,
+              label: 'Progress',
+              value:
+                  '${_formatCompact(closest.currentAmount)} / ${_formatCompact(closest.targetAmount)}',
+            ),
+            SheetInfoRow(
+              icon: Icons.local_florist_rounded,
+              label: 'Next step',
+              value: closest.nextStep,
+            ),
+          ],
+        ),
+      ));
+    }
+
+    // Learn-later tile — if there's a thread to pick up.
+    if (learnThreads.isNotEmpty) {
+      final thread = learnThreads.first;
+      tiles.add(_HappeningTileData(
+        icon: Icons.lightbulb_rounded,
+        title: 'Learn later',
+        value: 'Why funds move',
+        detail: '2-min read',
+        color: SproutColors.tintWarm,
+        iconColor: const Color(0xFFE8923C),
+        severity: 'all_good',
+        onTap: () => SproutBottomSheet.show(
+          context,
+          title: thread.title,
+          rows: [
+            SheetInfoRow(
+              icon: Icons.lightbulb_rounded,
+              label: 'Summary',
+              value: thread.summary,
+            ),
+            SheetInfoRow(
+              icon: Icons.menu_book_rounded,
+              label: 'Explanation',
+              value: thread.body,
+            ),
+          ],
+        ),
+      ));
+    }
+
+    if (tiles.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "What's happening",
+          style: SproutType.playfulLabel(
+            color: colors.ink,
+            size: SproutTypeScale.s18,
+            weight: FontWeight.w800,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: SproutSpacing.lg),
+        GridView.builder(
+          itemCount: tiles.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: SproutSpacing.xl,
+            mainAxisSpacing: SproutSpacing.xl,
+            childAspectRatio: 1.1,
+          ),
+          itemBuilder: (context, index) {
+            return _HappeningTile(tile: tiles[index]);
+          },
+        ),
+      ],
+    );
+  }
+
+  _HappeningTileData _eventToTile(BuildContext context, WealthEvent event) {
+    final isDown = event.direction == 'down';
+    final isFlat = event.direction == 'flat';
+    final severity = event.severity;
+
+    // Green for up/all_good, amber for down/heads_up, never red.
+    final color = isFlat
+        ? SproutColors.tintSky
+        : (isDown ? SproutColors.tintGold : SproutColors.tintMint);
+    final iconColor = isFlat
+        ? SproutColors.muted
+        : (isDown ? SproutColors.gold : SproutColors.seed);
+
+    final icon = switch (event.kind) {
+      WealthEventKind.navMove => Icons.trending_up_rounded,
+      WealthEventKind.fxMove => Icons.currency_exchange_rounded,
+      WealthEventKind.contribution => Icons.savings_rounded,
+      WealthEventKind.withdrawal => Icons.account_balance_wallet_rounded,
+      WealthEventKind.bill => Icons.receipt_rounded,
+      WealthEventKind.goalMilestone => Icons.flag_rounded,
+      WealthEventKind.newsContext => Icons.public_rounded,
+    };
+
+    final magnitudeLabel = isFlat
+        ? '—'
+        : '${isDown ? "−" : "+"}${_formatCompact(event.magnitudePkr.abs())}';
+
+    // Short tile copy: 1-3 word title, ≤5 word description. The full
+    // plainWhy lives behind the tap-through, not on the tile.
+    final (title, description) = switch (event.kind) {
+      WealthEventKind.navMove => (
+          isDown ? 'Funds dipped' : 'Funds up',
+          'Al Meezan, NAV correction',
+        ),
+      WealthEventKind.fxMove => (
+          isDown ? 'FX down' : 'EUR up',
+          'FX moved your way',
+        ),
+      WealthEventKind.contribution => (
+          'Added',
+          'Contribution landed',
+        ),
+      WealthEventKind.withdrawal => (
+          'Withdrawn',
+          'Funds moved out',
+        ),
+      WealthEventKind.bill => (
+          'Bill paid',
+          'Payment cleared',
+        ),
+      WealthEventKind.goalMilestone => (
+          'Goal milestone',
+          'Getting closer',
+        ),
+      WealthEventKind.newsContext => (
+          'Market context',
+          'Affects your holdings',
+        ),
+    };
+
+    return _HappeningTileData(
+      icon: icon,
+      title: title,
+      value: magnitudeLabel,
+      detail: description,
+      color: color,
+      iconColor: iconColor,
+      severity: severity,
+      onTap: () => SproutBottomSheet.show(
+        context,
+        title: title,
+        rows: [
+          SheetInfoRow(
+            icon: icon,
+            label: 'What happened',
+            value: event.plainWhy,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCompact(int value) {
+    if (value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    } else if (value >= 1000) {
+      return '${(value / 1000).round()}k';
+    }
+    return value.toString();
+  }
+}
+
+class _HappeningTileData {
+  const _HappeningTileData({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.detail,
+    required this.color,
+    required this.iconColor,
+    required this.severity,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String detail;
+  final Color color;
+  final Color iconColor;
+  final String severity;
+  final VoidCallback onTap;
+}
+
+class _HappeningTile extends StatelessWidget {
+  const _HappeningTile({required this.tile});
+
+  final _HappeningTileData tile;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    final isDark = colors.brightness == Brightness.dark;
+    final edgeColor = isDark
+        ? colors.line.withValues(alpha: 0.4)
+        : tile.iconColor.withValues(alpha: 0.22);
+
+    return _ChunkyPressButton(
+      onTap: tile.onTap,
+      semanticLabel: '${tile.title}. ${tile.detail}',
+      fill: tile.color,
+      edgeColor: edgeColor,
+      edgeHeight: 3,
+      borderRadius: SproutRadius.tile,
+      child: Padding(
+        // More internal padding — congestion is mostly a padding problem.
+        padding: const EdgeInsets.all(SproutSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top row: icon (left) + number/delta (right), aligned on one line.
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Bold characterful icon — carries the personality.
+                Icon(tile.icon, color: tile.iconColor, size: 26),
+                const SizedBox(width: SproutSpacing.sm),
+                // Number/delta — mono font, colored by direction.
+                // Flexible so it shrinks instead of overflowing on narrow tiles.
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      tile.value,
+                      maxLines: 1,
+                      style: SproutType.metricValue(
+                        color: colors.ink,
+                        size: SproutTypeScale.s18,
+                        weight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // A clear gap between top row and text.
+            const Spacer(),
+            // Title — short, bold, one line.
+            Text(
+              tile.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: SproutType.body(
+                color: colors.ink,
+                size: SproutTypeScale.s14,
+                weight: FontWeight.w800,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 2),
+            // One-line description — short, secondary color.
+            Text(
+              tile.detail,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: SproutType.body(
+                color: colors.muted,
+                size: SproutTypeScale.s14,
+                weight: FontWeight.w500,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -494,7 +831,7 @@ class _HoldingsBreakdown extends StatelessWidget {
           'Your holdings',
           style: SproutType.playfulLabel(
             color: colors.ink,
-            size: 14,
+            size: SproutTypeScale.s14,
             weight: FontWeight.w500,
             height: 1.2,
           ),
@@ -540,9 +877,9 @@ class _HoldingsBreakdown extends StatelessWidget {
                 'View 6-day trend chart →',
                 style: SproutType.body(
                   color: SproutColors.sky,
-                  size: 13,
+                  size: SproutTypeScale.s14,
                   weight: FontWeight.w500,
-                  height: 1.2,
+                  height: 1.4,
                 ),
               ),
             ),
@@ -584,7 +921,7 @@ class _HoldingRow extends StatelessWidget {
                   holding.label,
                   style: SproutType.body(
                     color: colors.ink,
-                    size: 14,
+                    size: SproutTypeScale.s14,
                     weight: FontWeight.w500,
                     height: 1.2,
                   ),
@@ -596,9 +933,9 @@ class _HoldingRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: SproutType.body(
                       color: colors.muted,
-                      size: 12,
+                      size: SproutTypeScale.s14,
                       weight: FontWeight.w500,
-                      height: 1.2,
+                      height: 1.4,
                     ),
                   ),
               ],
@@ -612,7 +949,7 @@ class _HoldingRow extends StatelessWidget {
                 _formatCompact(holding.valuePkr),
                 style: SproutType.moneyValue(
                   color: colors.ink,
-                  size: 14,
+                  size: SproutTypeScale.s14,
                   weight: FontWeight.w500,
                   height: 1.05,
                 ),
@@ -624,7 +961,7 @@ class _HoldingRow extends StatelessWidget {
                     : '${isDown ? "−" : "+"}${_formatCompact(change.abs())}',
                 style: SproutType.metricValue(
                   color: changeColor,
-                  size: 12,
+                  size: SproutTypeScale.s14,
                   weight: FontWeight.w500,
                 ),
               ),
@@ -693,7 +1030,7 @@ class _WhyItMoved extends StatelessWidget {
           'Why it moved today',
           style: SproutType.playfulLabel(
             color: colors.ink,
-            size: 14,
+            size: SproutTypeScale.s14,
             weight: FontWeight.w500,
             height: 1.2,
           ),
@@ -703,7 +1040,7 @@ class _WhyItMoved extends StatelessWidget {
           interpretation.join(' '),
           style: SproutType.body(
             color: colors.muted,
-            size: 13,
+            size: SproutTypeScale.s18,
             weight: FontWeight.w500,
             height: 1.6,
           ),
@@ -728,7 +1065,7 @@ class _GoalsSection extends StatelessWidget {
           'Your goals',
           style: SproutType.playfulLabel(
             color: colors.ink,
-            size: 14,
+            size: SproutTypeScale.s14,
             weight: FontWeight.w500,
             height: 1.2,
           ),
@@ -766,7 +1103,7 @@ class _GoalRow extends StatelessWidget {
               goal.name,
               style: SproutType.body(
                 color: colors.ink,
-                size: 13,
+                size: SproutTypeScale.s14,
                 weight: FontWeight.w500,
                 height: 1.2,
               ),
@@ -777,7 +1114,7 @@ class _GoalRow extends StatelessWidget {
                   : '${_formatCompact(goal.currentAmount)} / ${_formatCompact(goal.targetAmount)}',
               style: SproutType.metricValue(
                 color: isComplete ? SproutColors.seed : colors.muted,
-                size: 13,
+                size: SproutTypeScale.s14,
                 weight: FontWeight.w500,
               ),
             ),
@@ -807,9 +1144,9 @@ class _GoalRow extends StatelessWidget {
           goal.paceNote,
           style: SproutType.body(
             color: isComplete ? colors.muted : SproutColors.seed,
-            size: 12,
+            size: SproutTypeScale.s14,
             weight: FontWeight.w500,
-            height: 1.2,
+            height: 1.4,
           ),
         ),
       ],
@@ -843,7 +1180,7 @@ class _LearnLater extends StatelessWidget {
           'Learn later',
           style: SproutType.playfulLabel(
             color: colors.ink,
-            size: 14,
+            size: SproutTypeScale.s14,
             weight: FontWeight.w500,
             height: 1.2,
           ),
@@ -888,9 +1225,9 @@ class _LearnLater extends StatelessWidget {
                           thread.title,
                           style: SproutType.body(
                             color: SproutColors.lilac,
-                            size: 13,
+                            size: SproutTypeScale.s14,
                             weight: FontWeight.w500,
-                            height: 1.2,
+                            height: 1.4,
                           ),
                         ),
                         Text(
@@ -900,9 +1237,9 @@ class _LearnLater extends StatelessWidget {
                           style: SproutType.body(
                             color:
                                 SproutColors.lilac.withValues(alpha: 0.85),
-                            size: 12,
+                            size: SproutTypeScale.s14,
                             weight: FontWeight.w500,
-                            height: 1.2,
+                            height: 1.4,
                           ),
                         ),
                       ],
@@ -937,7 +1274,7 @@ class _ProvenanceFooter extends StatelessWidget {
         text,
         style: SproutType.body(
           color: colors.muted,
-          size: 12,
+          size: SproutTypeScale.s14,
           weight: FontWeight.w500,
           height: 1.6,
         ),
@@ -1047,12 +1384,7 @@ class QuickActionGrid extends StatelessWidget {
 
   /// Opens the Quick Add sheet from the center "+" button.
   static void openQuickAdd(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const AddScreen(),
-    );
+    QuickAddSheet.open(context);
   }
 
   @override

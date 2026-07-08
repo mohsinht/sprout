@@ -345,6 +345,7 @@ const mockDataSources = <SproutDataSource>[
     label: 'SMS detection',
     detail: 'Android only — coming soon',
     connected: false,
+    comingSoon: true,
   ),
 ];
 
@@ -370,12 +371,17 @@ class SproutDataSource {
     required this.label,
     required this.detail,
     required this.connected,
+    this.comingSoon = false,
   });
 
   final String id;
   final String label;
   final String detail;
   final bool connected;
+
+  /// When true, the source is not yet available — rendered as "Soon" and
+  /// not tappable for connect/disconnect.
+  final bool comingSoon;
 }
 
 /// Privacy trust statements shown on Settings → Privacy.
