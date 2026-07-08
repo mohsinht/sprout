@@ -58,12 +58,14 @@ export const sproutTokens = {
   },
   spacing: {
     xs: 4,
-    sm: 8,
-    md: 12,
+    sm: 6,
+    md: 10,
     lg: 16,
-    xl: 24,
-    xxl: 32,
-    pageHorizontal: 20
+    xl: 26,
+    xxl: 42,
+    pageHorizontal: 20,
+    pageTop: 10,
+    pageBottom: 26
   },
   elevation: {
     card: { blur: 24, y: 12, alpha: 0.06 },

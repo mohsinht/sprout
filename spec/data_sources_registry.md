@@ -1,0 +1,61 @@
+# Data Sources Registry
+
+## Purpose
+
+This registry lists external data sources Sprout can use, what each source feeds, cost posture, cadence, and product constraints.
+
+Use official or semi-official free sources as the foundation. Treat commercial sources as enrichment, not product-critical dependencies.
+
+## Registry
+
+| Source | Type | Feeds | Access / Cost | Refresh Cadence | Product Notes |
+| --- | --- | --- | --- | --- | --- |
+| Manual entry | User-entered | Transactions, goals, cash, income notes | Free, first-party | Instant/local | Foundation for MVP and offline use. |
+| Gmail API | User-permissioned email | Salary, bills, receipts, alerts | OAuth, Google policy/scopes | Push/webhook or periodic sync | Best non-bank MVP capture path. Use finance senders and least privilege. |
+| Microsoft Graph | User-permissioned email | Salary, bills, receipts, alerts | OAuth, Microsoft scopes | Change notifications or periodic sync | Needed for Outlook/Hotmail users. |
+| Statement import | User upload | Transaction history, balances | Free; parser work required | User-triggered | CSV/XLSX/PDF/MT940/CAMT/QIF where available. Discard source file by default. |
+| Android SMS | Device permission | Bank/wallet alerts | Store-policy constrained | Near real-time on Android only | Optional fallback. Not available on iOS. Play Store approval is a risk. |
+| MUFAP | Public/semi-official market data | Mutual-fund NAVs, returns, AUM, categories | Free public access; no guaranteed API | Daily market days | Good foundation for mutual-fund snapshots. Respect source terms. |
+| SBP EasyData | Official public data | Macro context, policy, selected indicators | Free public access | Source-dependent | Use for Pakistan context and learning/explanations. |
+| PBS CPI | Official public data | Inflation context | Free public access | Monthly | Use for inflation explanations and goal target reviews. |
+| FBR tax cards / budget notes | Official public data | Salary tax lessons, tax estimates | Free public access | Annual/budget-cycle | Use for Learn/Sprout Explains. Keep dated and versioned. |
+| SBP regulated institutions list | Official public data | Institution verification | Free public access | As published | Use to verify referenced banks/EMIs/PSPs. |
+| Sarmaaya | Commercial platform | Market analytics, mutual funds, watchlists | Paid/commercial | Vendor-dependent | Enrichment only. Not a free foundation. |
+| Wise API / exports | Partner/API and user export | Foreign balances, statements, conversions | Partnership/API terms or user exports | Webhooks/exports | Partnership track; exports are safer for MVP. |
+| 1LINK APIs | Institutional/payment rails | Payment products, merchant/institution flows | Sandbox/certification/commercial | Partner-dependent | Not a retail PFM feed. Do not treat as account aggregation. |
+| Bank partnerships | Commercial partnership | Account data, statements, referrals | Negotiated | Partner-dependent | Phase 3+. Not MVP foundation. |
+
+## Non-Foundation Sources
+
+The research did not identify a reliable Plaid-style retail bank aggregator for Pakistan. Product language should not imply universal "connect your bank" support.
+
+Use:
+
+- "Connect email."
+- "Import statement."
+- "Add manually."
+- "Optional Android SMS."
+- "Bank partnerships later."
+
+Avoid:
+
+- "Connect any Pakistani bank."
+- "Automatic bank sync for everyone."
+
+## Source Freshness Labels
+
+Every external data source should expose:
+
+- Source name.
+- Last refresh time or label.
+- Freshness: `fresh`, `recent`, `stale`, `unavailable`, or `mock`.
+- Confidence.
+- Delete/disconnect control where applicable.
+
+## Acceptance
+
+- Market, tax, and macro features name their source and freshness.
+- Commercial sources are optional enrichment.
+- Mock source data is never presented as live production data.
+- Bank aggregation is not assumed without partnership.
+- Source registry is reviewed before adding any new external dependency.

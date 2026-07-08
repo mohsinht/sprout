@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sprout Spec Guardian"
+  short_description: "Guard Sprout work with repo specs"
+  default_prompt: "Use $sprout-spec-guardian before changing Sprout code or specs."

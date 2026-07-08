@@ -2,8 +2,8 @@
 ///
 /// Today has its own models in `today_models.dart` and is finalised
 /// separately. These models back the Add, Money, Learn and Settings
-/// screens. Money is stored as `int` in minor units (PKR) to avoid
-/// floating-point drift in a financial app.
+/// screens. Money is stored as `int` whole PKR rupees to avoid
+/// floating-point drift while matching daily Pakistani usage.
 library;
 
 enum TransactionType { expense, income, transfer }
