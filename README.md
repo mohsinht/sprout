@@ -2,6 +2,9 @@
 
 Sprout is a playful financial health companion for Pakistan. The first version focuses on the Today screen: clear status, one recommended action, auto-capture confidence, and lightweight gamification.
 
+<img width="555" height="1043" alt="2026-07-10 01 59 37" src="https://github.com/user-attachments/assets/cdb7818a-d774-4cbf-afac-eb1e91b06655" />
+
+
 ## Monorepo
 
 ```text
