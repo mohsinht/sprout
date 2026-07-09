@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../app/theme_mode_controller.dart';
+import '../../data/goal_store.dart';
 import '../../data/mock_sprout_data.dart';
+import '../../domain/today_models.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
 import '../../widgets/sprout_page.dart';
 import '../../widgets/sprout_panel.dart';
 import '../../widgets/trust_badge.dart';
+import '../goals/goal_editor_sheet.dart';
 import '../today/today_widgets.dart';
 import 'settings_widgets.dart';
 
@@ -331,6 +335,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ],
         _profileSection(colors),
         gap,
+        _goalsSection(colors),
+        gap,
         _dataSourcesSection(colors),
         gap,
         _privacySection(colors),
@@ -392,6 +398,169 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _goalsSection(SproutColorScheme colors) {
+    final goals = ref.watch(goalStoreProvider);
+    return SettingsSection(
+      header: 'Goals',
+      child: Column(
+        children: [
+          if (goals.isEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: SproutSpacing.lg,
+                horizontal: SproutSpacing.md,
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'A goal makes Today\'s "one step" meaningful.',
+                    style: SproutType.body(
+                      color: colors.muted,
+                      size: SproutTypeScale.s14,
+                      weight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: SproutSpacing.md),
+                  FilledButton.icon(
+                    onPressed: () => GoalEditorSheet.open(context),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Add a goal'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: SproutColors.seed,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            for (final goal in goals) ...[
+              SproutButtonPress(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  GoalEditorSheet.open(context, goal: goal);
+                },
+                scale: 0.98,
+                semanticLabel: '${goal.name}. Tap to edit.',
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: SproutSpacing.md,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _goalTypeIcon(goal.type),
+                        color: SproutColors.seed,
+                        size: 20,
+                      ),
+                      const SizedBox(width: SproutSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              goal.name,
+                              style: SproutType.body(
+                                color: colors.ink,
+                                size: SproutTypeScale.s14,
+                                weight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              goal.status == 'complete'
+                                  ? 'Complete ✓'
+                                  : 'PKR ${_formatGoalCompact(goal.currentAmount)} / ${_formatGoalCompact(goal.targetAmount)}',
+                              style: SproutType.body(
+                                color: colors.muted,
+                                size: SproutTypeScale.s14,
+                                weight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (goal.isPrimary)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: SproutColors.seed.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(SproutRadius.pill),
+                          ),
+                          child: Text(
+                            'Primary',
+                            style: SproutType.body(
+                              color: SproutColors.seed,
+                              size: 11,
+                              weight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: SproutColors.muted, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+              if (goal.id != goals.last.id) _rowDivider,
+            ],
+            _rowDivider,
+            SproutButtonPress(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                GoalEditorSheet.open(context);
+              },
+              scale: 0.98,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
+                child: Row(
+                  children: [
+                    Icon(Icons.add_rounded, color: SproutColors.seed, size: 20),
+                    const SizedBox(width: SproutSpacing.md),
+                    Text(
+                      'Add a new goal',
+                      style: SproutType.body(
+                        color: SproutColors.seed,
+                        size: SproutTypeScale.s14,
+                        weight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _goalTypeIcon(String type) {
+    return switch (type) {
+      'emergency' => Icons.health_and_safety_rounded,
+      'car' => Icons.directions_car_rounded,
+      'home' => Icons.home_rounded,
+      'education' => Icons.school_rounded,
+      'travel' => Icons.flight_rounded,
+      'eidi' => Icons.card_giftcard_rounded,
+      'zakat' => Icons.volunteer_activism_rounded,
+      _ => Icons.star_rounded,
+    };
+  }
+
+  String _formatGoalCompact(int value) {
+    if (value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    } else if (value >= 1000) {
+      return '${(value / 1000).round()}k';
+    }
+    return value.toString();
   }
 
   Widget _dataSourcesSection(SproutColorScheme colors) {

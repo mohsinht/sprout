@@ -1,14 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../domain/today_models.dart';
-
-final todayRepositoryProvider = Provider<TodayRepository>((ref) {
-  return MockTodayRepository();
-});
-
-abstract interface class TodayRepository {
-  Future<TodayData> fetchToday();
-}
+import 'http_today_repository.dart';
 
 class MockTodayRepository implements TodayRepository {
   @override

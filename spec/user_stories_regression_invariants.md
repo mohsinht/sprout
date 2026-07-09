@@ -490,6 +490,16 @@ Must always:
 - `I42`: Manual expense logging remains first-class for the cash use case (not deleted or broken by the wealth realignment).
 - `I43`: Stale prices/FX are labelled with the as-of date, never silently trusted.
 
+### Navigation, Insights, And Goal Management
+
+- `I44`: All four tabs (Today, Money, Insights, Settings) + center "+" are always present — a build missing a primary tab fails.
+- `I45`: Goals are fully manageable (add/edit/contribute/complete/delete/reorder) and are never write-once; editing a goal changes the AI's next recommendation.
+- `I46`: Dark mode is legible — all Today content passes contrast; decorative/watermark layers never obscure text.
+- `I47`: Completing or deleting a goal never implies the user's money changed — goals are tracking, not accounts. Copy must make this clear.
+- `I48`: A user who set one goal at onboarding can later add a second and delete the first, and Today's "one step" updates accordingly.
+- `I49`: Every Insight ties a world/market fact to the user's holdings, goals, cash, or currencies; generic feed items, FOMO, guaranteed-return language, and unsupported claims are forbidden.
+- `I50`: Content is never obscured by the floating nav on Today, Money, Insights, or Settings, including at about 1.3x text scale.
+
 ## Regression Discipline
 
 - Every `S` story maps to at least one e2e or integration test.

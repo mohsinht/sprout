@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../domain/today_models.dart';
@@ -11,6 +12,8 @@ import '../../widgets/sprout_mascot.dart';
 import '../../widgets/sprout_mascot_state.dart';
 import '../../widgets/sprout_states.dart';
 import '../add/quick_add_sheet.dart';
+import '../goals/goal_editor_sheet.dart';
+import '../shell/nav_metrics.dart';
 import 'today_controller.dart';
 import 'today_widgets.dart';
 
@@ -18,6 +21,12 @@ String _formatSigned(int value) {
   if (value == 0) return 'flat';
   final prefix = value < 0 ? 'down' : 'up';
   return '$prefix ${SproutFormat.compactCurrency(value.abs())}';
+}
+
+String _formatCompactStatic(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(2)}M';
+  if (value >= 1000) return '${(value / 1000).round()}k';
+  return value.toString();
 }
 
 class TodayScreen extends ConsumerWidget {
@@ -48,6 +57,20 @@ class _TodayContent extends ConsumerStatefulWidget {
 }
 
 class _TodayContentState extends ConsumerState<_TodayContent> {
+  var _showCompletionReward = false;
+
+  void _completeToday(RecommendedAction action, bool reducedMotion) {
+    if (!reducedMotion) {
+      HapticFeedback.mediumImpact();
+      SystemSound.play(SystemSoundType.click);
+      setState(() => _showCompletionReward = true);
+      Future<void>.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) setState(() => _showCompletionReward = false);
+      });
+    }
+    ref.read(todayQuestCompletedProvider.notifier).state = true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final reducedMotion = MediaQuery.of(context).disableAnimations;
@@ -97,13 +120,8 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       _OneStep(
         action: data.health.recommendedAction,
         completed: completed,
-        onComplete: () {
-          if (!reducedMotion) {
-            HapticFeedback.mediumImpact();
-            SystemSound.play(SystemSoundType.click);
-          }
-          ref.read(todayQuestCompletedProvider.notifier).state = true;
-        },
+        onComplete: () =>
+            _completeToday(data.health.recommendedAction, reducedMotion),
       ),
 
       // Caption
@@ -155,7 +173,7 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       const SizedBox(height: SproutSpacing.xl),
       _ProvenanceFooter(text: data.provenanceSummary),
 
-      const SizedBox(height: 148),
+      const SizedBox(height: SproutSpacing.lg),
     ];
 
     return Stack(
@@ -163,7 +181,12 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
         CustomScrollView(
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 132),
+              padding: EdgeInsets.fromLTRB(
+                SproutSpacing.pageHorizontal,
+                12,
+                SproutSpacing.pageHorizontal,
+                NavMetrics.bottomContentPadding(context),
+              ),
               sliver: SliverList.list(
                 children: reducedMotion
                     ? children
@@ -177,7 +200,7 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
             ),
           ],
         ),
-        if (completed && !reducedMotion) ...[
+        if (_showCompletionReward && !reducedMotion) ...[
           const Positioned.fill(child: ConfettiBurst()),
           Positioned(
             left: 0,
@@ -339,18 +362,68 @@ class _WealthHero extends StatelessWidget {
             ).copyWith(letterSpacing: 0.6),
           ),
           const SizedBox(height: 3),
-          // The hero number — counts up from 0 on load. The single most
-          // satisfying half-second in a money app. Ease-out: fast then slow.
-          SproutNumberCounter(
-            value: wealth.totalPkr,
-            duration: const Duration(milliseconds: 800),
-            builder: (context, animatedValue) => Text(
-              SproutFormat.compactCurrency(animatedValue.round()),
-              style: SproutType.scoreValue(
-                color: colors.ink,
-                size: 42,
-                weight: FontWeight.w500,
-                height: 1.05,
+          // The hero number — counts up from 0 on load. Tappable →
+          // wealth breakdown drawer with real data + actions.
+          SproutButtonPress(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              SproutActionSheet.show(
+                context,
+                title: 'Your total wealth',
+                rows: [
+                  for (final h in wealth.holdings)
+                    SheetInfoRow(
+                      icon: Icons.account_balance_wallet_rounded,
+                      label: h.label,
+                      value:
+                          '${_formatCompactStatic(h.valuePkr)} · ${h.changeVsYesterday >= 0 ? "+" : "−"}${_formatCompactStatic(h.changeVsYesterday.abs())} today',
+                    ),
+                  const SheetInfoRow(
+                    icon: Icons.verified_rounded,
+                    label: 'Status',
+                    value:
+                        'Estimated from your latest statement and today\'s prices',
+                  ),
+                ],
+                actions: [
+                  SheetAction(
+                    label: 'Update with a new statement',
+                    icon: Icons.upload_file_rounded,
+                    onTap: () {
+                      // In production this opens an upload/re-anchor flow.
+                      // On mock, show a brief confirmation.
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                              'Statement upload coming soon. Your wealth stays estimated.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                  SheetAction(
+                    label: 'View full breakdown',
+                    icon: Icons.account_balance_rounded,
+                    onTap: () => context.go('/money'),
+                    isPrimary: true,
+                  ),
+                ],
+              );
+            },
+            scale: 0.99,
+            semanticLabel:
+                'Total wealth: ${SproutFormat.compactCurrency(wealth.totalPkr)}. Tap for breakdown.',
+            child: SproutNumberCounter(
+              value: wealth.totalPkr,
+              duration: const Duration(milliseconds: 800),
+              builder: (context, animatedValue) => Text(
+                SproutFormat.compactCurrency(animatedValue.round()),
+                style: SproutType.scoreValue(
+                  color: colors.ink,
+                  size: 42,
+                  weight: FontWeight.w500,
+                  height: 1.05,
+                ),
               ),
             ),
           ),
@@ -713,31 +786,15 @@ class _WhatsHappening extends StatelessWidget {
       final closest = activeGoals.first;
       tiles.add(_HappeningTileData(
         icon: Icons.flag_rounded,
-        title: 'Car goal',
-        value: 'PKR 2 lakh',
+        title: closest.name,
+        value: 'PKR ${_formatCompact(closest.remainingToTarget)}',
         detail: 'left to go',
         color: SproutColors.tintLilac,
         iconColor: SproutColors.lilac,
         severity: 'all_good',
         onTap: () {
           HapticFeedback.lightImpact();
-          SproutBottomSheet.show(
-            context,
-            title: closest.name,
-            rows: [
-              SheetInfoRow(
-                icon: Icons.flag_rounded,
-                label: 'Progress',
-                value:
-                    '${_formatCompact(closest.currentAmount)} / ${_formatCompact(closest.targetAmount)}',
-              ),
-              SheetInfoRow(
-                icon: Icons.local_florist_rounded,
-                label: 'Next step',
-                value: closest.nextStep,
-              ),
-            ],
-          );
+          GoalEditorSheet.open(context, goal: closest);
         },
       ));
     }
@@ -954,13 +1011,14 @@ class _HappeningTile extends StatelessWidget {
         children: [
           // Low-opacity icon watermark — subtle depth without dead space.
           // Clipped to the tile bounds so it doesn't trigger layout overflow.
+          // Dark-mode opacity is kept very low so text stays fully legible.
           Positioned(
             right: -13,
             bottom: -17,
             child: Icon(
               tile.icon,
               size: 68,
-              color: iconColor.withValues(alpha: isDark ? 0.14 : 0.07),
+              color: iconColor.withValues(alpha: isDark ? 0.07 : 0.05),
             ),
           ),
           // Content — top-aligned, tight block with even padding.
@@ -1406,77 +1464,85 @@ class _GoalRow extends StatelessWidget {
         ? (goal.currentAmount / goal.targetAmount).clamp(0.0, 1.0)
         : 0.0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              goal.name,
-              style: SproutType.body(
-                color: colors.ink,
-                size: SproutTypeScale.s14,
-                weight: FontWeight.w500,
-                height: 1.2,
+    return SproutButtonPress(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        GoalEditorSheet.open(context, goal: goal);
+      },
+      scale: 0.98,
+      semanticLabel: '${goal.name}. ${goal.paceNote}. Tap to edit.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                goal.name,
+                style: SproutType.body(
+                  color: colors.ink,
+                  size: SproutTypeScale.s14,
+                  weight: FontWeight.w500,
+                  height: 1.2,
+                ),
               ),
-            ),
-            Text(
-              isComplete
-                  ? 'complete ✓'
-                  : '${_formatCompact(goal.currentAmount)} / ${_formatCompact(goal.targetAmount)}',
-              style: SproutType.metricValue(
-                color: isComplete
-                    ? _todayAccent(context, SproutColors.seed)
-                    : colors.muted,
-                size: SproutTypeScale.s14,
-                weight: FontWeight.w500,
+              Text(
+                isComplete
+                    ? 'complete ✓'
+                    : '${_formatCompact(goal.currentAmount)} / ${_formatCompact(goal.targetAmount)}',
+                style: SproutType.metricValue(
+                  color: isComplete
+                      ? _todayAccent(context, SproutColors.seed)
+                      : colors.muted,
+                  size: SproutTypeScale.s14,
+                  weight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        // Progress bar — animates fill from 0 to target on load.
-        ClipRRect(
-          borderRadius: BorderRadius.circular(SproutRadius.pill),
-          child: Container(
-            height: 8,
-            decoration: BoxDecoration(
-              color: _todayTrackColor(context),
-              borderRadius: BorderRadius.circular(SproutRadius.pill),
-            ),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: progress),
-              duration: MediaQuery.of(context).disableAnimations
-                  ? Duration.zero
-                  : const Duration(milliseconds: 900),
-              curve: SproutCurves.progress,
-              builder: (context, animatedProgress, _) => FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: animatedProgress,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _todayAccent(context, SproutColors.seed),
-                    borderRadius: BorderRadius.circular(SproutRadius.pill),
+            ],
+          ),
+          const SizedBox(height: 6),
+          // Progress bar — animates fill from 0 to target on load.
+          ClipRRect(
+            borderRadius: BorderRadius.circular(SproutRadius.pill),
+            child: Container(
+              height: 8,
+              decoration: BoxDecoration(
+                color: _todayTrackColor(context),
+                borderRadius: BorderRadius.circular(SproutRadius.pill),
+              ),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: progress),
+                duration: MediaQuery.of(context).disableAnimations
+                    ? Duration.zero
+                    : const Duration(milliseconds: 900),
+                curve: SproutCurves.progress,
+                builder: (context, animatedProgress, _) => FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: animatedProgress,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _todayAccent(context, SproutColors.seed),
+                      borderRadius: BorderRadius.circular(SproutRadius.pill),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          goal.paceNote,
-          style: SproutType.body(
-            color: isComplete
-                ? colors.muted
-                : _todayAccent(context, SproutColors.seed),
-            size: SproutTypeScale.s14,
-            weight: FontWeight.w500,
-            height: 1.4,
+          const SizedBox(height: 5),
+          Text(
+            goal.paceNote,
+            style: SproutType.body(
+              color: isComplete
+                  ? colors.muted
+                  : _todayAccent(context, SproutColors.seed),
+              size: SproutTypeScale.s14,
+              weight: FontWeight.w500,
+              height: 1.4,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1801,18 +1867,21 @@ bool _todayIsDark(BuildContext context) {
 
 Color _todayTint(BuildContext context, Color lightTint) {
   if (!_todayIsDark(context)) return lightTint;
+  // Dark-mode tints are committed, not washed-out. Each tint gets a
+  // dark variant at enough alpha to read as a colored surface (not flat
+  // black), while keeping text (darkInk, near-white) fully legible.
   if (lightTint == SproutColors.tintMint) {
-    return SproutColors.darkMint.withValues(alpha: 0.78);
+    return SproutColors.darkMint.withValues(alpha: 0.82);
   }
   if (lightTint == SproutColors.tintGold ||
       lightTint == SproutColors.tintWarm) {
-    return SproutColors.darkGold.withValues(alpha: 0.18);
+    return SproutColors.darkGold.withValues(alpha: 0.14);
   }
   if (lightTint == SproutColors.tintSky) {
-    return SproutColors.darkSky.withValues(alpha: 0.16);
+    return SproutColors.darkSky.withValues(alpha: 0.14);
   }
   if (lightTint == SproutColors.tintLilac) {
-    return SproutColors.darkLilac.withValues(alpha: 0.18);
+    return SproutColors.darkLilac.withValues(alpha: 0.16);
   }
   return SproutColorScheme.of(context).surface;
 }

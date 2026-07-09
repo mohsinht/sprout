@@ -22,7 +22,7 @@ This folder is the working spec package for Sprout. It translates the high-level
 - [Scoring Model](scoring_model.md): deterministic v0 wealth-health score (goal pace, buffer, diversification, contribution consistency, trend stability), finding detection, thresholds, and recommended-action selection. Check-in is removed.
 - [AI Briefing Backend Spec](ai_briefing_backend_spec.md): nightly wealth job inputs, cadence, severity model, WealthSnapshot + events + provenance validation, output contract, fallback behavior, and guardrails.
 - [Market Personalization Spec](market_personalization_spec.md): when market context appears (only to explain the user's own movement or goal), how it is sourced, and how it becomes personally relevant.
-- [Navigation IA](navigation_ia.md): target 3-tab shell plus center quick-add action. Money is the holdings + trend + provenance depth surface.
+- [Navigation IA](navigation_ia.md): regression-protected 4-tab shell plus center quick-add action: Today · Money · [＋] · Insights · Settings. Money is the holdings + trend + provenance depth surface.
 - [Copy Tone Guide](copy_tone_guide.md): Sprout voice rules, wealth movement phrasing, goal-relative step phrasing, provenance phrasing, and example strings.
 - [Notifications Spec](notifications_spec.md): daily habit trigger timing, copy, privacy defaults, and deep-link behavior.
 - [Screen Acceptance Criteria](screen_acceptance_criteria.md): per-screen done bars for product and QA review, including locked Today layout, motion/mascot/craft pass-fail checks, and wealth-health criteria.
@@ -35,3 +35,5 @@ This folder is the working spec package for Sprout. It translates the high-level
 ## Package Rule
 
 When a screen changes, update its product requirement, data contract impact, copy examples, and acceptance criteria together. A screen is not ready for implementation if its empty, offline, error, zero-connection, stale-price, and wealth-down states are unspecified.
+
+**Navigation tabs, Insights relevance, and goal CRUD are regression-protected** — see invariants I44–I50 in `user_stories_regression_invariants.md`. A build missing a primary tab, showing generic Insights feed items, obscuring content behind nav, or lacking full goal management fails.

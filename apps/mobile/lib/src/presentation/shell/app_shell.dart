@@ -5,18 +5,26 @@ import 'package:sprout_motion/sprout_motion.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
 import '../today/today_screen.dart' show QuickActionGrid;
+import 'nav_metrics.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({required this.child, super.key});
 
   final Widget child;
 
-  // Navigation per spec: only three tabs visible in the shell.
+  // Regression-protected shell: Today · Money · + · Insights · Settings.
+  // The center "+" is an action sheet trigger, not a destination tab.
   static const _tabs = [
     _SproutTab('Today', Icons.wb_sunny_rounded, '/today'),
     _SproutTab('Money', Icons.account_balance_wallet_rounded, '/money'),
+    _SproutTab('Insights', Icons.explore_rounded, '/insights'),
     _SproutTab('Settings', Icons.settings_rounded, '/settings'),
   ];
+
+  /// Resolves whether tab [index] is the active one. Falls back to Today
+  /// (index 0) when the location doesn't match any tab (e.g. /learn).
+  bool _isSelected(int currentIndex, int index) =>
+      (currentIndex < 0 ? 0 : currentIndex) == index;
 
   @override
   Widget build(BuildContext context) {
@@ -32,31 +40,55 @@ class AppShell extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             Container(
-          margin: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(SproutRadius.hero),
-            boxShadow: [
-              BoxShadow(
-                color: colors.ink.withValues(alpha: 0.1),
-                blurRadius: 26,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              for (var i = 0; i < _tabs.length; i++)
-                Expanded(
-                  child: _NavItem(
-                    tab: _tabs[i],
-                    selected: i == (currentIndex < 0 ? 0 : currentIndex),
-                    onTap: () => context.go(_tabs[i].path),
+              height: NavMetrics.barHeight,
+              margin: const EdgeInsets.fromLTRB(
+                  14, 0, 14, NavMetrics.barBottomMargin),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(SproutRadius.hero),
+                border: Border.all(color: colors.line.withValues(alpha: 0.45)),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.ink.withValues(alpha: 0.1),
+                    blurRadius: 26,
+                    offset: const Offset(0, 12),
                   ),
-                ),
-            ],
-          ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _NavItem(
+                      tab: _tabs[0],
+                      selected: _isSelected(currentIndex, 0),
+                      onTap: () => context.go(_tabs[0].path),
+                    ),
+                  ),
+                  Expanded(
+                    child: _NavItem(
+                      tab: _tabs[1],
+                      selected: _isSelected(currentIndex, 1),
+                      onTap: () => context.go(_tabs[1].path),
+                    ),
+                  ),
+                  const SizedBox(width: 76),
+                  Expanded(
+                    child: _NavItem(
+                      tab: _tabs[2],
+                      selected: _isSelected(currentIndex, 2),
+                      onTap: () => context.go(_tabs[2].path),
+                    ),
+                  ),
+                  Expanded(
+                    child: _NavItem(
+                      tab: _tabs[3],
+                      selected: _isSelected(currentIndex, 3),
+                      onTap: () => context.go(_tabs[3].path),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             // Center Quick Add button (not a tab) — a confident saturated
@@ -116,7 +148,7 @@ class _NavItem extends StatelessWidget {
       child: AnimatedContainer(
         duration: reducedMotion ? Duration.zero : SproutDurations.buttonPress,
         curve: SproutCurves.button,
-        padding: const EdgeInsets.symmetric(vertical: 7),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
         decoration: BoxDecoration(
           color: selected ? colors.mint : Colors.transparent,
           borderRadius: BorderRadius.circular(SproutRadius.tile),
@@ -124,22 +156,20 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (selected && tab.label == 'Today')
-              Icon(Icons.eco_rounded, size: 10, color: selectedColor),
             Icon(
               tab.icon,
               color: selected ? selectedColor : idleColor,
-              size: selected ? 27 : 25,
+              size: selected ? 24 : 23,
               fill: selected ? 1.0 : 0.4,
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 2),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 tab.label,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: selected ? selectedColor : idleColor,
-                      fontSize: 12,
+                      fontSize: tab.label.length > 7 ? 11 : 12,
                       fontWeight: selected ? FontWeight.w900 : FontWeight.w600,
                     ),
               ),

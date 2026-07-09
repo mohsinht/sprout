@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../presentation/learn/learn_screen.dart';
+import '../presentation/insights/insights_screen.dart';
 import '../presentation/mascot_lab/mascot_lab_screen.dart';
 import '../presentation/money/money_screen.dart';
 import '../presentation/onboarding/onboarding_screen.dart';
@@ -30,7 +31,7 @@ final _router = GoRouter(
     ShellRoute(
       builder: (context, state, child) => AppShell(child: child),
       routes: [
-        // Three primary tabs per spec: Today, Money, Settings.
+        // Four primary tabs per spec: Today, Money, Insights, Settings.
         GoRoute(
           path: '/today',
           pageBuilder: (context, state) =>
@@ -40,6 +41,11 @@ final _router = GoRouter(
           path: '/money',
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: MoneyScreen()),
+        ),
+        GoRoute(
+          path: '/insights',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: InsightsScreen()),
         ),
         GoRoute(
           path: '/settings',

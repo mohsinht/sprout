@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
+import '../presentation/shell/nav_metrics.dart';
 import '../theme/sprout_tokens.dart';
 
 class SproutPage extends StatelessWidget {
@@ -22,12 +23,7 @@ class SproutPage extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            SproutSpacing.pageHorizontal,
-            SproutSpacing.pageTop,
-            SproutSpacing.pageHorizontal,
-            SproutSpacing.pageBottom,
-          ),
+          padding: NavMetrics.pagePadding(context),
           sliver: SliverList.list(
             children: [
               Row(
@@ -36,9 +32,11 @@ class SproutPage extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                        Text(title,
+                            style: Theme.of(context).textTheme.headlineSmall),
                         const SizedBox(height: SproutSpacing.xs),
-                        Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+                        Text(subtitle,
+                            style: Theme.of(context).textTheme.bodyMedium),
                       ],
                     ),
                   ),

@@ -39,14 +39,15 @@ Sprout is the 20-second daily wealth-health check-in: a calm, trustworthy mascot
 
 ### Navigation
 
-Target navigation is three tabs plus a center action:
+Target navigation is four tabs plus a center action:
 
 - Today
 - Money
+- Insights
 - Settings
 - Center `+` quick-add sheet
 
-Today is the default landing screen. Quick Add is not a tab. Educational content appears through Sprout explanations and contextual recommendations.
+Today is the default landing screen. Quick Add is not a tab. Educational content appears through Sprout explanations, contextual recommendations, and the finite Insights surface.
 
 ### Daily Loop
 
@@ -140,6 +141,29 @@ Minimum:
 - One-tap confirmation for uncertain transactions.
 - A short calm Sprout line.
 
+### Insights
+
+Purpose: show a small, curated set of personally-relevant world→user items:
+what changed outside the app and what it calmly means for the user's own
+holdings, goals, or cash.
+
+Minimum:
+
+- Short Sprout intro line.
+- Finite list of 3–6 relevant items; never an infinite feed.
+- Each item has an icon, what happened, what it means for the user, relevance
+  tag, date, and provenance.
+- Each item opens detail with plain-language explanation, the personal tie,
+  optional real action, and source.
+- Quiet-week state when little is relevant; do not pad with generic headlines.
+- Offline cached state labelled.
+
+Must not include:
+
+- Generic headlines.
+- FOMO, investment pressure, guaranteed-return language, or anxiety-inducing
+  volume.
+
 ### Quick Add
 
 Purpose: log cash, income, or unseen activity in about three seconds.
@@ -196,11 +220,11 @@ Minimum:
 
 ### Phase 1
 
-3-tab shell plus center `+`, onboarding, manual-first capture, Today, Money, Settings, Sprout Explains, local persistence, mock/rules briefing, mascot states, and celebration.
+4-tab shell plus center `+`, onboarding, manual-first capture, Today, Money, Insights, Settings, Sprout Explains, local persistence, mock/rules briefing, mascot states, and celebration. Insights uses mock data behind a repository in Phase 1.
 
 ### Phase 2
 
-Real nightly AI briefing behind the same contract, severity-ranked findings, model-powered explanations, notification timing, and personalized market context where relevant.
+Real nightly AI briefing behind the same contract, AI-generated personal Insights with the same gather→write→validate guardrails, severity-ranked findings, model-powered explanations, notification timing, and personalized market context where relevant.
 
 ### Phase 3
 

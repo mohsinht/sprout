@@ -44,6 +44,8 @@ Use only `SproutColors` / `SproutColorScheme.of(context)`. Never a raw hex in fe
 - **Tinted surfaces, not flat white everywhere.** Use the tint surfaces (`tintMint`, `tintSky`, `tintLilac`, `tintGold`, `tintWarm`) to give cards gentle personality — but a tint carries meaning (mint = healthy, gold = money/reward, warm = gentle attention). Don't tint for decoration.
 - **Color must never be the only signal.** Pair every colored state with an icon or label (accessibility + colorblind users). A red border alone is not an error message.
 - **Dark mode is first-class.** Every color comes from the adaptive scheme; test every screen in both. No hardcoded light-mode assumption.
+- **Every tint has a dark variant.** Light tints dropped onto a dark surface wash out and become muddy. Use the dark-variant helpers (`_todayTint`, `_todayAccent`, `_todayEdgeColor` pattern) so tile fills, edges, and accents stay committed and legible in both themes.
+- **Decorative/watermark layers cap opacity so text stays legible.** A background icon watermark, confetti, or XP overlay must sit behind content at low enough opacity (~5–7% light, ~7% dark) that all text remains fully readable. If a decorative layer reduces text contrast, it fails.
 
 ---
 

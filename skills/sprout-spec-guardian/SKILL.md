@@ -81,9 +81,9 @@ Never do these unless a spec explicitly changes:
 
 ## Navigation Is Fixed
 
-Three tabs: Today, Money, Settings.
+Four tabs: Today, Money, Insights, Settings.
 
-Center `+` opens Quick Add as a sheet. Quick Add is not a tab. There is no Learn tab; learning folds into Sprout Explains. Do not add tabs.
+Center `+` opens Quick Add as a sheet. Quick Add is not a tab. There is no Learn tab; learning folds into Sprout Explains and Insights details. Do not add tabs beyond the regression-protected four without a deliberate spec update.
 
 ## Build Order
 

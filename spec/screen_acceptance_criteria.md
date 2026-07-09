@@ -29,6 +29,8 @@
 - The app remains smooth on low-end Android.
 - **Total wealth is always the Today hero.**
 - **Opening the app never changes the health score.**
+- **Nav renders Today · Money · [＋] · Insights · Settings**, and no screen
+  content is hidden behind the floating nav at 1.3x text scale.
 
 ## Today
 
@@ -75,16 +77,59 @@
 
 ## Money
 
+- **Money tab is present and rendering** — a build missing the Money tab fails.
 - Shows holdings with per-holding value, source, freshness, and provenance.
 - **6-day wealth trend chart is available as a depth element.**
 - Shows accounts with balances and freshness.
 - Shows safe-to-spend or budget summary.
 - Shows goals with progress, remaining-to-target, and next step.
+- **Tapping a goal opens its editor** (add/contribute/complete/delete reachable).
 - Shows transactions with source and confidence/review state.
 - Uncertain transactions are confirmable in one tap.
 - Offline cached data is visible.
 - Stale balances and **stale prices/FX are labelled.**
 - The screen remains quiet and un-gamified.
+
+## Insights
+
+- Insights tab is present and rendering.
+- The screen is finite: no infinite feed, no generic headline padding.
+- Every item ties a world/market fact to the user's holdings, goals, cash, or
+  currencies.
+- Every item carries date/freshness and provenance.
+- Every card taps to a detail drawer with personal meaning, plain-language
+  explanation, optional real action, and source.
+- Quiet-week state is calm and does not fill with generic market noise.
+- Thin-data state shows only relevant items.
+- Offline cached state is labelled.
+- Copy avoids FOMO, guaranteed returns, investment pressure, shame, and panic.
+- Light and dark mode remain legible at 1.3x text scale.
+
+## Navigation
+
+- Nav renders exactly: Today · Money · [＋] · Insights · Settings.
+- Center `+` opens Quick Add and is not a destination tab.
+- Two tabs sit left of `+`, two tabs sit right of `+`.
+- Active tab is visually distinct; inactive tabs are muted but readable.
+- Content on Today, Money, Insights, and Settings clears the floating nav and
+  is never obscured.
+
+## Goals
+
+- A user can **add, edit, contribute to, complete, delete, and reorder** goals from Settings and from tapping a goal.
+- **One shared goal-editor** is reached from both entry points (Settings and goal tap).
+- **Goal changes affect the next briefing's recommendation** — the connection is real, not cosmetic.
+- **Delete/complete copy clarifies money is unaffected** — goals are tracking, not accounts.
+- **Empty state prompts warmly** to add a goal (a goal makes Today's "one step" meaningful).
+- **A primary/closest goal flag** determines which goal Today references.
+- All goal flows work offline; changes persist locally.
+- **Goals are never write-once** — everything is editable after creation.
+
+## Design System (dark mode)
+
+- **Dark-mode tiles are legible** — tints have dark variants, not light tints dropped onto black.
+- **Decorative/watermark layers never reduce text contrast** — opacity is capped so text stays fully legible in both themes.
+- **Verified at 1.3× text scale** in both light and dark.
 
 ## Quick Add
 
@@ -101,7 +146,7 @@
 ## Settings
 
 - Shows profile, income timing, and income type.
-- Goals can be edited.
+- **Goals editor includes full CRUD** (add/edit/contribute/complete/delete/reorder), not just viewing.
 - Data sources show status, confidence, freshness, and controls.
 - Connect, disconnect, and delete data controls are reachable.
 - Privacy copy includes no stored bank passwords, user-controlled sources, statement deletion, and confirmation for uncertain transactions.

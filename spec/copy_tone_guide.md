@@ -98,6 +98,25 @@ Next-steps are framed against the user's goals and holdings. Honest, never hype,
 - "You're guaranteed to reach your goal." (certainty)
 - "Buy MIF before it goes up." (investment pressure)
 
+## Insights Phrasing
+
+Insights translate world → user. The sentence shape is:
+
+"[Something happened] → here's what it calmly means for your [holding, goal,
+cash, or currency]."
+
+**Do:**
+- "SBP cut rates → your income funds may yield a little less; equity funds often like lower rates."
+- "PKR softened vs USD → your Wise USD cash is worth a bit more in rupees this week."
+- "Car prices moved up → your PKR 2.5M car goal may need a small review."
+- "Nothing major moved your money this week. That's useful too."
+
+**Don't:**
+- "Markets are crashing." (panic)
+- "Buy before prices rise again." (FOMO)
+- "This will boost your returns." (guarantee)
+- "SBP cut rates." (generic headline with no personal tie)
+
 ## Provenance Phrasing
 
 Provenance is the trust. State where the number came from, with dates, in plain language. It appears on tap, never hidden.

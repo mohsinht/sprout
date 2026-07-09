@@ -653,6 +653,142 @@ class SproutBottomSheet extends StatelessWidget {
   }
 }
 
+/// A drawer that contains real data rows AND at least one action button.
+/// This is the "signal" drawer — it never dead-ends with just a paragraph.
+/// Every drawer must offer a real action or a drill into real data.
+class SproutActionSheet extends StatelessWidget {
+  const SproutActionSheet({
+    required this.title,
+    required this.rows,
+    this.actions = const [],
+    super.key,
+  });
+
+  final String title;
+  final List<SheetInfoRow> rows;
+
+  /// Action buttons at the bottom. Each must lead to a real action or drill.
+  final List<SheetAction> actions;
+
+  static Future<void> show(
+    BuildContext context, {
+    required String title,
+    required List<SheetInfoRow> rows,
+    List<SheetAction> actions = const [],
+  }) {
+    final colors = SproutColorScheme.of(context);
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useRootNavigator: true,
+      useSafeArea: true,
+      backgroundColor: colors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (context) =>
+          SproutActionSheet(title: title, rows: rows, actions: actions),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.78;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + bottomInset),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: SproutSpacing.lg),
+            for (final row in rows) ...[
+              row,
+              const SizedBox(height: SproutSpacing.md),
+            ],
+            if (actions.isNotEmpty) ...[
+              const SizedBox(height: SproutSpacing.sm),
+              for (final action in actions) ...[
+                action,
+                const SizedBox(height: SproutSpacing.sm),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// An action button inside a [SproutActionSheet]. Must lead to a real action
+/// or a drill into real data — never a dead end.
+class SheetAction extends StatelessWidget {
+  const SheetAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.isPrimary = false,
+    this.isDestructive = false,
+    super.key,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isPrimary;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    final color = isDestructive
+        ? SproutColors.tomato
+        : (isPrimary ? SproutColors.seed : colors.ink);
+
+    return SizedBox(
+      width: double.infinity,
+      child: SproutButtonPress(
+        onTap: () {
+          Navigator.pop(context);
+          onTap();
+        },
+        scale: 0.97,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          decoration: BoxDecoration(
+            color: isPrimary
+                ? SproutColors.seed.withValues(alpha: 0.08)
+                : colors.line.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: color, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class SheetInfoRow extends StatelessWidget {
   const SheetInfoRow({
     required this.icon,

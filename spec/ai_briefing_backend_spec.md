@@ -84,6 +84,33 @@ The nightly job follows this sequence (mirroring the canonical automation exampl
 6. **Select recommended action:** choose one goal-relative, concrete next-step per the scoring model's priority order. Never a check-in. Never investment advice with implied certainty.
 7. **Attach learn-later threads:** for events worth learning (e.g. "why do fund NAVs move?"), attach a `learnMoreId` linking to a `LearnThread`.
 
+## Insights Generation
+
+Insights use the same nightly gather → AI writes → validator saves model as
+the daily briefing, but scoped to personally-relevant world/market facts.
+
+Pipeline:
+
+1. Gather candidate facts with provenance: policy-rate moves, inflation, FX,
+   car/goal price context, and market moves only when they can affect the
+   user's holdings, goals, cash, or currencies.
+2. Join candidates against the user's actual holdings, goals, and balances.
+3. The model writes the world→user framing: what happened, what it means for
+   this user, optional action, and calm explanation.
+4. The validator drops any item without personal relevance, provenance, date,
+   or safe tone.
+5. The UI receives a finite list, usually 3–6 items, plus a quiet-week state
+   when nothing meaningful applies.
+
+Validation:
+
+- Every Insight must complete: "[something happened] → here's what it means
+  for your [holding/goal/cash]."
+- No generic headlines.
+- No FOMO, "buy now," guaranteed-return language, or unsupported prediction.
+- Provenance and as-of date are required.
+- Quiet weeks are allowed and should not be padded.
+
 ## Provenance Validation
 
 Before saving a briefing:
@@ -208,6 +235,8 @@ Before saving a briefing:
 - **Ensure `wealthSnapshot.changeVsYesterday` and `changeMtd` are both present** — always shown together.
 - **Ensure the recommended action is goal-relative** (has `goalRelativeNote` or targets a goal/holding).
 - **Ensure no "check-in" action is selected** — opening the app is not an action.
+- **Ensure every Insight is personally relevant and provenance-backed** — no
+  generic feed item is saved.
 
 ## Backend Acceptance
 

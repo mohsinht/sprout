@@ -1,20 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../domain/wealth_models.dart';
-
-/// Repository interface for the wealth briefing.
-///
-/// The production mock is wired behind this interface so the real backend
-/// swaps in later without changing consumers. This is explicitly labelled
-/// as mock/stub data — it is not a live integration.
-final wealthBriefingRepositoryProvider =
-    Provider<WealthBriefingRepository>((ref) {
-  return MockWealthBriefingRepository();
-});
-
-abstract interface class WealthBriefingRepository {
-  Future<WealthBriefing> fetchWealthBriefing();
-}
+import 'http_wealth_repository.dart';
 
 /// Mock wealth briefing derived from the canonical automation example.
 ///

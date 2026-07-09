@@ -4,17 +4,28 @@
 > + trend + provenance depth surface — where the 6-day chart, per-fund
 > detail, and dated price/FX provenance live. Today links into it. The
 > 3-tab + center "+" shell is unchanged.
+>
+> **Insights note (2026-07-10):** The shell is updated to four required tabs
+> plus the center quick-add action: Today · Money · [＋] · Insights ·
+> Settings. Insights is a finite, personally-relevant world→user surface,
+> not a news feed.
 
 ## Target Shell
 
-Sprout uses a three-tab shell plus a center quick-add action:
+Sprout uses a four-tab shell plus a center quick-add action:
 
 - Today
 - Money
+- Insights
 - Settings
 - Center `+`
 
 Today is the default route on every app open.
+
+> **All four tabs are required and must not be dropped.** A build
+> missing Today, Money, Insights, or Settings fails. The nav renders all four tabs + center
+> action — this is a regression invariant (see
+> `user_stories_regression_invariants.md`).
 
 ## Current Code Note
 
@@ -31,6 +42,7 @@ Target routes:
 
 - `/today`
 - `/money`
+- `/insights`
 - `/settings`
 - `/onboarding`
 - Modal/sheet: `quick-add`
@@ -82,6 +94,27 @@ Exit points:
 - Settings data source control.
 - Sprout Explains (provenance detail, learn-later thread).
 
+## Insights
+
+Primary job:
+
+- Translate personally-relevant world and market context into what it means
+  for the user's holdings, goals, and cash.
+- Stay finite and calm: 3–6 items when populated, quiet-week state when
+  little matters, no infinite feed.
+
+Entry points:
+
+- Bottom tab.
+- Sprout Explains related action.
+- Future briefing notification when an item materially affects the user.
+
+Exit points:
+
+- Money holding/account detail.
+- Goal editor for goal-target insights.
+- Sprout Explains / Learn for context.
+
 ## Settings
 
 Primary job:
@@ -129,9 +162,13 @@ Behavior:
 ## IA Acceptance
 
 - App launch lands on Today.
+- **Nav renders all four tabs (Today, Money, Insights, Settings) + center "+" action.** A build missing a primary tab fails.
 - Quick Add is reachable from every primary tab.
 - Quick Add is not represented as a destination tab.
+- Content on Today, Money, Insights, and Settings clears the floating nav at
+  1.3x text scale and is never hidden behind it.
 - **Money is the holdings + trend + provenance depth surface** (6-day chart, per-fund detail, dated price/FX).
+- Insights is curated, personally relevant, finite, and provenance-backed.
 - Money is quieter than Today and never competes with the daily loop.
 - Settings is the trust surface.
 - Every insight path has a return path.

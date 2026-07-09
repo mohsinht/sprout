@@ -11,6 +11,23 @@
 
 ---
 
+## Standing rules (enforce on every ticket)
+
+1. **Real-data tickets fail loudly, never silently fall back to mock.** If
+   MUFAP is hard to parse, the ticket fails — it does not quietly use mock
+   NAVs so the ticket "passes." A beautiful app showing a fabricated wealth
+   number is the single most dangerous failure mode. Every real-data source
+   must fail visibly and label the data stale/missing, never silently
+   substitute mock.
+2. **The done-check is the gate, not the agent saying "done."** Compilation is
+   not correctness. For each ticket, *you* confirm the done-check with real
+   eyes: for FX, is the rate today's actual rate? For MUFAP, does it match
+   your known NAVs? For the pipeline, does it produce your real number?
+3. **One ticket, verified, before the next.** Small commits, review each.
+   Don't let the agent build ahead — hidden breakage lives in bulk work.
+
+---
+
 ## Ticket 1 — Consolidate the Flutter domain models
 
 **Why first:** The app has duplicate model classes (`today_models.dart` vs
@@ -112,6 +129,12 @@ EUR cash balances.
 source of truth — the confirmed baseline. Everything else estimates forward
 from it.
 
+**Clarification:** For Phase 1 with one user, **hand-seeding your confirmed
+units is completely fine and faster** — don't build a full PDF parser here.
+You can insert the six unit counts directly via the API or a seed script.
+Real automated statement parsing is a later ticket. The goal here is to get
+the confirmed baseline into the database, not to build a parser.
+
 **Build:**
 - Use the `POST /v1/upload/statement` endpoint (already built).
 - Send a JSON payload with your real statement data:
@@ -209,6 +232,12 @@ events, computes the score, selects the action, and stores the briefing.
 **Done-check:**
 - [ ] `GET /v1/briefing` returns a valid `WealthBriefing` with your real
       total wealth.
+- [ ] **Reconciliation golden test:** the computed total matches the
+      known-good automation figure for the same day within a small
+      tolerance (e.g. ±2% for FX/NAV movement). If the pipeline says
+      PKR 13.67M and your trusted automation says PKR 13.67M, good. If it
+      says PKR 15M, stop — a confident wrong number is the one failure
+      mode that destroys trust in a wealth tracker.
 - [ ] The total is within a plausible range of your statement's confirmed
       value (adjusted for NAV/FX movement since the statement date).
 - [ ] `provenanceSummary` states the dated sources used.
@@ -216,6 +245,36 @@ events, computes the score, selects the action, and stores the briefing.
       never silently wrong).
 - [ ] The recommended action is goal-relative (not a check-in).
 - [ ] No guardrail violations in the job run.
+
+---
+
+## Ticket 7.5 — Verify the API output before touching Flutter
+
+**Why:** A cheap intermediate check between the pipeline (7) and the Flutter
+wiring (8). Look at the JSON the API returns for your account — is the number
+right, the provenance present, the interpretation sane? Catch bugs at the API
+layer where they're easy to see, before they're wrapped in UI where they're
+harder to diagnose. It's a five-minute check that saves an hour of "is it the
+backend or the wiring?"
+
+**Build:**
+- Start the API: `pnpm --filter @sprout/api dev`.
+- Call `GET /v1/briefing` with your auth token.
+- Inspect the full JSON response:
+  - Is `totalPkr` correct (matches your known-good figure)?
+  - Is `provenanceSummary` present and accurate?
+  - Are `changeVsYesterday` and `changeMtd` both present?
+  - Is the `interpretation` sane (in Sprout's voice, no hype/shame)?
+  - Is `recommendedAction` goal-relative?
+  - Are `holdings` populated with real data?
+  - Is `freshness` correct?
+- If anything is wrong, fix it here — not in the Flutter wiring.
+
+**Done-check:**
+- [ ] The JSON response from `GET /v1/briefing` is correct and complete.
+- [ ] Every field that the Flutter app will consume is present and valid.
+- [ ] No mock data appears in the response (all sources are real or
+      labelled stale).
 
 ---
 

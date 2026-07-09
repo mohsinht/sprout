@@ -1,3 +1,5 @@
+import 'wealth_models.dart' as wealth;
+
 class TodayData {
   const TodayData({
     required this.user,
@@ -36,6 +38,27 @@ class TodayData {
 
   /// One-line provenance summary for the trust footer.
   final String provenanceSummary;
+
+  /// Copy with — used to merge live goal-store changes into the briefing
+  /// so goal edits (add/edit/complete/delete) are reflected on Today.
+  TodayData copyWith({
+    List<Goal>? goals,
+  }) {
+    return TodayData(
+      user: user,
+      currency: currency,
+      salary: salary,
+      health: health,
+      autoCapture: autoCapture,
+      snapshot: snapshot,
+      quickActions: quickActions,
+      wealthSnapshot: wealthSnapshot,
+      wealthEvents: wealthEvents,
+      goals: goals ?? this.goals,
+      learnThreads: learnThreads,
+      provenanceSummary: provenanceSummary,
+    );
+  }
 }
 
 class SproutUser {
@@ -261,6 +284,8 @@ class Goal {
     required this.nextStep,
     required this.remainingToTarget,
     required this.paceNote,
+    this.isPrimary = false,
+    this.deadline,
   });
 
   final String id;
@@ -273,6 +298,43 @@ class Goal {
   final String nextStep;
   final int remainingToTarget;
   final String paceNote;
+
+  /// Whether this is the user-chosen "hero" goal that Today references.
+  /// The closest active goal is used if no explicit primary is set.
+  final bool isPrimary;
+
+  /// Optional deadline (ISO date string). Null means no deadline.
+  final String? deadline;
+
+  Goal copyWith({
+    String? id,
+    String? name,
+    String? type,
+    int? targetAmount,
+    int? currentAmount,
+    String? status,
+    String? pace,
+    String? nextStep,
+    int? remainingToTarget,
+    String? paceNote,
+    bool? isPrimary,
+    String? deadline,
+  }) {
+    return Goal(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      targetAmount: targetAmount ?? this.targetAmount,
+      currentAmount: currentAmount ?? this.currentAmount,
+      status: status ?? this.status,
+      pace: pace ?? this.pace,
+      nextStep: nextStep ?? this.nextStep,
+      remainingToTarget: remainingToTarget ?? this.remainingToTarget,
+      paceNote: paceNote ?? this.paceNote,
+      isPrimary: isPrimary ?? this.isPrimary,
+      deadline: deadline ?? this.deadline,
+    );
+  }
 }
 
 /// A retrievable "learn later" thread attached to a wealth event.
@@ -290,4 +352,176 @@ class LearnThread {
   final String summary;
   final String body;
   final String relatedEventId;
+}
+
+// ── Bridge: WealthBriefing → TodayData ─────────────────────────────────────────
+// Maps the backend's WealthBriefing contract (wealth_models.dart) to the
+// TodayData shape the Today screen consumes. This lets the HTTP repository
+// parse the API response into WealthBriefing and convert it here, without
+// changing any screen code.
+
+TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
+  // Map wealth goals to today goals
+  final goals = b.goals
+      .map((g) => Goal(
+            id: g.id,
+            name: g.name,
+            type: g.type.name,
+            targetAmount: g.targetAmount,
+            currentAmount: g.currentAmount,
+            status: g.status.name,
+            pace: g.pace.name,
+            nextStep: g.nextStep,
+            remainingToTarget: g.remainingToTarget,
+            paceNote: g.paceNote,
+            deadline: g.deadline,
+          ))
+      .toList();
+
+  // Map wealth events to today events
+  final events = b.wealthEvents
+      .map((e) => WealthEvent(
+            id: e.id,
+            date: e.date,
+            kind: _bridgeEventKind(e.kind),
+            magnitudePkr: e.magnitudePkr,
+            direction: e.direction.name,
+            plainWhy: e.plainWhy,
+            holdingId: e.holdingId,
+            learnMoreId: e.learnMoreId,
+            severity: e.severity.name,
+          ))
+      .toList();
+
+  // Map wealth holdings to today holdings (with changeVsYesterday/changeMtd
+  // from the snapshot breakdown)
+  final breakdownMap = {
+    for (final bd in b.wealthSnapshot.perHoldingBreakdown)
+      bd.holdingId: bd,
+  };
+
+  final holdings = b.holdings
+      .map((h) => Holding(
+            id: h.id,
+            kind: _bridgeHoldingKind(h.kind),
+            institution: h.institution,
+            label: h.label,
+            currency: h.currency,
+            valuePkr: h.valuePkr,
+            valueNative: h.valueNative?.round(),
+            units: h.units,
+            price: h.price != null
+                ? PriceQuote(
+                    value: h.price!.value,
+                    asOf: h.price!.asOf,
+                    source: h.price!.source,
+                    currency: h.price!.currency,
+                  )
+                : null,
+            fxRate: h.fxRate != null
+                ? FxRate(
+                    pair: h.fxRate!.pair,
+                    value: h.fxRate!.value,
+                    asOf: h.fxRate!.asOf,
+                    source: h.fxRate!.source,
+                  )
+                : null,
+            priceAsOf: h.priceAsOf,
+            priceSource: h.priceSource,
+            freshness: h.freshness.name,
+            changeVsYesterday: breakdownMap[h.id]?.changeVsYesterday ?? 0,
+            changeMtd: breakdownMap[h.id]?.changeMtd ?? 0,
+            detail: h.fundCode ?? h.institution,
+          ))
+      .toList();
+
+  // Map learn threads
+  final learnThreads = b.learnThreads
+      .map((t) => LearnThread(
+            id: t.id,
+            title: t.title,
+            summary: t.summary,
+            body: t.body,
+            relatedEventId: t.relatedEventId,
+          ))
+      .toList();
+
+  // Build the wealth snapshot (today_models shape)
+  final wealthSnapshot = WealthSnapshot(
+    date: b.wealthSnapshot.date,
+    totalPkr: b.wealthSnapshot.totalPkr,
+    holdings: holdings,
+    changeVsYesterday: b.wealthSnapshot.changeVsYesterday,
+    changeMtd: b.wealthSnapshot.changeMtd,
+    mainReason: b.wealthSnapshot.mainReason,
+    interpretation: b.wealthSnapshot.interpretation,
+    provenanceSummary: b.wealthSnapshot.provenanceSummary,
+  );
+
+  // Map recommended action
+  final recommendedAction = RecommendedAction(
+    title: b.recommendedAction.label,
+    xp: b.recommendedAction.xp,
+    impact: b.recommendedAction.effect,
+  );
+
+  // Map health score
+  final health = FinancialHealthScore(
+    score: b.healthScore,
+    status: b.healthStatus.name,
+    summary: b.summary,
+    positiveFactors: const [],
+    attentionFactors: const [],
+    recommendedAction: recommendedAction,
+  );
+
+  return TodayData(
+    user: SproutUser(
+      firstName: b.greeting.replaceAll(RegExp(r'^Good (morning|afternoon|evening),\s*'), ''),
+      level: b.level,
+      xp: b.xp,
+      dayStreak: b.streak,
+    ),
+    currency: 'PKR',
+    salary: SalaryInfo(
+      nextPayday: DateTime.now().add(const Duration(days: 30)),
+      daysUntilSalary: 30,
+    ),
+    health: health,
+    autoCapture: const [],
+    snapshot: const TodaySnapshot(
+      availableCash: 0,
+      monthSpent: 0,
+      budgetRemaining: 0,
+      upcomingBills: 0,
+      unconfirmedTransactions: 0,
+    ),
+    quickActions: const [],
+    wealthSnapshot: wealthSnapshot,
+    wealthEvents: events,
+    goals: goals,
+    learnThreads: learnThreads,
+    provenanceSummary: b.wealthSnapshot.provenanceSummary,
+  );
+}
+
+WealthEventKind _bridgeEventKind(wealth.WealthEventKind k) {
+  return switch (k) {
+    wealth.WealthEventKind.navMove => WealthEventKind.navMove,
+    wealth.WealthEventKind.fxMove => WealthEventKind.fxMove,
+    wealth.WealthEventKind.contribution => WealthEventKind.contribution,
+    wealth.WealthEventKind.withdrawal => WealthEventKind.withdrawal,
+    wealth.WealthEventKind.bill => WealthEventKind.bill,
+    wealth.WealthEventKind.goalMilestone => WealthEventKind.goalMilestone,
+    wealth.WealthEventKind.newsContext => WealthEventKind.newsContext,
+  };
+}
+
+HoldingKind _bridgeHoldingKind(wealth.HoldingKind k) {
+  return switch (k) {
+    wealth.HoldingKind.mutualFund => HoldingKind.mutualFund,
+    wealth.HoldingKind.cash => HoldingKind.cash,
+    wealth.HoldingKind.equity => HoldingKind.equity,
+    wealth.HoldingKind.other => HoldingKind.other,
+  };
 }

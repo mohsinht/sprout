@@ -235,13 +235,24 @@ type Goal = {
   nextStep: string;
   remainingToTarget: number;   // targetAmount - currentAmount, always >= 0
   paceNote: string;             // plain-language, e.g. "PKR 2 lakh to go"
+  isPrimary?: boolean;          // user-chosen hero goal that Today references
 };
 ```
+
+> **Goal CRUD note (2026-07-09):** Goals support full create/update/delete/
+> complete/reorder operations. The `isPrimary` flag determines which goal
+> Today's "one step" references. If no explicit primary is set, the closest
+> active goal (highest progress ratio) is used. Goal changes update the
+> inputs the AI uses — the next briefing reflects the change. Completing or
+> deleting a goal never implies the user's money changed — goals are
+> tracking, not accounts.
 
 Current equivalents:
 
 - `SavingsGoalSchema` for Grow.
 - `SproutGoal` for Flutter.
+- `Goal` in `apps/mobile/lib/src/domain/today_models.dart` (with `isPrimary`).
+- `GoalStore` in `apps/mobile/lib/src/data/goal_store.dart` (CRUD + reorder).
 
 ## Holding
 

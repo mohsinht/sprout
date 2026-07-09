@@ -47,10 +47,11 @@ Minimum navigation:
 
 - `Today`: default landing screen and primary daily loop.
 - `Money`: calm detail room for balances, budgets, goals, and transactions.
+- `Insights`: finite, personally-relevant world→user context for holdings, goals, and cash.
 - `Settings`: trust, privacy, profile, goals, notifications, and data controls.
 - Center `+`: quick-add sheet, not a tab.
 
-Educational content should appear contextually through Sprout explanations and recommended actions. Do not add a standalone learning surface unless the product direction changes.
+Educational content should appear contextually through Sprout explanations, Insights details, and recommended actions. Do not add a standalone learning surface unless the product direction changes.
 
 ## Screen Spec Template
 
@@ -195,6 +196,9 @@ Minimum content:
 - Account balances with source and freshness.
 - Safe-to-spend or monthly budget summary.
 - Goals with progress, remaining-to-target, and next step.
+- **Tapping a goal opens its editor** (add/contribute/complete/delete reachable from here too).
+- **An "Add" affordance on the Goals header** opens the shared goal editor in add-new mode.
+- **Goal empty state:** if no goals exist, a warm prompt to add one (a goal is what makes Today's "one step" meaningful) — never a dead blank.
 - Recent transactions with category, source, and confidence.
 - One-tap confirmation for uncertain transactions.
 - A short Sprout line that summarizes the wealth state calmly.
@@ -207,6 +211,7 @@ Required states:
 - Transactions needing review.
 - Balance unavailable or stale.
 - **Stale price/FX on a holding** (labelled with as-of date).
+- **No goals** (warm empty state with add prompt).
 
 Acceptance criteria:
 
@@ -215,8 +220,44 @@ Acceptance criteria:
 - **The 6-day trend chart is available as a depth element.**
 - Safe-to-spend is understandable at a glance.
 - Uncertain transactions can be confirmed in one tap.
+- **Goals are tappable and open the shared goal editor; an add affordance is visible.**
 - The screen does not duplicate the Today hero treatment.
 - Offline cached data remains readable and useful.
+
+### Insights
+
+Purpose: help the user understand what in the world is moving their own
+money, without becoming a news feed.
+
+Required content:
+
+- Calm intro line from Sprout.
+- Small curated list, usually 3–6 cards.
+- Each card shows icon, headline, one-line personal meaning, relevance tag,
+  date/freshness, and provenance.
+- Every item must complete the sentence: "[something happened] → here's what
+  it means for your [holding/goal/cash]."
+
+Required states:
+
+- Populated with relevant items.
+- Quiet week: "Nothing major moved your money this week" without filler.
+- Thin data / few holdings: show only what is relevant.
+- Offline cached: label the cached state.
+- Loading and error through existing Sprout state components.
+
+Tap behavior:
+
+- Card tap opens a detail drawer with plain-language explanation, specific
+  personal tie, optional real action, and provenance.
+- Actions route to real destinations where available (Money, goal editor,
+  Learn/Sprout Explains). Pure explainers end with calm closure.
+
+Must not include:
+
+- Infinite scroll.
+- Generic market/news headlines.
+- FOMO, "buy now," "guaranteed," or investment-pressure language.
 
 ### Quick Add
 
@@ -256,6 +297,11 @@ Minimum content:
 
 - Profile: name, salary date, income type.
 - Goals editor for the goals that drive briefing recommendations.
+  - **Full CRUD:** add, edit, contribute, complete, delete, and reorder goals.
+  - **One shared goal-editor** reached from Settings and from tapping a goal on Money/Today.
+  - **Primary goal toggle** to set which goal Today references.
+  - **Empty state:** warm prompt to add a goal if none exist.
+  - **Offline-safe:** goal changes persist locally and sync; never write-once.
 - Data sources: manual, email, statement import, optional Android SMS, and future partnerships, each with status.
 - Connect, disconnect, and delete controls where applicable.
 - Plain-language privacy block.
