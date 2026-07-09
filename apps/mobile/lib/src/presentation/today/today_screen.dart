@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
+import '../../data/goal_store.dart';
 import '../../domain/today_models.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
@@ -68,6 +69,11 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
         if (mounted) setState(() => _showCompletionReward = false);
       });
     }
+
+    if (action.completionKind == 'contributeToGoal' && action.targetId != null) {
+      ref.read(goalStoreProvider.notifier).contribute(action.targetId!, 25000);
+    }
+
     ref.read(todayQuestCompletedProvider.notifier).state = true;
   }
 
@@ -110,10 +116,23 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       _SalaryStrip(
         daysUntilSalary: data.salary.daysUntilSalary,
         upcomingBills: data.snapshot.upcomingBills,
+        nextPayday: data.salary.nextPayday,
+        availableCash: data.snapshot.availableCash,
       ),
 
       const SizedBox(height: SproutSpacing.md),
-      _SproutRead(text: data.health.summary),
+      _SproutRead(
+        text: data.health.summary,
+        detail: data.wealthSnapshot.interpretation.join(' '),
+        actionLabel: 'See what I should do',
+        onAction: () {
+          HapticFeedback.lightImpact();
+          final goal = ref.read(goalStoreProvider).where((g) => g.status == 'active').firstOrNull;
+          if (goal != null) {
+            GoalEditorSheet.open(context, goal: goal);
+          }
+        },
+      ),
 
       // ── Standard section gap → One step ──
       const SizedBox(height: SproutSpacing.xl),
@@ -561,26 +580,51 @@ class _MovementChip extends StatelessWidget {
 }
 
 class _SproutRead extends StatelessWidget {
-  const _SproutRead({required this.text});
+  const _SproutRead({
+    required this.text,
+    required this.detail,
+    required this.actionLabel,
+    required this.onAction,
+  });
 
   final String text;
+  final String detail;
+  final String actionLabel;
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-        color: _todayTint(context, SproutColors.tintMint),
-        borderRadius: BorderRadius.circular(16),
-        border: _todayHairline(context),
-      ),
-      child: Text(
-        text,
-        style: SproutType.body(
-          color: _todayAccent(context, SproutColors.leaf),
-          size: SproutTypeScale.s14,
-          weight: FontWeight.w500,
-          height: 1.45,
+    return SproutButtonPress(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        SproutActionSheet.show(
+          context,
+          title: 'What Sprout is seeing',
+          rows: [
+            SheetInfoRow(icon: Icons.insights_rounded, label: 'Why today moved', value: detail),
+            SheetInfoRow(icon: Icons.flag_rounded, label: 'Closest next step', value: actionLabel),
+          ],
+          actions: [
+            SheetAction(label: actionLabel, icon: Icons.play_arrow_rounded, onTap: onAction, isPrimary: true),
+          ],
+        );
+      },
+      scale: 0.98,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        decoration: BoxDecoration(
+          color: _todayTint(context, SproutColors.tintMint),
+          borderRadius: BorderRadius.circular(16),
+          border: _todayHairline(context),
+        ),
+        child: Text(
+          text,
+          style: SproutType.body(
+            color: _todayAccent(context, SproutColors.leaf),
+            size: SproutTypeScale.s14,
+            weight: FontWeight.w500,
+            height: 1.45,
+          ),
         ),
       ),
     );
@@ -594,10 +638,14 @@ class _SalaryStrip extends StatelessWidget {
   const _SalaryStrip({
     required this.daysUntilSalary,
     required this.upcomingBills,
+    required this.nextPayday,
+    required this.availableCash,
   });
 
   final int daysUntilSalary;
   final int upcomingBills;
+  final DateTime nextPayday;
+  final int availableCash;
 
   @override
   Widget build(BuildContext context) {
@@ -638,36 +686,61 @@ class _SalaryStrip extends StatelessWidget {
     final reassurance =
         billsCovered ? 'covers your upcoming bills' : 'no bills due soon';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: _todayTint(context, SproutColors.tintWarm),
-        borderRadius: BorderRadius.circular(12),
-        border: _todayHairline(context),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.savings_rounded,
-            color: _todayAccent(context, SproutColors.goldInk),
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Salary in $daysUntilSalary days · $reassurance',
-              style: SproutType.body(
-                color: _todayAccent(context, SproutColors.goldInk),
-                size: SproutTypeScale.s14,
-                weight: FontWeight.w500,
-                height: 1.3,
+    return SproutButtonPress(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        SproutActionSheet.show(
+          context,
+          title: 'Salary cashflow',
+          rows: [
+            SheetInfoRow(icon: Icons.calendar_today_rounded, label: 'Expected salary', value: 'Arrives ${_formatDate(nextPayday)}'),
+            SheetInfoRow(icon: Icons.account_balance_wallet_rounded, label: 'Projected PKR', value: 'About ${SproutFormat.compactCurrency(availableCash)} available now'),
+            SheetInfoRow(icon: Icons.receipt_long_rounded, label: 'Bills this window', value: 'PKR ${SproutFormat.compactCurrency(upcomingBills)} due soon'),
+          ],
+          actions: [
+            SheetAction(label: 'Edit salary date or amount', icon: Icons.edit_rounded, onTap: () => context.go('/settings'), isPrimary: true),
+            SheetAction(label: 'Add a bill I’m expecting', icon: Icons.add_circle_outline_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bill reminder added to your mock plan.')))),
+          ],
+        );
+      },
+      scale: 0.98,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: _todayTint(context, SproutColors.tintWarm),
+          borderRadius: BorderRadius.circular(12),
+          border: _todayHairline(context),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.savings_rounded,
+              color: _todayAccent(context, SproutColors.goldInk),
+              size: 16,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Salary in $daysUntilSalary days · $reassurance',
+                style: SproutType.body(
+                  color: _todayAccent(context, SproutColors.goldInk),
+                  size: SproutTypeScale.s14,
+                  weight: FontWeight.w500,
+                  height: 1.3,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+String _formatDate(DateTime value) {
+  final day = value.day;
+  final month = value.month;
+  return '$day/${month.toString().padLeft(2, '0')}';
 }
 
 class _OneStep extends StatelessWidget {
@@ -687,6 +760,7 @@ class _OneStep extends StatelessWidget {
     final isDark = colors.brightness == Brightness.dark;
     final fill = isDark ? SproutColors.darkSeed : SproutColors.seed;
     final edgeColor = isDark ? SproutColors.darkMint : SproutColors.leaf;
+    final actionLabel = completed ? 'Done today' : action.title;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -707,7 +781,7 @@ class _OneStep extends StatelessWidget {
         // Chunky pressable button
         _ChunkyPressButton(
           onTap: completed ? null : onComplete,
-          semanticLabel: completed ? 'Done today' : action.title,
+          semanticLabel: actionLabel,
           fill: fill,
           edgeColor: edgeColor,
           edgeHeight: 4,
@@ -717,7 +791,7 @@ class _OneStep extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  completed ? 'Done today' : action.title,
+                  actionLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
@@ -759,7 +833,7 @@ class _OneStep extends StatelessWidget {
 /// A small set of tiles: fund moves, FX gains, goal proximity, learn later.
 /// Good and bad shown honestly, read instantly by color and icon.
 /// Green = good, amber = watchful, never red alarm. No more than a handful.
-class _WhatsHappening extends StatelessWidget {
+class _WhatsHappening extends ConsumerWidget {
   const _WhatsHappening({
     required this.events,
     required this.goals,
@@ -771,7 +845,7 @@ class _WhatsHappening extends StatelessWidget {
   final List<LearnThread> learnThreads;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = SproutColorScheme.of(context);
     final tiles = <_HappeningTileData>[];
 
@@ -794,7 +868,20 @@ class _WhatsHappening extends StatelessWidget {
         severity: 'all_good',
         onTap: () {
           HapticFeedback.lightImpact();
-          GoalEditorSheet.open(context, goal: closest);
+          SproutActionSheet.show(
+            context,
+            title: closest.name,
+            rows: [
+              SheetInfoRow(icon: Icons.flag_rounded, label: 'Progress', value: '${SproutFormat.compactCurrency(closest.currentAmount)} saved · ${SproutFormat.compactCurrency(closest.remainingToTarget)} left'),
+              SheetInfoRow(icon: Icons.speed_rounded, label: 'Pace', value: closest.paceNote),
+            ],
+            actions: [
+              SheetAction(label: 'Add to this goal', icon: Icons.add_circle_outline_rounded, onTap: () => GoalEditorSheet.open(context, goal: closest), isPrimary: true),
+              SheetAction(label: 'Edit goal', icon: Icons.edit_rounded, onTap: () => GoalEditorSheet.open(context, goal: closest)),
+              SheetAction(label: 'Complete', icon: Icons.check_circle_outline_rounded, onTap: () => ref.read(goalStoreProvider.notifier).complete(closest.id), isDestructive: false),
+              SheetAction(label: 'Delete', icon: Icons.delete_outline_rounded, onTap: () => ref.read(goalStoreProvider.notifier).delete(closest.id), isDestructive: true),
+            ],
+          );
         },
       ));
     }
@@ -812,20 +899,15 @@ class _WhatsHappening extends StatelessWidget {
         severity: 'all_good',
         onTap: () {
           HapticFeedback.lightImpact();
-          SproutBottomSheet.show(
+          SproutActionSheet.show(
             context,
             title: thread.title,
             rows: [
-              SheetInfoRow(
-                icon: Icons.lightbulb_rounded,
-                label: 'Summary',
-                value: thread.summary,
-              ),
-              SheetInfoRow(
-                icon: Icons.menu_book_rounded,
-                label: 'Explanation',
-                value: thread.body,
-              ),
+              SheetInfoRow(icon: Icons.lightbulb_rounded, label: 'Summary', value: thread.summary),
+              SheetInfoRow(icon: Icons.menu_book_rounded, label: 'Explanation', value: thread.body),
+            ],
+            actions: [
+              SheetAction(label: 'Got it', icon: Icons.check_circle_outline_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as read.'))), isPrimary: true),
             ],
           );
         },
@@ -936,15 +1018,16 @@ class _WhatsHappening extends StatelessWidget {
       severity: severity,
       onTap: () {
         HapticFeedback.lightImpact();
-        SproutBottomSheet.show(
+        SproutActionSheet.show(
           context,
           title: title,
           rows: [
-            SheetInfoRow(
-              icon: icon,
-              label: 'What happened',
-              value: event.plainWhy,
-            ),
+            SheetInfoRow(icon: icon, label: 'What happened', value: event.plainWhy),
+            SheetInfoRow(icon: Icons.verified_rounded, label: 'Why this matters', value: event.kind == WealthEventKind.fxMove ? 'FX moved the value of your EUR balance.' : 'This is the driver behind today\'s net change.'),
+          ],
+          actions: [
+            SheetAction(label: 'See full holding', icon: Icons.account_balance_rounded, onTap: () => context.go('/money'), isPrimary: true),
+            SheetAction(label: 'Learn why this moves', icon: Icons.menu_book_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Learn thread opened from the mock briefing.')))),
           ],
         );
       },
@@ -1171,15 +1254,19 @@ class _HoldingsBreakdown extends StatelessWidget {
         SproutButtonPress(
           onTap: () {
             HapticFeedback.lightImpact();
-            SproutBottomSheet.show(
+            SproutActionSheet.show(
               context,
               title: '6-day wealth trend',
-              rows: const [
-                SheetInfoRow(
-                  icon: Icons.show_chart_rounded,
-                  label: 'Trend',
-                  value: 'Your total wealth over the last 6 days.',
-                ),
+              rows: [
+                for (final point in holdings.isEmpty ? const <int>[] : [for (final value in [13667000, 13669000, 13670000, 13672000, 13674000, 13677000]) value])
+                  SheetInfoRow(
+                    icon: Icons.show_chart_rounded,
+                    label: 'Point',
+                    value: 'PKR ${SproutFormat.compactCurrency(point)}',
+                  ),
+              ],
+              actions: [
+                SheetAction(label: 'See full chart', icon: Icons.show_chart_rounded, onTap: () => context.go('/insights'), isPrimary: true),
               ],
             );
           },
@@ -1245,32 +1332,19 @@ class _HoldingRow extends StatelessWidget {
     return SproutButtonPress(
       onTap: () {
         HapticFeedback.lightImpact();
-        SproutBottomSheet.show(
+        SproutActionSheet.show(
           context,
           title: holding.label,
           rows: [
-            SheetInfoRow(
-              icon: Icons.account_balance_wallet_rounded,
-              label: 'Value',
-              value: _formatCompact(holding.valuePkr),
-            ),
-            SheetInfoRow(
-              icon: Icons.verified_rounded,
-              label: 'Source',
-              value: '${holding.priceSource} · ${holding.priceAsOf}',
-            ),
+            SheetInfoRow(icon: Icons.account_balance_wallet_rounded, label: 'Value', value: _formatCompact(holding.valuePkr)),
+            SheetInfoRow(icon: Icons.verified_rounded, label: 'Source', value: '${holding.priceSource} · ${holding.priceAsOf}'),
             if (holding.fxRate != null)
-              SheetInfoRow(
-                icon: Icons.currency_exchange_rounded,
-                label: holding.fxRate!.pair,
-                value:
-                    '${holding.fxRate!.value} · ${holding.fxRate!.source} · ${holding.fxRate!.asOf}',
-              ),
-            SheetInfoRow(
-              icon: Icons.insights_rounded,
-              label: 'Movement reason',
-              value: event?.plainWhy ?? 'Flat today. No movement driver.',
-            ),
+              SheetInfoRow(icon: Icons.currency_exchange_rounded, label: holding.fxRate!.pair, value: '${holding.fxRate!.value} · ${holding.fxRate!.source} · ${holding.fxRate!.asOf}'),
+            SheetInfoRow(icon: Icons.insights_rounded, label: 'Movement reason', value: event?.plainWhy ?? 'Flat today. No movement driver.'),
+          ],
+          actions: [
+            SheetAction(label: 'See full holding', icon: Icons.account_balance_rounded, onTap: () => context.go('/money'), isPrimary: true),
+            SheetAction(label: 'Learn why this moves', icon: Icons.menu_book_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Learn thread opened from the holding detail.')))),
           ],
         );
       },
@@ -1405,15 +1479,32 @@ class _WhyItMoved extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Text(
-          interpretation.join(' '),
-          style: SproutType.body(
-            color: _todayIsDark(context)
-                ? colors.ink.withValues(alpha: 0.78)
-                : colors.muted,
-            size: SproutTypeScale.s18,
-            weight: FontWeight.w500,
-            height: 1.6,
+        SproutButtonPress(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            SproutActionSheet.show(
+              context,
+              title: 'Why it moved today',
+              rows: [
+                for (final item in interpretation)
+                  SheetInfoRow(icon: Icons.insights_rounded, label: 'Driver', value: item),
+              ],
+              actions: [
+                SheetAction(label: 'See 6-day trend', icon: Icons.show_chart_rounded, onTap: () => context.go('/insights'), isPrimary: true),
+              ],
+            );
+          },
+          scale: 0.98,
+          child: Text(
+            interpretation.join(' '),
+            style: SproutType.body(
+              color: _todayIsDark(context)
+                  ? colors.ink.withValues(alpha: 0.78)
+                  : colors.muted,
+              size: SproutTypeScale.s18,
+              weight: FontWeight.w500,
+              height: 1.6,
+            ),
           ),
         ),
       ],
@@ -1583,20 +1674,15 @@ class _LearnLater extends StatelessWidget {
           SproutButtonPress(
             onTap: () {
               HapticFeedback.lightImpact();
-              SproutBottomSheet.show(
+              SproutActionSheet.show(
                 context,
                 title: thread.title,
                 rows: [
-                  SheetInfoRow(
-                    icon: Icons.lightbulb_rounded,
-                    label: 'Summary',
-                    value: thread.summary,
-                  ),
-                  SheetInfoRow(
-                    icon: Icons.menu_book_rounded,
-                    label: 'Explanation',
-                    value: thread.body,
-                  ),
+                  SheetInfoRow(icon: Icons.lightbulb_rounded, label: 'Summary', value: thread.summary),
+                  SheetInfoRow(icon: Icons.menu_book_rounded, label: 'Explanation', value: thread.body),
+                ],
+                actions: [
+                  SheetAction(label: 'Got it', icon: Icons.check_circle_outline_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as read.'))), isPrimary: true),
                 ],
               );
             },

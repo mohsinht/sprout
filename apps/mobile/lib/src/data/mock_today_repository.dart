@@ -102,6 +102,7 @@ class MockTodayRepository implements TodayRepository {
       ],
       provenanceSummary:
           'Valued using Al Meezan redemption prices (8 Jul 2026) and Xe FX: USD 277.99, EUR 317.54. Units reconciled with your statement.',
+      sixDayTrend: [13667000, 13669000, 13670000, 13672000, 13674000, 13677000],
     );
 
     const wealthEvents = [
@@ -197,6 +198,8 @@ class MockTodayRepository implements TodayRepository {
           title: 'Add PKR 25k to car fund',
           xp: 20,
           impact: 'Only PKR 2 lakh to go',
+          completionKind: 'contributeToGoal',
+          targetId: 'car',
         ),
       ),
       autoCapture: const [

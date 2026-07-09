@@ -105,11 +105,15 @@ class RecommendedAction {
     required this.title,
     required this.xp,
     required this.impact,
+    this.completionKind,
+    this.targetId,
   });
 
   final String title;
   final int xp;
   final String impact;
+  final String? completionKind;
+  final String? targetId;
 }
 
 class AutoCaptureSource {
@@ -224,6 +228,7 @@ class WealthSnapshot {
     required this.mainReason,
     required this.interpretation,
     required this.provenanceSummary,
+    this.sixDayTrend = const [],
   });
 
   final String date;
@@ -234,6 +239,7 @@ class WealthSnapshot {
   final String mainReason;
   final List<String> interpretation;
   final String provenanceSummary;
+  final List<int> sixDayTrend;
 }
 
 /// A real, dated event that moved wealth or marks a goal milestone.
@@ -456,6 +462,7 @@ TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
     mainReason: b.wealthSnapshot.mainReason,
     interpretation: b.wealthSnapshot.interpretation,
     provenanceSummary: b.wealthSnapshot.provenanceSummary,
+    sixDayTrend: b.wealthSnapshot.trend.map((point) => point.totalPkr).toList(),
   );
 
   // Map recommended action
@@ -463,6 +470,8 @@ TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
     title: b.recommendedAction.label,
     xp: b.recommendedAction.xp,
     impact: b.recommendedAction.effect,
+    completionKind: b.recommendedAction.completionKind.name,
+    targetId: b.recommendedAction.targetId,
   );
 
   // Map health score
