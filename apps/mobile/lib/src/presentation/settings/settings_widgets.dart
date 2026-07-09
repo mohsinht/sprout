@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
 import '../../widgets/sprout_panel.dart';
+import '../../widgets/trust_badge.dart';
 
 /// A section header label used above each grouped [SproutRaisedPanel].
 class SettingsSectionHeader extends StatelessWidget {
@@ -31,11 +32,18 @@ class SettingsSectionHeader extends StatelessWidget {
 }
 
 /// A grouped section: a calm header label followed by a raised panel.
+///
+/// All Settings sections use this widget so they share the same label style,
+/// label→card gap, card radius, border, elevation, and internal padding.
+/// The optional [tint] and [tintBorder] allow the privacy block to use the
+/// same structure with a calm green tint — the only intentional variation.
 class SettingsSection extends StatelessWidget {
   const SettingsSection({
     required this.header,
     required this.child,
     this.padding = const EdgeInsets.all(SproutSpacing.lg),
+    this.tint,
+    this.tintBorder,
     super.key,
   });
 
@@ -43,65 +51,29 @@ class SettingsSection extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SettingsSectionHeader(label: header),
-        SproutRaisedPanel(padding: padding, child: child),
-      ],
-    );
-  }
-}
+  /// Optional background tint (e.g. privacy block's calm green).
+  final Color? tint;
 
-/// Calm status pill for a data source. Green when connected, neutral when not.
-class SourceConnectionPill extends StatelessWidget {
-  const SourceConnectionPill({
-    required this.connected,
-    required this.alwaysOn,
-    super.key,
-  });
-
-  final bool connected;
-  final bool alwaysOn;
+  /// Optional border color to pair with [tint].
+  final Color? tintBorder;
 
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
-    final isOn = connected || alwaysOn;
-    final bg = isOn ? colors.mint : colors.surface;
-    final fg = isOn ? SproutColors.leaf : colors.muted;
-    final borderColor =
-        isOn ? SproutColors.seed.withValues(alpha: 0.18) : colors.line;
-    return Semantics(
-      label: isOn ? 'Connected' : 'Not connected',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(SproutRadius.pill),
-          border: Border.all(color: borderColor),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SettingsSectionHeader(label: header),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: tint ?? colors.surface,
+            borderRadius: BorderRadius.circular(SproutRadius.card),
+            border: Border.all(color: tintBorder ?? colors.line),
+            boxShadow: SproutElevation.raised(),
+          ),
+          child: Padding(padding: padding, child: child),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isOn ? Icons.link_rounded : Icons.link_off_rounded,
-              color: fg,
-              size: 13,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              isOn ? 'Connected' : 'Not connected',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: fg,
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
@@ -162,13 +134,7 @@ class CurrencyChip extends StatelessWidget {
           ),
           if (!enabled) ...[
             const SizedBox(height: 2),
-            Text(
-              'Soon',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: SproutColors.goldInk,
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
+            const SoonPill(),
           ],
         ],
       ),

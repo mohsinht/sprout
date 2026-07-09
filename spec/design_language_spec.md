@@ -7,6 +7,13 @@
 > the same care as the mascot in the weight ladder. The trend sparkline/chart
 > is a depth element, not a Today-hero element. The mascot remains the
 > largest visual element; the wealth figure is the largest *numeric* element.
+>
+> **Layout-lock + motion note (2026-07-09):** The Today layout is locked
+> (13-part canonical structure). A "Today load sequence" subsection is added
+> specifying the ordered entrance, the count-up-as-hero-moment rule, and
+> stagger timing. Haptics-on-every-tap is now a standard. An approved
+> interaction toolkit is recorded to protect the 60fps gate. Depth is
+> reinforced as the chunky solid kind — tiles never flat/washed.
 
 **Prime rule:** the tokens are the vocabulary; this doc is the grammar. A raw hex, a magic `EdgeInsets`, a literal `Duration`, or a one-off color in feature code is a bug. If a value isn't in a token, it doesn't ship.
 
@@ -95,7 +102,7 @@ Every screen is assembled from these existing primitives. A new bespoke componen
 
 - **`SproutCard`** — one content unit (account, goal, transaction group, explanation). Token-driven. The default container.
 - **Pills** — status, confidence, source, streak, XP, recommended action. Short, scannable, `pill` radius.
-- **Tiles** — Today glance items and quick-action chips. Tappable when they reveal an explanation/action; the tap affordance must be visible.
+- **Tiles** — Today glance items and quick-action chips. Tappable when they reveal an explanation/action; the tap affordance must be visible. **Tiles keep the solid chunky bottom edge** — committed tints, not washed-out pastels. Depth is the chunky solid kind, never flat/washed.
 - **`SproutPanel`** — all bottom sheets (Quick Add, Sprout Explains, confirmations). One sheet style app-wide: same handle, same radius, same entrance.
 - **`SproutStates`** — loading, empty, error. Empty states are useful with zero connections (never a dead blank).
 - **Buttons** — one primary style (filled, `pill`, full content width), one secondary (quieter), one text/skip (warm, underlined). Exactly one primary action emphasized per screen.
@@ -127,8 +134,8 @@ All motion comes from the `sprout_motion` primitives (`SproutButtonPress`, `Conf
 
 - **Celebration (loud, rare):** completed daily action, milestone, streak protected/repaired. Confetti + mascot bounce + XP burst + count-up. Capped particles. This is the peak — reserve it for real wins.
 - **Reveal (medium):** score counts up, ring sweeps, goal bars fill — on first appearance only, to communicate change. Staggered card entrance (the existing ~45ms/index) gives the screen life without chaos.
-- **Feedback (small, everywhere):** button press-scale, chip select, tap ripples, haptics on quick actions, a chime on completion.
-- **Ambient (subtle):** mascot idle blink/bob only — never enough to distract from reading.
+- **Feedback (small, everywhere):** button press-scale, chip select, tap ripples, **haptics on every tap** (tile, chip, nav, action — via built-in `HapticFeedback`), a chime on completion.
+- **Ambient (subtle):** mascot idle blink/bob only — never enough to distract from reading. **The mascot must animate on Today** — idle breathing/bob + occasional blink is the minimum; static PNG is fallback only (reduce-motion, missing asset).
 - **Gentle (for bad news):** soft, slow, caring motion. Never alarm, never shake, never red flash.
 
 ### Motion rules (non-negotiable)
@@ -193,22 +200,37 @@ A screen is visually done only when:
 
 ## 12. Today Screen Motion Implementation (sprout_motion wiring)
 
-The Today screen's emotional journey relies on motion tied to state change, not decoration. These are wired via `sprout_motion` primitives:
+The Today screen's emotional journey relies on motion tied to state change, not decoration. The layout is locked (13-part canonical structure); the remaining quality is temporal. These are wired via `sprout_motion` and `flutter_animate` primitives.
 
-### On Load (first appearance)
-- **Score count-up:** Use `SproutNumberCounter` with `SproutDurations.progressRing`. The number animates from 0 to the health score while the ring sweeps.
-- **Mascot bounce:** Use `Transform.scale` with `SproutCurves.playful` — gentle, not exuberant, unless the score is high (thriving mood).
-- **Card entrance:** Staggered ~45ms per card (already implemented via `sproutCardEntrance` extension).
-- **Total on-screen time:** ~1.2s before the user perceives the screen as fully loaded.
+### Today Load Sequence (the screen assembles, it does not just appear)
+
+On Today open, the screen assembles in this ordered entrance. This is a first-class requirement.
+
+1. **Wealth figure counts up** to its value over ~800ms, ease-out (fast then settling). This is the **hero moment** of the load — the number the user opened the app for arrives with weight. Use `SproutNumberCounter` with `SproutCurves` ease-out. Inter font throughout, never swap mid-count.
+2. **Movement chips fade in** just after the number lands (~100ms delay).
+3. **Mascot does a small settle-bounce** on entrance — `Transform.scale` with `SproutCurves.playful`, gentle not exuberant unless thriving mood.
+4. **"What's happening" tiles stagger in**, rising/fading, ~50ms apart via `flutter_animate` stagger.
+5. **Goal progress bars/rings fill** left-to-right on first reveal — `SproutProgressRing` / animated `LinearProgressIndicator`.
+6. **"Why it moved" paragraph fades in** last.
+
+**Total on-screen time:** ~1.2s before the user perceives the screen as fully loaded. Content is readable instantly — non-essential motion finishes behind reading. Never block reading on animation.
 
 ### On Action Completion
 - **Confetti burst:** Use `ConfettiBurst` (capped particles, respects `reduce-motion`). Auto-dismisses after ~1.8s; never blocks the user.
-- **Streak and XP animation:** Use `XpRewardAnimation` for the "+XP" burst, streak pill pulses (already implemented via `_StatusMetric` pulse).
+- **Haptic + chime:** `HapticFeedback.mediumImpact` + completion chime on action completion.
+- **Streak and XP animation:** Use `XpRewardAnimation` for the "+XP" burst, streak pill pulses.
 - **Mascot state:** Transition to `celebrate` with bounce (use `Transform.scale` and `SproutCurves.playful`).
-- **Completion feedback:** Brief "Done today. You're checked in." message stays calm; no alarm or triumph.
+- **Completion feedback:** Brief "Done today." message stays calm; no alarm or triumph.
+
+### Haptics Standard
+
+- **Light haptic on every tap:** tile taps, chip taps, nav taps, button presses — via built-in `HapticFeedback.lightImpact`. No dependency needed.
+- **Medium haptic on action completion:** `HapticFeedback.mediumImpact` paired with the chime + confetti.
+- Haptics are suppressed when reduce-motion is enabled (consistent with the motion-suppression contract).
 
 ### Respect Reduce-Motion
 - When `MediaQuery.of(context).disableAnimations` is true, show all elements instantly in their final state.
+- Count-up → static final number. Stagger → all tiles visible immediately. Bounce → no bounce. Confetti → no confetti. Goal fill → bars at final state.
 - The screen must be complete and understandable with zero animation.
 - Use `if (reducedMotion)` guards as already implemented in `_QuestHeroState`.
 
@@ -217,3 +239,13 @@ The Today screen's emotional journey relies on motion tied to state change, not 
 - Cap `ConfettiBurst` particle count (default is safe; do not increase).
 - Test on target low-end Android: if any motion causes frame drops, simplify or remove.
 - A still screen at 60fps is better than beautiful motion at 40fps.
+
+### Approved Interaction Toolkit
+
+No heavy additions. Every dependency risks the 60fps low-end gate.
+
+- **`flutter_animate`** — load cascade, staggered tiles, fades/slides.
+- **`sprout_motion`** (`SproutNumberCounter`, `SproutProgressRing`, `ConfettiBurst`, press) — count-up, ring/bar fill, confetti, press.
+- **Built-in `HapticFeedback`** — taps everywhere (no dependency needed).
+- **`fl_chart`** — the 6-day trend tap-through only.
+- **Do NOT add** heavy animation/physics libraries (e.g. lottie physics engines, custom particle systems, physics-based spring packages beyond what `sprout_motion` provides). Every dependency risks the 60fps low-end gate.

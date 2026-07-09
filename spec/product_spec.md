@@ -9,6 +9,13 @@
 > the cash guy) but is demoted from the Today hero. The three questions Today
 > must answer (§1 of the realignment doc) replace the old daily loop. The
 > calm, playful, no-shame feel and all UX philosophy laws are preserved.
+>
+> **Layout-lock note (2026-07-09):** The Today screen layout is **locked** as
+> a canonical 13-part structure. No new content or elements may be added to
+> Today; further quality is temporal (load sequence, micro-interactions,
+> mascot coming alive). Reordering or adding requires a deliberate spec
+> revision. The daily loop now includes the assembling load sequence and
+> completion celebration as part of the defined loop.
 
 ## One-Line Product
 
@@ -43,7 +50,7 @@ Today is the default landing screen. Quick Add is not a tab. Educational content
 
 ### Daily Loop
 
-Open app -> Sprout greets by name and reacts to the current state -> user sees **total wealth, how it moved, and why** -> user reads the one goal-relative next step -> user completes one small action (if any) -> confetti, mascot cheer, streak tick, and XP -> user closes the app feeling calmer.
+Open app -> **the screen assembles** (wealth figure counts up, movement chips fade in, mascot settles, tiles stagger in, goal bars fill, interpretation fades in last) -> Sprout greets by name and reacts to the current state -> user sees **total wealth, how it moved, and why** -> user reads the one goal-relative next step -> user completes one small action (if any) -> **haptic + chime + confetti + mascot cheer**, streak tick, and XP -> user closes the app feeling calmer.
 
 The Today screen must answer three questions, in order:
 
@@ -52,6 +59,8 @@ The Today screen must answer three questions, in order:
 3. **What's my one next step toward my goals?** (an AI suggestion, not empty ritual)
 
 Completion must feel like closure: the user is done for today.
+
+**The Today layout is locked** (13-part canonical structure — see `application_screen_guidance.md`). No new content or elements may be added; further quality is temporal (load sequence, micro-interactions, mascot). Reordering or adding requires a deliberate spec revision.
 
 ### Streak System
 

@@ -13,6 +13,19 @@ import '../../widgets/trust_badge.dart';
 import '../today/today_widgets.dart';
 import 'settings_widgets.dart';
 
+/// One consistent divider between rows inside any Settings card.
+/// Same inset, same height, same spacing — used by every section.
+const _rowDivider = Column(
+  children: [
+    SizedBox(height: SproutSpacing.sm),
+    Padding(
+      padding: EdgeInsets.only(left: 36), // icon(20) + gap(md=10) + a touch
+      child: Divider(height: 1),
+    ),
+    SizedBox(height: SproutSpacing.sm),
+  ],
+);
+
 /// User-facing copy for Settings. Kept local so the Strings owner can edit
 /// `sprout_strings.dart` without merge conflicts.
 class _SettingsStrings {
@@ -35,7 +48,6 @@ class _SettingsStrings {
   static const notConnected = 'Not connected';
   static const on = 'On';
   static const connect = 'Connect';
-  static const soon = 'Soon';
   static const disconnect = 'Disconnect';
   static const disconnectConfirmTitle = 'Disconnect this source?';
   static String disconnectConfirmBody(String label) =>
@@ -307,18 +319,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
 
+    const gap = SizedBox(height: SproutSpacing.xl, key: ValueKey('section-gap'));
+
     return SproutPage(
       title: _SettingsStrings.title,
       subtitle: _SettingsStrings.subtitle,
       children: [
-        if (!_hasExternalConnection)
+        if (!_hasExternalConnection) ...[
           _EmptySourcesCard(onManage: _scrollToSources),
+          gap,
+        ],
         _profileSection(colors),
+        gap,
         _dataSourcesSection(colors),
+        gap,
         _privacySection(colors),
+        gap,
         _notificationsSection(colors),
+        gap,
         _currencySection(colors),
+        gap,
         _preferencesSection(colors, isDark: isDark),
+        gap,
         _deleteSection(colors),
       ],
     );
@@ -330,40 +352,43 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: SproutButtonPress(
         onTap: _openProfileSheet,
         semanticLabel: _SettingsStrings.viewProfile,
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: colors.mint,
-              child: const Icon(Icons.person_rounded,
-                  color: SproutColors.leaf, size: 22),
-            ),
-            const SizedBox(width: SproutSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    mockProfile.name,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(color: colors.ink),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${SproutFormat.currency(mockProfile.monthlyIncome)} / month',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: colors.muted),
-                  ),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: colors.mint,
+                child: const Icon(Icons.person_rounded,
+                    color: SproutColors.leaf, size: 20),
               ),
-            ),
-            Icon(Icons.chevron_right_rounded,
-                color: colors.muted, size: 24),
-          ],
+              const SizedBox(width: SproutSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      mockProfile.name,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(color: colors.ink),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${SproutFormat.currency(mockProfile.monthlyIncome)} / month',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: colors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: colors.muted, size: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -380,11 +405,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               source: source,
               onTap: () => _openSourceSheet(source),
             ),
-            if (source.id != _sources.last.id) ...[
-              const SizedBox(height: SproutSpacing.sm),
-              const Divider(height: 1),
-              const SizedBox(height: SproutSpacing.sm),
-            ],
+            if (source.id != _sources.last.id) _rowDivider,
           ],
         ],
       ),
@@ -398,52 +419,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       Icons.delete_outline_rounded,
       Icons.verified_user_rounded,
     ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SettingsSectionHeader(label: _SettingsStrings.privacy),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.mint.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(SproutRadius.card),
-            border: Border.all(
-              color: SproutColors.seed.withValues(alpha: 0.16),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(SproutSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _SettingsStrings.youAreInControl,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: SproutColors.leaf,
-                        fontWeight: FontWeight.w800,
-                      ),
+    return SettingsSection(
+      header: _SettingsStrings.privacy,
+      tint: colors.mint.withValues(alpha: 0.45),
+      tintBorder: SproutColors.seed.withValues(alpha: 0.16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _SettingsStrings.youAreInControl,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: SproutColors.leaf,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: SproutSpacing.sm),
-                Text(
-                  _SettingsStrings.privacyIntro,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: colors.muted),
-                ),
-                const SizedBox(height: SproutSpacing.md),
-                for (var i = 0; i < mockPrivacyStatements.length; i++) ...[
-                  TrustBadge(
-                    label: mockPrivacyStatements[i],
-                    icon: icons[i % icons.length],
-                  ),
-                  if (i != mockPrivacyStatements.length - 1)
-                    const SizedBox(height: SproutSpacing.md),
-                ],
-              ],
-            ),
           ),
-        ),
-      ],
+          const SizedBox(height: SproutSpacing.sm),
+          Text(
+            _SettingsStrings.privacyIntro,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: SproutSpacing.md),
+          for (var i = 0; i < mockPrivacyStatements.length; i++) ...[
+            TrustBadge(
+              label: mockPrivacyStatements[i],
+              icon: icons[i % icons.length],
+            ),
+            if (i != mockPrivacyStatements.length - 1)
+              const SizedBox(height: SproutSpacing.md),
+          ],
+        ],
+      ),
     );
   }
 
@@ -467,11 +475,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               onChanged: (v) =>
                   setState(() => _notifications[labels[i]] = v),
             ),
-            if (i != labels.length - 1) ...[
-              const SizedBox(height: SproutSpacing.sm),
-              const Divider(height: 1),
-              const SizedBox(height: SproutSpacing.sm),
-            ],
+            if (i != labels.length - 1) _rowDivider,
           ],
         ],
       ),
@@ -536,27 +540,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (v) =>
                 setState(() => _prefs[_SettingsStrings.reducedMotion] = v),
           ),
-          const SizedBox(height: SproutSpacing.sm),
-          const Divider(height: 1),
-          const SizedBox(height: SproutSpacing.sm),
+          _rowDivider,
           const PreferenceToggle(
             label: _SettingsStrings.soundEffects,
             value: false,
             icon: Icons.volume_up_rounded,
             comingSoon: true,
           ),
-          const SizedBox(height: SproutSpacing.sm),
-          const Divider(height: 1),
-          const SizedBox(height: SproutSpacing.sm),
+          _rowDivider,
           const PreferenceToggle(
             label: _SettingsStrings.haptics,
             value: false,
             icon: Icons.vibration_rounded,
             comingSoon: true,
           ),
-          const SizedBox(height: SproutSpacing.sm),
-          const Divider(height: 1),
-          const SizedBox(height: SproutSpacing.sm),
+          _rowDivider,
           PreferenceToggle(
             label: _SettingsStrings.darkMode,
             value: isDark,
@@ -576,22 +574,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.delete_outline_rounded,
-                  color: SproutColors.tomato, size: 20),
-              const SizedBox(width: SproutSpacing.sm),
-              Expanded(
-                child: Text(
-                  _SettingsStrings.deleteIntro,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colors.ink,
-                      ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline_rounded,
+                    color: SproutColors.tomato, size: 20),
+                const SizedBox(width: SproutSpacing.md),
+                Expanded(
+                  child: Text(
+                    _SettingsStrings.deleteIntro,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: colors.ink,
+                        ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: SproutSpacing.md),
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton(
@@ -626,42 +626,66 @@ class _DataSourceRow extends StatelessWidget {
     return SproutButtonPress(
       onTap: source.comingSoon ? null : onTap,
       semanticLabel: source.label,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  source.label,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: colors.ink,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  source.detail,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.muted,
-                      ),
-                ),
-              ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              _sourceIcon(source.id),
+              color: colors.muted,
+              size: 20,
             ),
-          ),
-          const SizedBox(width: SproutSpacing.md),
-          _SourceControl(
-            isActive: isActive,
-            comingSoon: source.comingSoon,
-          ),
-          if (!source.comingSoon) ...[
-            const SizedBox(width: SproutSpacing.sm),
-            Icon(Icons.chevron_right_rounded,
-                color: colors.muted, size: 24),
+            const SizedBox(width: SproutSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    source.label,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: colors.ink,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    source.detail,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.muted,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: SproutSpacing.md),
+            _SourceControl(
+              isActive: isActive,
+              comingSoon: source.comingSoon,
+            ),
+            if (!source.comingSoon) ...[
+              const SizedBox(width: SproutSpacing.sm),
+              Icon(Icons.chevron_right_rounded,
+                  color: colors.muted, size: 24),
+            ],
           ],
-        ],
+        ),
       ),
     );
+  }
+
+  IconData _sourceIcon(String id) {
+    switch (id) {
+      case 'manual':
+        return Icons.edit_rounded;
+      case 'email':
+        return Icons.email_outlined;
+      case 'statement':
+        return Icons.description_outlined;
+      case 'sms':
+        return Icons.sms_outlined;
+      default:
+        return Icons.link_rounded;
+    }
   }
 }
 
@@ -684,20 +708,7 @@ class _SourceControl extends StatelessWidget {
     final colors = SproutColorScheme.of(context);
 
     if (comingSoon) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: SproutColors.gold.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(SproutRadius.pill),
-        ),
-        child: Text(
-          _SettingsStrings.soon,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: SproutColors.goldInk,
-                fontWeight: FontWeight.w800,
-              ),
-        ),
-      );
+      return const SoonPill();
     }
 
     if (isActive) {
@@ -748,7 +759,7 @@ class _EmptySourcesCard extends StatelessWidget {
     return SproutRaisedPanel(
       child: Row(
         children: [
-          const Icon(Icons.shield_rounded, color: SproutColors.leaf, size: 22),
+          const Icon(Icons.shield_rounded, color: SproutColors.leaf, size: 20),
           const SizedBox(width: SproutSpacing.md),
           Expanded(
             child: Column(

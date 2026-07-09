@@ -1,5 +1,14 @@
 # Sprout Mascot Asset Set
 
+> **Layout-lock note (2026-07-09):** The animated mascot is elevated from
+> "future" to **required for Today.** On Today, the mascot must animate —
+> at minimum a subtle idle (breathing/bob + occasional blink), a
+> mood-matched expression driven by product state, plus a reaction on load
+> and on action completion. Static PNG is a fallback only (reduce-motion,
+> missing asset), never the default experience on Today. The existing
+> expression assets (videos / Rive states) must be wired to the four
+> product moods, not left unused.
+
 ## Purpose
 
 Sprout is the emotional center of the product. The mascot should make money feel calm, understandable, and winnable without hiding the truth.
@@ -90,11 +99,15 @@ Use helper factories where possible:
 
 ## Required Animation States
 
-### Idle
+### Idle (required for Today)
 
-Use for most screen presence. It should feel alive but quiet. Blink and bob are acceptable when reduce-motion is off.
+The mascot must **animate** on Today — at minimum a subtle idle (breathing/bob + occasional blink). It should feel alive but quiet. Blink and bob are acceptable when reduce-motion is off. **Static PNG is a fallback only** (reduce-motion, missing asset), never the default experience on Today.
 
-### Bounce / Celebrate
+### Mood-Matched Expressions (required for Today)
+
+The mascot's expression must be **driven by product state** (thriving / content / watchful / concerned) and react on load (settle-bounce) and on action completion (celebrate bounce). The existing expression videos / Rive states must be wired to the four product moods, not left unused.
+
+### Bounce / Celebrate (required for action completion)
 
 Use only after meaningful completion:
 
@@ -127,17 +140,17 @@ Minimum canonical PNG set:
 
 Existing stills satisfy this through the deterministic mapping above. Future asset naming should use the product mood names for clarity.
 
-## Lottie / Rive Future Requirements
+## Lottie / Rive Requirements (required for Today)
 
-Rive or Lottie should be added only after the static mood set is stable.
+Rive or Lottie is **required for Today** — the mascot must animate (idle + mood expressions + load reaction + completion reaction). Static PNGs remain the fallback layer. The existing expression assets (videos / Rive states) must be mapped to the four product moods and wired to the mascot state.
 
 Required animation clips:
 
-- `idle`
-- `celebrate`
-- `gentle`
-- `wave`
-- `blink`
+- `idle` — subtle breathing/bob + occasional blink (the default Today presence).
+- `celebrate` — bounce on action completion.
+- `gentle` — care, not alarm, for bad news / uncertainty / stale data.
+- `wave` — greeting or onboarding.
+- `blink` — occasional blink during idle.
 
 Performance requirements:
 
@@ -149,7 +162,7 @@ Performance requirements:
 
 ## Usage Rules
 
-- Today: mascot is the largest visual element.
+- **Today: mascot is the largest visual element and must animate** — idle + mood-matched expression + load reaction + completion reaction. Static PNG is fallback only.
 - Money: mascot is a small calm signal only.
 - Settings: mascot appears sparingly; trust copy matters more.
 - Quick Add: mascot can confirm completion but should not slow entry.
@@ -160,6 +173,8 @@ Performance requirements:
 - Every required mood has a static PNG fallback.
 - Every animated state has a static fallback.
 - The four product moods map 1:1 to canonical states and assets.
+- **The existing expression assets (videos / Rive states) are wired to the four product moods** — not left unused.
+- **On Today, the mascot animates by default** (idle + mood-matched + load reaction + completion reaction). Static PNG is fallback only (reduce-motion, missing asset).
 - Missing Rive/video assets never produce a blank box.
 - Reduce-motion displays still art.
 - Mascot mood is driven by product state, not decorative choice.

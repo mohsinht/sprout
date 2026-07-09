@@ -13,11 +13,11 @@ This folder is the working spec package for Sprout. It translates the high-level
 
 - [UX Philosophy](ux_philosophy.md): the feel constitution that governs how every screen should feel.
 - [Information Gathering and Trust](information_gathering_trust.md): the law for how Sprout asks for any information without becoming a form.
-- [Product Spec](product_spec.md): app-level principles, navigation, daily loop (three wealth questions), screen requirements, phasing, and definition of done.
-- [Application Screen Guidance](application_screen_guidance.md): reusable guidance for writing or reviewing any screen spec, including the three-questions Today structure and wealth states.
+- [Product Spec](product_spec.md): app-level principles, navigation, daily loop (three wealth questions + assembling load sequence), locked Today layout, screen requirements, phasing, and definition of done.
+- [Application Screen Guidance](application_screen_guidance.md): reusable guidance for writing or reviewing any screen spec, including the locked 13-part Today layout, load sequence, mascot-alive, micro-interactions, and wealth states.
 - [Design System Reference](design_system_reference.md): current colors, typography, spacing, radius, card/pill/tile styles, iconography, and component rules.
-- [Design Language & Elements Spec](design_language_spec.md): the playful visual language, motion system, wealth hero figure rules, and consistency rules that govern how Sprout looks and moves across screens.
-- [Mascot Asset Set](mascot_asset_set.md): required Sprout mascot moods, animation states, current asset inventory, and future asset requirements.
+- [Design Language & Elements Spec](design_language_spec.md): the playful visual language, motion system (Today load sequence, haptics standard, approved interaction toolkit), wealth hero figure rules, and consistency rules that govern how Sprout looks and moves across screens.
+- [Mascot Asset Set](mascot_asset_set.md): required Sprout mascot moods, animation states (animated mascot required for Today), current asset inventory, and asset requirements.
 - [Data Model Contract](data_model_contract.md): typed daily briefing contract plus Holding, PriceQuote/FxRate, WealthSnapshot, WealthEvent, LearnThread, transaction, goal, account, finding, and support models.
 - [Scoring Model](scoring_model.md): deterministic v0 wealth-health score (goal pace, buffer, diversification, contribution consistency, trend stability), finding detection, thresholds, and recommended-action selection. Check-in is removed.
 - [AI Briefing Backend Spec](ai_briefing_backend_spec.md): nightly wealth job inputs, cadence, severity model, WealthSnapshot + events + provenance validation, output contract, fallback behavior, and guardrails.
@@ -25,7 +25,7 @@ This folder is the working spec package for Sprout. It translates the high-level
 - [Navigation IA](navigation_ia.md): target 3-tab shell plus center quick-add action. Money is the holdings + trend + provenance depth surface.
 - [Copy Tone Guide](copy_tone_guide.md): Sprout voice rules, wealth movement phrasing, goal-relative step phrasing, provenance phrasing, and example strings.
 - [Notifications Spec](notifications_spec.md): daily habit trigger timing, copy, privacy defaults, and deep-link behavior.
-- [Screen Acceptance Criteria](screen_acceptance_criteria.md): per-screen done bars for product and QA review, including wealth-health Today criteria.
+- [Screen Acceptance Criteria](screen_acceptance_criteria.md): per-screen done bars for product and QA review, including locked Today layout, motion/mascot/craft pass-fail checks, and wealth-health criteria.
 - [User Stories and Regression Invariants](user_stories_regression_invariants.md): permanent persona journeys (including P7 Multi-Currency Investor) and invariants for e2e/integration tests.
 - [Regulatory Constraints](regulatory_constraints.md): fund-movement boundary, privacy posture, hosting assumptions, and PECA/screen-scraping limits.
 - [Data Sources Registry](data_sources_registry.md): official, semi-official, commercial, and user-permissioned sources (Al Meezan prices, Xe FX, Wise balances, MUFAP) with cost/cadence/provenance notes.

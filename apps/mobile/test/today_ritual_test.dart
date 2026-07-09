@@ -8,8 +8,8 @@ void main() {
   testWidgets('Today shows wealth hero, holdings, goals, and provenance',
       (tester) async {
     await _pumpToday(tester);
-    await tester.pump(const Duration(milliseconds: 250));
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Greeting
     expect(find.text('Salaam, Mohsin 👋'), findsOneWidget);
@@ -26,9 +26,12 @@ void main() {
     // What's happening tiles
     expect(find.text("What's happening"), findsOneWidget);
 
+    // Salary countdown strip
+    expect(find.textContaining('Salary in'), findsOneWidget);
+
     // Scroll down to reveal below-fold content.
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Holdings section
     expect(find.text('Your holdings'), findsOneWidget);
@@ -42,7 +45,7 @@ void main() {
 
     // Scroll more for goals.
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Goals
     expect(find.text('Your goals'), findsOneWidget);
@@ -51,7 +54,7 @@ void main() {
 
     // Scroll more for learn later.
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     // Learn later
     expect(find.text('Learn later'), findsOneWidget);
@@ -73,8 +76,12 @@ Future<void> _pumpToday(WidgetTester tester) {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: buildSproutTheme(),
-        home: const Scaffold(
-          body: SafeArea(child: TodayScreen()),
+        home: MediaQuery(
+          data: MediaQueryData.fromView(tester.view)
+              .copyWith(disableAnimations: true),
+          child: const Scaffold(
+            body: SafeArea(child: TodayScreen()),
+          ),
         ),
       ),
     ),

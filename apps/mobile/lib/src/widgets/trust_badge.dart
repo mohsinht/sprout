@@ -46,6 +46,10 @@ class TrustBadge extends StatelessWidget {
 
 /// A simple labelled toggle row for preferences (reduced motion, haptics,
 /// sound, etc.). Dark-mode aware through the theme's Switch.
+///
+/// Uses the unified Settings row template: [icon 20 muted] — [titleSmall
+/// title] — [trailing control], with consistent vertical padding so every
+/// row in every Settings card reads at the same height.
 class PreferenceToggle extends StatelessWidget {
   const PreferenceToggle({
     required this.label,
@@ -69,36 +73,42 @@ class PreferenceToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
-    return Row(
-      children: [
-        if (icon != null) ...[
-          Icon(icon, color: colors.muted, size: 20),
-          const SizedBox(width: SproutSpacing.md),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, color: colors.muted, size: 20),
+            const SizedBox(width: SproutSpacing.md),
+          ],
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(color: colors.ink),
+            ),
+          ),
+          if (comingSoon)
+            const SoonPill()
+          else
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeThumbColor: SproutColors.seed,
+            ),
         ],
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: colors.ink),
-          ),
-        ),
-        if (comingSoon)
-          const _SoonPill()
-        else
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: SproutColors.seed,
-          ),
-      ],
+      ),
     );
   }
 }
 
-class _SoonPill extends StatelessWidget {
-  const _SoonPill();
+/// One shared "Soon" pill style — gold tint, pill radius, labelSmall w800
+/// goldInk. Used everywhere a not-yet-available control appears: currency
+/// chips, data-source rows, and preference toggles.
+class SoonPill extends StatelessWidget {
+  const SoonPill({super.key});
 
   @override
   Widget build(BuildContext context) {

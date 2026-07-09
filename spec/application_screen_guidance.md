@@ -7,6 +7,12 @@
 > and stale-price/stale-FX day. The rule "no movement shown without a why"
 > is added. The Money section is updated to include holdings breakdown and
 > trend depth. Manual expense logging remains first-class via Quick Add.
+>
+> **Layout-lock note (2026-07-09):** The Today screen layout is now **locked**
+> as a canonical 13-part structure (see below). No new content or elements
+> may be added to Today; further quality is *temporal* — it lives in the load
+> sequence, micro-interactions, and the mascot coming alive, not in more
+> elements. Reordering or adding requires a deliberate spec revision.
 
 ## Purpose
 
@@ -72,22 +78,58 @@ Purpose: deliver the daily wealth-health check-in as a fast emotional arc that a
 2. Why did it move? (plain-language interpretation of the drivers)
 3. What's my one next step toward my goals? (an AI suggestion, not empty ritual)
 
-Minimum content:
+#### Locked layout (canonical structure — do not add or reorder)
 
-- Prominent streak and XP.
-- Greeting by name.
-- Large reactive Sprout mascot with a visible mood — the largest visual element, never competed for by other UI.
-- **Total wealth figure** (large, Inter font) with an up/down movement chip showing today's change and MTD change — the hero number the user opens the app for.
-- One clear sentence in Sprout's voice, leading with the movement + reason + reassurance (e.g. "Down PKR 38k today — Al Meezan took a tea break after yesterday's jump, not a crash").
-- **"What happened" event set** — dated events with yesterday-continuity, each with a plain-language "why." Mix good and not-good honestly.
-- **One goal-relative AI next-step** as the main call to action — visible but recessed, so the reading order is: face → wealth figure → sentence → events → score → action.
-- Garden-health score in trustworthy Inter font (mono/tabular), with count-up and ring animation.
-- Tap-through explanation for the score and its factors.
-- Tappable glance tiles with recognizable icons: holdings, goal, trend, and the most relevant context tile (review items, salary countdown, bills, or data quality). Market appears only when personally relevant.
-- **Provenance on tap:** every valuation exposes its dated price/FX source.
-- **The trend sparkline/chart is a depth element, not a Today-hero element.** It lives one tap down.
+The Today screen has reached its final layout. This exact top-to-bottom order is the fixed structure. Nothing added, nothing reordered without a deliberate spec change.
 
-**Required states:**
+1. Greeting + streak (compact, top).
+2. Mascot (reactive, mood-driven).
+3. **Total wealth** — the hero figure, largest on screen.
+4. Movement chips — today + month-to-date.
+5. Sprout's one-line read (calm/honest, mood-matched).
+6. Your one step — single chunky action button.
+7. **What's happening** — 4–5 tiles (good/bad news + fund/goal highlights).
+8. Your holdings — visual rows.
+9. Depth door — 6-day trend / breakdown (tap-through).
+10. Why it moved today — the interpretation paragraph.
+11. Your goals — progress bars.
+12. Learn later — tap-through.
+13. Provenance footer — prices/FX/dates/sources.
+
+**Above the fold = 1–6** (the 20-second glance). **Below = the rest** (depth for the curious). The layout is DONE. The remaining quality is temporal — it lives in the load sequence and micro-interactions, not in more elements.
+
+#### Load sequence (the screen assembles, it does not just appear)
+
+On Today open, the screen assembles in this ordered entrance. This is a first-class requirement, not an optional nicety.
+
+1. **Wealth figure counts up** to its value over ~800ms, ease-out (fast then settling). This is the hero moment of the load.
+2. **Movement chips fade in** just after the number lands.
+3. **Mascot does a small settle-bounce** on entrance.
+4. **"What's happening" tiles stagger in**, rising/fading, ~50ms apart.
+5. **Goal progress bars/rings fill** left-to-right on first reveal.
+6. **"Why it moved" paragraph fades in** last.
+
+Content is readable instantly — non-essential motion finishes behind reading. Never block reading on animation.
+
+#### Micro-interactions (every interactive element)
+
+- **Light haptic** on every tile tap, chip tap, and nav tap.
+- **Tiles and buttons press down** on touch (the chunky-edge press).
+- **Action completion** → haptic + chime + confetti, then the calm "done" state.
+
+#### Mascot-alive requirement
+
+- On Today, the mascot must **animate** — at minimum a subtle idle (breathing/bob + occasional blink), and a **mood-matched expression** driven by product state (thriving / content / watchful / concerned), plus a reaction on load and on action completion.
+- Static PNG is a **fallback only** (reduce-motion, missing asset), never the default experience on Today.
+- The mascot is the primary emotional signal; its motion is what turns the screen from "calm dashboard" into "calm companion."
+
+#### Motion rules
+
+- Everything routes through `sprout_motion` / `flutter_animate`; no ad-hoc controllers with literal durations.
+- **Reduce-motion** fully respected: count-up, stagger, bounce, confetti all replaced by calm static reveals; no information hidden, no layout broken.
+- **60fps on the target low-end Android device** is the gate; simplify or cut any entrance effect that janks.
+
+#### Required states
 
 - Normal (wealth up): calm celebration, not exuberance.
 - **Wealth-down day:** calm, not alarm. Mascot is watchful (never angry/red-faced). The sentence ends on calm. No shame.
@@ -99,11 +141,19 @@ Minimum content:
 - Offline cached state.
 - Briefing unavailable state.
 
+#### Craft quality bar
+
+- **Tile heights:** tiles are equal-height AND content fills them — no large dead gap between icon row and title. Reduce height or top-align content so there's no empty middle.
+- **No truncation, ever:** tile copy is shortened at the source (1–3 word title, ≤5 word description). "Al Meezan, NAV correcti…" style clipping fails acceptance.
+- **Readability floor:** no readable body text below ~14px; the interpretation paragraph at comfortable body size; all survives 1.3× text scale without clipping.
+- **Depth retained:** tiles and buttons keep the solid chunky bottom edge; committed tints, not washed-out pastels.
+
 **Rule: no movement shown without a "why."** Every change (today's change, MTD change, per-event magnitude) must be accompanied by its driver — "main reason: NAV movement," "EUR/PKR moved," "you added to savings." This is the interpretation layer that makes it a health tracker *with an analyst*, not a number.
 
 Acceptance criteria:
 
 - Today is the default landing screen.
+- **The 13-part locked layout is present in the exact order specified.** No extra elements, no reordering.
 - The mascot is the largest visual element and the emotional hero of the screen.
 - Reading order is clear: greeting → mascot/mood signal → wealth figure + movement → summary sentence → events → score number → action card → glance tiles.
 - The wealth figure uses Inter font for trustworthiness.
@@ -117,6 +167,17 @@ Acceptance criteria:
 - **A wealth-down day stays calm** — no alarm, no shame, no red-faced mascot.
 - **Stale price/FX is labelled** with the as-of date, never silently trusted.
 - **Opening the app never changes health** — the score reflects wealth reality, not attendance.
+- **Wealth figure animates count-up on first reveal** (unless reduce-motion).
+- **Tiles stagger in** on load (~50ms apart).
+- **Goal bars fill on reveal.**
+- **Mascot animates and is mood-matched** (not a static PNG by default).
+- **Haptic feedback on every tile/chip/nav tap.**
+- **Action completion celebrates** (haptic + chime + confetti → calm "done").
+- **Entrance motion holds 60fps** on the target low-end Android device.
+- **Reduce-motion replaces all entrance motion** with static reveals, losing no information.
+- **Tiles are equal-height and content-filled** — no dead gaps, no truncation.
+- **No body text below ~14px; 1.3× text scale intact.**
+- **Chunky depth present** on tiles and buttons; committed tints, not washed-out pastels.
 - The user can complete the recommended action and receive closure through celebration, streak/XP feedback, and a sign-off.
 - Every score, tile, event, or finding opens a plain-language explanation.
 - Market appears only when personally relevant.

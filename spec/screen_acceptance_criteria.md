@@ -8,6 +8,10 @@
 > health. Money criteria are updated to include holdings breakdown and
 > trend depth. AI Briefing criteria are updated for WealthSnapshot and
 > provenance.
+>
+> **Layout-lock note (2026-07-09):** Today layout is locked as a canonical
+> 13-part structure. Motion, mascot-alive, haptics, and craft fixes are now
+> pass/fail acceptance checks, not optional polish.
 
 ## App-Level
 
@@ -28,22 +32,46 @@
 
 ## Today
 
+### Layout (locked)
+
 - Opens as the default landing screen.
-- Shows streak, XP, greeting, mascot, summary, health score, recommended action, and glance tiles.
+- **The 13-part locked layout is present in the exact order specified** (greeting+streak → mascot → wealth → movement chips → one-line read → action button → what's happening tiles → holdings rows → depth door → why it moved → goals → learn later → provenance footer). No extra elements, no reordering.
+- **Above the fold (1–6) delivers the 20-second glance; below the fold is depth.**
+- Mascot is the largest visual element.
 - **Shows total wealth with today's change and MTD change** as the hero number.
 - **Every movement has a "why"** — no change shown without its driver.
 - **"What happened" events reference prior days** to form a story, not a snapshot.
 - **One goal-relative next-step** is shown (not an empty ritual).
 - **Breakdown, trend, and provenance are reachable on tap** (depth, not forced).
-- Mascot is the largest visual element.
-- Score animates on first reveal unless reduce-motion is enabled.
-- Completing the action triggers celebration, XP, streak feedback, and sign-off.
+
+### Motion (pass/fail)
+
+- **Wealth figure animates count-up on first reveal** (unless reduce-motion is enabled).
+- **"What's happening" tiles stagger in** on load (~50ms apart, rising/fading).
+- **Goal progress bars/rings fill** left-to-right on first reveal.
+- **Mascot animates on load** (settle-bounce) and is mood-matched (not a static PNG by default).
+- **Haptic feedback on every tile tap, chip tap, and nav tap.**
+- **Action completion celebrates:** haptic + chime + confetti → calm "done" state.
+- **Entrance motion holds 60fps** on the target low-end Android device; any effect that janks is simplified or cut.
+- **Reduce-motion replaces all entrance motion** with calm static reveals — no information hidden, no layout broken.
+
+### States (pass/fail)
+
 - **Wealth-down day stays calm** — no alarm, no shame, no red-faced mascot.
 - **Stale price/FX is labelled** with the as-of date, never silently trusted.
 - **Opening the app never changes health.**
 - Empty/first-run state works with zero connections.
 - Market tile appears only when personally relevant; otherwise a more relevant context tile appears.
+- Completing the action triggers celebration, XP, streak feedback, and sign-off.
 - Every tile, score factor, event, and finding opens Sprout Explains.
+
+### Craft (pass/fail)
+
+- **Tiles are equal-height AND content-filled** — no large dead gap between icon row and title. Reduce height or top-align content.
+- **Zero truncation:** tile copy is shortened at the source (1–3 word title, ≤5 word description). "Al Meezan, NAV correcti…" style clipping fails.
+- **No readable body text below ~14px;** the interpretation paragraph at comfortable body size.
+- **1.3× text scale survives** without clipping or broken layout.
+- **Chunky depth present** on tiles and buttons — solid bottom edge, committed tints, not washed-out pastels.
 
 ## Money
 
