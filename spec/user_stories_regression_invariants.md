@@ -226,13 +226,13 @@ Must always:
 - Today never renders blank, empty, or "connect something to begin."
 - Zero-data Today still shows Sprout, greeting/default identity, check-in action, and sensible first step.
 
-### S10 — Mascot Is Hero And Reflects Real State
+### S10 — Mascot Reflects Real State
 
-As any user, I see Sprout as the largest element reacting to my actual state, so that I know my status at a glance.
+As any user, I see Sprout reacting to my actual state, so that I understand the emotional context at a glance.
 
 Must always:
 
-- On Today, mascot is the largest visual element.
+- On Today, total wealth is the hero; mascot is prominent, alive, mood-driven, and does not overpower the wealth figure.
 - Mascot mood is driven by product state, not random decoration.
 
 ### S11 — Every Insight Is Explainable
@@ -385,7 +385,7 @@ Given a wealth-down day, when Today renders, then the mascot is watchful (never 
 Must always:
 
 - A wealth-down day never uses alarm, shame, or a red-faced mascot.
-- The sentence ends on calm ("not a crash, just a tea break").
+- The sentence ends on calm ("cooled after yesterday's jump, not a crash").
 
 ### S25 — Goals Always Show Remaining-To-Target
 

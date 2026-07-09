@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
+import '../../data/manual_money_store.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../domain/sprout_models.dart';
 import '../../theme/sprout_strings.dart';
@@ -11,36 +12,6 @@ import '../../widgets/sprout_helpers.dart';
 import '../../widgets/sprout_page.dart';
 import '../../widgets/sprout_panel.dart';
 import '../../widgets/transaction_row.dart';
-
-/// In-session store of accounts so manual balance edits actually persist
-/// while the app is open (survives tab switches; resets on app restart, like
-/// the theme-mode setting). Seeded from [mockAccounts].
-final accountsProvider =
-    StateNotifierProvider<AccountsNotifier, List<SproutAccount>>(
-  (ref) => AccountsNotifier(),
-);
-
-class AccountsNotifier extends StateNotifier<List<SproutAccount>> {
-  AccountsNotifier() : super(mockAccounts);
-
-  void updateBalance(String id, int newBalance) {
-    state = [
-      for (final a in state)
-        if (a.id == id)
-          SproutAccount(
-            id: a.id,
-            name: a.name,
-            type: a.type,
-            balance: newBalance,
-            currency: a.currency,
-            lastUpdatedLabel: 'Edited just now',
-            isManual: a.isManual,
-          )
-        else
-          a,
-    ];
-  }
-}
 
 /// Copy that is specific to the Money screen. Kept local so we never touch
 /// `sprout_strings.dart` (another agent may be editing it).
@@ -64,7 +35,8 @@ class _MoneyStrings {
   static const healthOkay = 'Looks okay. One small action can improve this.';
   static const healthNear = 'Nearly there. Small adjustments keep it calm.';
 
-  static const investmentsNote = 'Investment values are estimates until updated.';
+  static const investmentsNote =
+      'Investment values are estimates until updated.';
   static const mutualFunds = 'Mutual funds';
   static const cashBuffer = 'Cash buffer';
   static const foreignCurrency = 'Foreign currency savings';
@@ -93,13 +65,17 @@ class MoneySectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: SproutSpacing.sm, bottom: SproutSpacing.sm),
+      padding: const EdgeInsets.only(
+          top: SproutSpacing.sm, bottom: SproutSpacing.sm),
       child: Row(
         children: [
           Expanded(
             child: Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: colors.ink),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: colors.ink),
             ),
           ),
           if (trailing != null) trailing!,
@@ -125,7 +101,8 @@ class BalanceToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     return SproutButtonPress(
       onTap: onToggle,
-      semanticLabel: visible ? _MoneyStrings.hideBalances : _MoneyStrings.showBalances,
+      semanticLabel:
+          visible ? _MoneyStrings.hideBalances : _MoneyStrings.showBalances,
       child: Semantics(
         button: true,
         toggled: visible,
@@ -139,13 +116,17 @@ class BalanceToggle extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                visible ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                visible
+                    ? Icons.visibility_rounded
+                    : Icons.visibility_off_rounded,
                 color: SproutColors.leaf,
                 size: 16,
               ),
               const SizedBox(width: 6),
               Text(
-                visible ? _MoneyStrings.hideBalances : _MoneyStrings.showBalances,
+                visible
+                    ? _MoneyStrings.hideBalances
+                    : _MoneyStrings.showBalances,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: SproutColors.leaf,
                       fontSize: 12,
@@ -244,7 +225,8 @@ class _AccountEditSheet extends ConsumerStatefulWidget {
 
   final SproutAccount account;
 
-  static Future<void> show(BuildContext context, {required SproutAccount account}) {
+  static Future<void> show(BuildContext context,
+      {required SproutAccount account}) {
     final colors = SproutColorScheme.of(context);
     return showModalBottomSheet<void>(
       context: context,
@@ -254,7 +236,8 @@ class _AccountEditSheet extends ConsumerStatefulWidget {
       useSafeArea: true,
       backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(SproutRadius.hero)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(SproutRadius.hero)),
       ),
       builder: (context) => _AccountEditSheet(account: account),
     );
@@ -289,11 +272,15 @@ class _AccountEditSheetState extends ConsumerState<_AccountEditSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(_MoneyStrings.editAccount, style: Theme.of(context).textTheme.headlineSmall),
+          Text(_MoneyStrings.editAccount,
+              style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: SproutSpacing.sm),
           Text(
             _MoneyStrings.editAccountHint,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colors.muted),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: colors.muted),
           ),
           const SizedBox(height: SproutSpacing.lg),
           TextField(
@@ -361,10 +348,15 @@ class BudgetPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(budget.month, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: colors.ink)),
+              Text(budget.month,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(color: colors.ink)),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: barColor.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(SproutRadius.pill),
@@ -380,9 +372,13 @@ class BudgetPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SproutSpacing.lg),
-          _BudgetLine(label: _MoneyStrings.income, value: SproutFormat.compactCurrency(budget.monthlyIncome)),
+          _BudgetLine(
+              label: _MoneyStrings.income,
+              value: SproutFormat.compactCurrency(budget.monthlyIncome)),
           const SizedBox(height: SproutSpacing.sm),
-          _BudgetLine(label: _MoneyStrings.safeToSpend, value: SproutFormat.compactCurrency(budget.safeToSpend)),
+          _BudgetLine(
+              label: _MoneyStrings.safeToSpend,
+              value: SproutFormat.compactCurrency(budget.safeToSpend)),
           const SizedBox(height: SproutSpacing.md),
           SproutProgressBar(value: progress, color: barColor, height: 10),
           const SizedBox(height: SproutSpacing.sm),
@@ -391,17 +387,27 @@ class BudgetPanel extends StatelessWidget {
               Text(
                 '${SproutFormat.compactCurrency(budget.spent)} '
                 'of ${SproutFormat.compactCurrency(budget.safeToSpend)}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colors.muted),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: colors.muted),
               ),
               const Spacer(),
               Text(
                 '${_MoneyStrings.leftToSpend}: ${SproutFormat.compactCurrency(budget.remaining)}',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(color: colors.ink),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(color: colors.ink),
               ),
             ],
           ),
           const SizedBox(height: SproutSpacing.md),
-          Text(status, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colors.ink)),
+          Text(status,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: colors.ink)),
         ],
       ),
     );
@@ -419,9 +425,17 @@ class _BudgetLine extends StatelessWidget {
     final colors = SproutColorScheme.of(context);
     return Row(
       children: [
-        Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colors.muted)),
+        Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: colors.muted)),
         const Spacer(),
-        Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: colors.ink)),
+        Text(value,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: colors.ink)),
       ],
     );
   }
@@ -455,17 +469,24 @@ class GoalTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   goal.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: colors.ink),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(color: colors.ink),
                 ),
               ),
               Text(
                 '$currentText / $targetText',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colors.muted),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: colors.muted),
               ),
             ],
           ),
           const SizedBox(height: SproutSpacing.sm),
-          SproutProgressBar(value: progress, color: SproutColors.seed, height: 8),
+          SproutProgressBar(
+              value: progress, color: SproutColors.seed, height: 8),
           const SizedBox(height: SproutSpacing.sm),
           Text(
             goal.nextStep,
@@ -482,14 +503,15 @@ class GoalTile extends StatelessWidget {
 
 /// The recent transactions panel. "View all" opens a calm sheet listing every
 /// transaction.
-class RecentTransactionsPanel extends StatelessWidget {
+class RecentTransactionsPanel extends ConsumerWidget {
   const RecentTransactionsPanel({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = SproutColorScheme.of(context);
+    final transactions = ref.watch(visibleTransactionsProvider);
     // Show the most recent three in the panel; the sheet shows all.
-    final preview = mockTransactions.take(3).toList();
+    final preview = transactions.take(3).toList();
 
     return SproutRaisedPanel(
       child: Column(
@@ -500,7 +522,10 @@ class RecentTransactionsPanel extends StatelessWidget {
               Expanded(
                 child: Text(
                   _MoneyStrings.recentTransactions,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: colors.ink),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(color: colors.ink),
                 ),
               ),
               SproutButtonPress(
@@ -509,7 +534,8 @@ class RecentTransactionsPanel extends StatelessWidget {
                 child: Semantics(
                   button: true,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 14),
                     child: Text(
                       _MoneyStrings.viewAll,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -543,7 +569,8 @@ class _AllTransactionsSheet extends StatelessWidget {
       useSafeArea: true,
       backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(SproutRadius.hero)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(SproutRadius.hero)),
       ),
       builder: (context) => const _AllTransactionsSheet(),
     );
@@ -561,9 +588,20 @@ class _AllTransactionsSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_MoneyStrings.allTransactions, style: Theme.of(context).textTheme.headlineSmall),
+            Text(_MoneyStrings.allTransactions,
+                style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: SproutSpacing.md),
-            for (final txn in mockTransactions) TransactionRow(transaction: txn),
+            Consumer(
+              builder: (context, ref, _) {
+                final transactions = ref.watch(visibleTransactionsProvider);
+                return Column(
+                  children: [
+                    for (final txn in transactions)
+                      TransactionRow(transaction: txn),
+                  ],
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -600,7 +638,10 @@ class InvestmentsPanel extends StatelessWidget {
         children: [
           Text(
             _MoneyStrings.investmentsSnapshot,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: colors.ink),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: colors.ink),
           ),
           const SizedBox(height: SproutSpacing.md),
           _InvestmentLine(
@@ -621,12 +662,18 @@ class InvestmentsPanel extends StatelessWidget {
           const SizedBox(height: SproutSpacing.md),
           Text(
             '${_MoneyStrings.lastUpdated}: $lastUpdatedValue',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12, color: colors.muted),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(fontSize: 12, color: colors.muted),
           ),
           const SizedBox(height: SproutSpacing.xs),
           Text(
             _MoneyStrings.investmentsNote,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12, color: colors.muted),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(fontSize: 12, color: colors.muted),
           ),
         ],
       ),
@@ -653,11 +700,20 @@ class _InvestmentLine extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colors.ink)),
+            child: Text(label,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: colors.ink)),
           ),
           Text(
-            visible ? SproutFormat.compactCurrency(value) : SproutStrings.hiddenBalance,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: colors.ink),
+            visible
+                ? SproutFormat.compactCurrency(value)
+                : SproutStrings.hiddenBalance,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(color: colors.ink),
           ),
         ],
       ),

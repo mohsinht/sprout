@@ -11,7 +11,8 @@ void main() {
 
     expect(find.text('Salaam, Mohsin 👋'), findsOneWidget);
     expect(find.text('TOTAL WEALTH'), findsOneWidget);
-    expect(find.text('Add PKR 25k → only 2 lakh to your car'), findsOneWidget);
+    expect(find.text('Add PKR 25k to car fund'), findsOneWidget);
+    expect(find.text('Only PKR 2 lakh to go'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

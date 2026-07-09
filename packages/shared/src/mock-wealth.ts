@@ -260,9 +260,9 @@ export const mockWealthSnapshot: WealthSnapshot = {
   changeMtd: 14831,
   mainReason: "NAV movement",
   interpretation: [
-    "Al Meezan pulled back after yesterday's jump (equity NAV correction).",
+    "Al Meezan cooled after yesterday's jump (equity NAV correction).",
     "Wise EUR helped slightly but didn't offset the fund dip.",
-    "Still ~PKR 13.67M — not a crash, just a tea break.",
+    "Still ~PKR 13.67M — not a crash.",
   ],
   trend: mockTrend,
   provenanceSummary:
@@ -324,7 +324,7 @@ export const mockLearnThreads: LearnThread[] = [
     summary:
       "A fund's NAV changes when the underlying assets change in value. Equity funds move more than money market funds.",
     body:
-      "Yesterday your Al Meezan Mutual Fund (MIF) jumped — the stocks it holds went up. Today they corrected down a little. That's normal for an equity fund: it moves in steps, not a straight line. Money market funds (like AMMF) barely move because they hold short-term, stable assets. The tea break today is just the market breathing after a good day.",
+      "Yesterday your Al Meezan Mutual Fund (MIF) jumped — the stocks it holds went up. Today they corrected down a little. That is normal for an equity fund: it moves in steps, not a straight line. Money market funds (like AMMF) barely move because they hold short-term, stable assets. Today is the market cooling after a good day.",
     relatedEventId: "event-mif-pullback",
     createdAt: "2026-07-08T06:00:00Z",
   },
@@ -387,7 +387,7 @@ export const mockWealthBriefing: WealthBriefing = {
   mascotMood: "content",
   greeting: "Good morning, Mohsin",
   summary:
-    "Down PKR 38k today — Al Meezan took a tea break after yesterday's jump, not a crash. Still up PKR 15k this month.",
+    "Down PKR 38k today — Al Meezan cooled after yesterday's jump, not a crash. Still up PKR 15k this month.",
   healthScore: 78,
   healthStatus: "healthy",
   wealthSnapshot: mockWealthSnapshot,

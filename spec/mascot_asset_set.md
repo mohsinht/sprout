@@ -162,7 +162,7 @@ Performance requirements:
 
 ## Usage Rules
 
-- **Today: mascot is the largest visual element and must animate** — idle + mood-matched expression + load reaction + completion reaction. Static PNG is fallback only.
+- **Today: mascot is the living emotional narrator and must animate** — idle + mood-matched expression + load reaction + completion reaction. Static PNG is fallback only. It stays prominent without overpowering the wealth figure.
 - Money: mascot is a small calm signal only.
 - Settings: mascot appears sparingly; trust copy matters more.
 - Quick Add: mascot can confirm completion but should not slow entry.

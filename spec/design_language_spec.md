@@ -6,7 +6,8 @@
 > figure (Inter, trustworthy) with an up/down movement chip — treat it with
 > the same care as the mascot in the weight ladder. The trend sparkline/chart
 > is a depth element, not a Today-hero element. The mascot remains the
-> largest visual element; the wealth figure is the largest *numeric* element.
+> living emotional narrator; the wealth figure is the Today hero and largest
+> *numeric* element. Do not enlarge the mascot to overpower the wealth figure.
 >
 > **Layout-lock + motion note (2026-07-09):** The Today layout is locked
 > (13-part canonical structure). A "Today load sequence" subsection is added
@@ -151,7 +152,7 @@ All motion comes from the `sprout_motion` primitives (`SproutButtonPress`, `Conf
 
 Sprout is the primary expressive element, not an illustration in a corner.
 
-- **Today: mascot is the largest visual element**, mood driven by real state (via `SproutMascotState`), animated (idle/celebrate/gentle).
+- **Today: mascot is the living emotional narrator**, mood driven by real state (via `SproutMascotState`), animated (idle/celebrate/gentle), and visually present without overpowering the wealth figure.
 - **Money / Settings / Quick Add: mascot is a small, calm signal only** — never a second hero competing with the content.
 - **Rive first, CustomPaint fallback always available.** A missing/failed Rive asset never produces a blank box — the painted `CoinSproutMascot` renders instead. Reduce-motion shows still art.
 - **Four product moods, one canonical expression each** (thriving / content / watchful / concerned). Bad news uses watchful or concerned — never angry, never red-faced.
@@ -183,7 +184,7 @@ A screen is visually done only when:
 - All motion routes through `sprout_motion`, means something, and has a reduce-motion static state.
 - It holds the performance floor on the target low-end Android device.
 - It renders correctly in light and dark, at 1.3× text scale, and within safe areas on both Android and iOS.
-- The mascot's prominence matches the screen's role (hero on Today, quiet elsewhere).
+- The mascot's prominence matches the screen's role (emotional narrator on Today, quiet elsewhere).
 - Color is never the sole carrier of meaning.
 
 ---
@@ -193,7 +194,7 @@ A screen is visually done only when:
 - **Token drift** — a new blue here, a 22px padding there. After twenty screens, nothing matches. Enforce tokens by lint, not goodwill.
 - **Motion for its own sake** — animating to look busy instead of to communicate. It reads as chaos and it costs frames.
 - **Red for money moods** — the instinct to make a bad month "clearer" with red alarm. Red is errors only; money stays watchful-gold. This is the line between a coach and an anxiety machine.
-- **A second hero** — a big bright element added to "balance" the mascot. Don't balance it; let Sprout be the one thing.
+- **A second hero** — a big bright element added to "balance" the wealth figure. Today already has its hero: total wealth. Sprout supplies emotion; the UI should not create another competing focal point.
 - **Per-screen personality** — each screen inventing its own margins, radii, or rhythm. Consistency is the design; deviation is the bug.
 
 ---

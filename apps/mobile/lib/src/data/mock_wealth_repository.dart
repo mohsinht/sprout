@@ -225,7 +225,8 @@ final _mockTrend = List<WealthTrendPoint>.generate(_trendDates.length, (i) {
       .map((e) => WealthTrendHolding(holdingId: e.key, valuePkr: e.value[i]))
       .toList();
   final totalPkr = perHolding.fold<int>(0, (sum, h) => sum + h.valuePkr);
-  return WealthTrendPoint(date: _trendDates[i], totalPkr: totalPkr, perHolding: perHolding);
+  return WealthTrendPoint(
+      date: _trendDates[i], totalPkr: totalPkr, perHolding: perHolding);
 });
 
 // ── WealthSnapshot ──────────────────────────────────────────────────────────
@@ -234,8 +235,7 @@ final _mockWealthSnapshot = WealthSnapshot(
   date: '2026-07-08',
   totalPkr: 13673019,
   perHoldingBreakdown: _mockHoldings.map((h) {
-    final yesterdayValue =
-        _trendPerHolding[h.id]?[4] ?? h.valuePkr;
+    final yesterdayValue = _trendPerHolding[h.id]?[4] ?? h.valuePkr;
     final startValue = _trendPerHolding[h.id]?[0] ?? h.valuePkr;
     return WealthHoldingBreakdown(
       holdingId: h.id,
@@ -249,9 +249,9 @@ final _mockWealthSnapshot = WealthSnapshot(
   changeMtd: 14831,
   mainReason: 'NAV movement',
   interpretation: const [
-    'Al Meezan pulled back after yesterday\'s jump (equity NAV correction).',
+    'Al Meezan cooled after yesterday\'s jump (equity NAV correction).',
     'Wise EUR helped slightly but didn\'t offset the fund dip.',
-    'Still ~PKR 13.67M — not a crash, just a tea break.',
+    'Still ~PKR 13.67M — not a crash.',
   ],
   trend: _mockTrend,
   provenanceSummary:
@@ -269,7 +269,7 @@ const _mockWealthEvents = <WealthEvent>[
     magnitudePkr: -13610,
     direction: WealthEventDirection.down,
     plainWhy:
-        'Al Meezan pulled back after yesterday\'s jump (equity NAV correction).',
+        'Al Meezan cooled after yesterday\'s jump (equity NAV correction).',
     learnMoreId: 'learn-why-funds-move',
     severity: WealthEventSeverity.headsUp,
   ),
@@ -313,7 +313,7 @@ const _mockLearnThreads = <LearnThread>[
     summary:
         'A fund\'s NAV changes when the underlying assets change in value. Equity funds move more than money market funds.',
     body:
-        'Yesterday your Al Meezan Mutual Fund (MIF) jumped — the stocks it holds went up. Today they corrected down a little. That\'s normal for an equity fund: it moves in steps, not a straight line. Money market funds (like AMMF) barely move because they hold short-term, stable assets. The tea break today is just the market breathing after a good day.',
+        'Yesterday your Al Meezan Mutual Fund (MIF) jumped — the stocks it holds went up. Today they corrected down a little. That is normal for an equity fund: it moves in steps, not a straight line. Money market funds (like AMMF) barely move because they hold short-term, stable assets. Today is the market cooling after a good day.',
     relatedEventId: 'event-mif-pullback',
     createdAt: '2026-07-08T06:00:00Z',
   ),
@@ -376,7 +376,7 @@ final _mockWealthBriefing = WealthBriefing(
   mascotMood: WealthMascotMood.content,
   greeting: 'Good morning, Mohsin',
   summary:
-      'Down PKR 38k today — Al Meezan took a tea break after yesterday\'s jump, not a crash. Still up PKR 15k this month.',
+      'Down PKR 38k today — Al Meezan cooled after yesterday\'s jump, not a crash. Still up PKR 15k this month.',
   healthScore: 78,
   healthStatus: WealthHealthStatus.healthy,
   wealthSnapshot: _mockWealthSnapshot,

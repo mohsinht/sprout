@@ -104,7 +104,7 @@ class MockTodayRepository implements TodayRepository {
       changeMtd: 14831,
       mainReason: 'NAV movement',
       interpretation: [
-        "Al Meezan pulled back after yesterday's strong jump, mostly an equity NAV correction — about −39k.",
+        "Al Meezan cooled after yesterday's strong jump, mostly an equity NAV correction — about −39k.",
         'Your Wise EUR balance rose slightly on FX (+2k) but not enough to offset it.',
         'USD and PKR were flat.',
         'Net for the day: −38,490. You\'re still +14,831 since the month began.',
@@ -121,7 +121,7 @@ class MockTodayRepository implements TodayRepository {
         magnitudePkr: -39000,
         direction: 'down',
         plainWhy:
-            "Al Meezan pulled back after yesterday's strong jump, mostly an equity NAV correction.",
+            "Al Meezan cooled after yesterday's strong jump, mostly an equity NAV correction.",
         holdingId: 'meezan',
         learnMoreId: 'nav-explainer',
         severity: 'heads_up',
@@ -147,7 +147,7 @@ class MockTodayRepository implements TodayRepository {
         currentAmount: 2300000,
         status: 'active',
         pace: 'on_track',
-        nextStep: 'Add PKR 25k → only 2 lakh to your car',
+        nextStep: 'Add PKR 25k to car fund',
         remainingToTarget: 200000,
         paceNote: 'Only PKR 2 lakh to go — closest goal.',
       ),
@@ -192,7 +192,7 @@ class MockTodayRepository implements TodayRepository {
         score: 78,
         status: 'healthy',
         summary:
-            "Down a little today — your funds took a tea break after yesterday's jump. Not a crash. You're still up for the month.",
+            "Down a little today — Al Meezan cooled after yesterday's jump. Wise EUR helped, and you're still up this month.",
         positiveFactors: [
           'Emergency buffer is strong',
           'Salary lands in 3 days',
@@ -203,9 +203,9 @@ class MockTodayRepository implements TodayRepository {
           '3 transactions need confirmation',
         ],
         recommendedAction: RecommendedAction(
-          title: 'Add PKR 25k → only 2 lakh to your car',
+          title: 'Add PKR 25k to car fund',
           xp: 20,
-          impact: '+3 health score',
+          impact: 'Only PKR 2 lakh to go',
         ),
       ),
       autoCapture: const [

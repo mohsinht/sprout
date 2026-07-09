@@ -66,7 +66,7 @@ Never do these unless a spec explicitly changes:
 
 ## Non-Negotiables
 
-- Today has one hero, one sentence, one primary action. Mascot is the largest element.
+- Today has one hero, one sentence, one primary action. Total wealth is the Today hero; mascot is the living emotional narrator and must stay prominent, alive, and mood-driven without overpowering the wealth number.
 - App is alive with zero connections.
 - Manual entry is first-class.
 - Glance first, depth on tap. No black-box score or insight.

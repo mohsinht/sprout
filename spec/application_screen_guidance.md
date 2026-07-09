@@ -33,7 +33,7 @@ The application must remain useful with no connected accounts. Manual entry, cac
 Every screen must support these product rules:
 
 - The daily check-in is the central behavior. No screen should compete with Today for emotional weight.
-- Sprout, the mascot, carries emotional context at meaningful moments: loading, action, success, uncertainty, and setbacks.
+- Sprout, the mascot, carries emotional context at meaningful moments: loading, action, success, uncertainty, and setbacks. In the wealth-health era, the total wealth figure is the Today hero; Sprout is the living emotional narrator beside it.
 - The interface is glance-first. Essential meaning should be understood in seconds; detail belongs behind taps.
 - Problems are calm and specific. The app must never shame, guilt, or panic the user.
 - Trust is visible. Data source, freshness, confidence, parser health, privacy, and user control must be clear where relevant.
@@ -121,7 +121,7 @@ Content is readable instantly — non-essential motion finishes behind reading. 
 
 - On Today, the mascot must **animate** — at minimum a subtle idle (breathing/bob + occasional blink), and a **mood-matched expression** driven by product state (thriving / content / watchful / concerned), plus a reaction on load and on action completion.
 - Static PNG is a **fallback only** (reduce-motion, missing asset), never the default experience on Today.
-- The mascot is the primary emotional signal; its motion is what turns the screen from "calm dashboard" into "calm companion."
+- The mascot is the primary emotional signal; its motion is what turns the screen from "calm dashboard" into "calm companion." It should stay present, alive, and mood-driven without visually overpowering the wealth figure.
 
 #### Motion rules
 
@@ -154,10 +154,10 @@ Acceptance criteria:
 
 - Today is the default landing screen.
 - **The 13-part locked layout is present in the exact order specified.** No extra elements, no reordering.
-- The mascot is the largest visual element and the emotional hero of the screen.
-- Reading order is clear: greeting → mascot/mood signal → wealth figure + movement → summary sentence → events → score number → action card → glance tiles.
+- The total wealth figure is the hero of Today; the mascot is the emotional narrator and must remain prominent, alive, and mood-driven without being enlarged to dominate the wealth number.
+- Reading order is clear: greeting → mascot/mood signal → wealth figure + movement → summary sentence → one action → events → holdings → depth.
 - The wealth figure uses Inter font for trustworthiness.
-- The action card does not visually compete with the mascot for prominence; it sits below the score, not above it.
+- The action card does not visually compete with the wealth hero or mascot for prominence; it stays singular, chunky, and lower in the hierarchy.
 - The score number uses Inter font for trustworthiness; count-up animation respects tabular figures.
 - All money values in tiles (e.g., PKR amounts) use Inter, never playful display fonts.
 - **Every movement has a "why"** — no change shown without its driver.

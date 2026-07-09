@@ -30,7 +30,7 @@ export const HoldingSchema = z.object({
   valueNative: z.number().nonnegative().optional(),
   priceAsOf: z.string(),
   priceSource: z.string(),
-  freshness: z.enum(["fresh", "stale", "manual", "unavailable"]),
+  freshness: z.enum(["fresh", "stale", "manual", "unavailable", "estimated"]),
 });
 
 export const WealthTrendPointSchema = z.object({

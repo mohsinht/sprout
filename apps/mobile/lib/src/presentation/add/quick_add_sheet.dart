@@ -1,47 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
+import '../../data/manual_money_store.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../domain/sprout_models.dart';
+import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
 import '../../widgets/sprout_mascot.dart';
 import '../../widgets/sprout_mascot_state.dart';
 import 'add_widgets.dart';
 
-/// Copy for the Quick Add sheet.
 class QuickAddStrings {
   const QuickAddStrings._();
 
   static const title = 'Quick add';
-  static const expenseHint = 'Tap one. Done in 3 seconds.';
+  static const expenseHint = 'Tap one. Confirm the usual amount.';
   static const more = 'More';
   static const iGotPaid = 'I got paid';
   static const import = 'Import statement';
-  static const incomeTitle = 'Log income';
-  static const incomeHint = 'So I can celebrate your payday.';
-  static const incomeBack = 'Back';
-  static const incomeAmount = 'Amount';
-  static const incomeAmountHint = 'PKR 0';
+  static const amountHint = 'Most days, this is two taps.';
+  static const pocket = 'From';
+  static const today = 'Today';
+  static const addAmount = 'Add an amount to log this.';
+  static const customAmount = 'Custom amount';
+  static const incomeTitle = 'I got paid';
+  static const incomeHint = 'Log income manually. No connection needed.';
   static const incomeType = 'Type';
-  static const incomeSave = 'Save income';
-  static const incomeSource = 'Source (optional)';
-  static const incomeSourceHint = 'e.g. Employer, Client';
-  static const saved = 'Saved. Nice and calm.';
-  static const enterAmount = 'Enter an amount';
+  static const importTitle = 'Import statement';
+  static const importHint =
+      'Upload a file, confirm what Sprout reads, then re-baseline.';
+  static const logged = 'Logged!';
+  static const addAnother = 'Add another';
+  static const done = 'Done';
+  static const savedNote = 'Saved locally. Money updated.';
 }
 
-/// The Quick Add bottom sheet — a proper two-tap flow.
-///
-/// Sheet 1: expense chips (the 95% case) + "I got paid" + "Import" buttons.
-/// Sheet 2: minimal income form with a back button.
-///
-/// Data-source connections (Gmail, SMS) are NOT here — they live in Settings.
-class QuickAddSheet extends StatefulWidget {
+enum _QuickAddStep { categories, amount, more, income, import, success }
+
+enum _IncomeKind {
+  salary('Salary', Icons.work_rounded),
+  freelance('Freelance', Icons.laptop_mac_rounded),
+  gift('Gift', Icons.card_giftcard_rounded),
+  other('Other', Icons.more_horiz_rounded);
+
+  const _IncomeKind(this.label, this.icon);
+
+  final String label;
+  final IconData icon;
+}
+
+class QuickAddSheet extends ConsumerStatefulWidget {
   const QuickAddSheet({super.key});
 
-  /// Opens the Quick Add sheet above the current screen.
   static void open(BuildContext context) {
     final colors = SproutColorScheme.of(context);
     showModalBottomSheet<void>(
@@ -56,184 +69,378 @@ class QuickAddSheet extends StatefulWidget {
   }
 
   @override
-  State<QuickAddSheet> createState() => _QuickAddSheetState();
+  ConsumerState<QuickAddSheet> createState() => _QuickAddSheetState();
 }
 
-class _QuickAddSheetState extends State<QuickAddSheet> {
-  /// true = expense chips (default), false = income form.
-  bool _showIncome = false;
+class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
+  var _step = _QuickAddStep.categories;
+  _QuickCategory? _category;
+  SproutAccount _pocket = mockAccounts.first;
+  int? _amount;
+  String? _validation;
+  bool _customAmountOpen = false;
+  DateTime _date = DateTime.now();
+  final _customAmount = TextEditingController();
+  final _customCategory = TextEditingController();
+  final _customFocus = FocusNode();
+  final _incomeAmount = TextEditingController();
+  var _incomeKind = _IncomeKind.salary;
+  SproutTransaction? _lastTransaction;
 
-  void _logExpense(String category) {
-    // For now, log with a sensible default and close.
-    // The existing showExpenseSheet is still available for amount entry.
-    Navigator.of(context).pop();
-    _showSuccess(context, category);
-  }
-
-  void _logIncome(SproutTransaction txn) {
-    Navigator.of(context).pop();
-    _showSuccess(context, txn.category);
-  }
-
-  void _showSuccess(BuildContext context, String label) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-    final reduced = MediaQuery.of(context).disableAnimations;
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const SproutMascot(
-                state: SproutMascotState.thumbsUp,
-                size: 40,
-                enableBlink: false,
-              ),
-              const SizedBox(width: SproutSpacing.md),
-              Expanded(
-                child: Text(
-                  '$label ${QuickAddStrings.saved}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: SproutColors.leaf,
-                      ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: SproutColors.seed,
-                  borderRadius: BorderRadius.circular(SproutRadius.pill),
-                ),
-                child: Text(
-                  '+5 XP',
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge
-                      ?.copyWith(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: SproutColors.mint,
-          elevation: 0,
-          duration: Duration(milliseconds: reduced ? 1200 : 1600),
-        ),
-      );
+  @override
+  void initState() {
+    super.initState();
+    _customAmount.addListener(_rebuildForAmountText);
+    _incomeAmount.addListener(_rebuildForAmountText);
   }
 
   @override
-  Widget build(BuildContext context) {
-    final colors = SproutColorScheme.of(context);
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      child: _showIncome
-          ? _IncomeSheet(
-              key: const ValueKey('income'),
-              bottomInset: bottomInset,
-              onBack: () => setState(() => _showIncome = false),
-              onSaved: _logIncome,
-            )
-          : _ExpenseSheet(
-              key: const ValueKey('expense'),
-              bottomInset: bottomInset,
-              onClose: () => Navigator.of(context).pop(),
-              onChipTap: _logExpense,
-              onMoreTap: () => _openMoreExpenseSheet(context),
-              onIncomeTap: () => setState(() => _showIncome = true),
-              onImportTap: () => _openImportSheet(context),
-            ),
-    );
+  void dispose() {
+    _customAmount.removeListener(_rebuildForAmountText);
+    _incomeAmount.removeListener(_rebuildForAmountText);
+    _customAmount.dispose();
+    _customCategory.dispose();
+    _customFocus.dispose();
+    _incomeAmount.dispose();
+    super.dispose();
   }
 
-  Future<void> _openMoreExpenseSheet(BuildContext context) async {
-    final txn = await showExpenseSheet(context, category: 'More');
-    if (txn != null && mounted) {
-      Navigator.of(context).pop();
-      _showSuccess(context, txn.category);
+  void _rebuildForAmountText() {
+    if (mounted) setState(() {});
+  }
+
+  void _chooseCategory(_QuickCategory category) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _category = category;
+      _amount = category.smartDefault;
+      _customAmount.text =
+          category.smartDefault == null ? '' : category.smartDefault.toString();
+      _validation = null;
+      _customAmountOpen = category.smartDefault == null;
+      _step = _QuickAddStep.amount;
+    });
+    if (category.smartDefault == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _customFocus.requestFocus();
+      });
     }
   }
 
-  void _openImportSheet(BuildContext context) {
-    Navigator.of(context).pop();
-    // Re-open the import card as a standalone sheet.
+  void _choosePreset(int amount) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _amount = amount;
+      _customAmount.text = amount.toString();
+      _validation = null;
+      _customAmountOpen = false;
+    });
+  }
+
+  void _openCustomAmount() {
+    setState(() => _customAmountOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _customFocus.requestFocus();
+    });
+  }
+
+  void _confirmExpense() {
+    final category = _category;
+    final typed =
+        int.tryParse(_customAmount.text.replaceAll(RegExp(r'[^0-9]'), ''));
+    final amount = _customAmountOpen ? typed : _amount;
+    if (category == null || amount == null || amount <= 0) {
+      HapticFeedback.selectionClick();
+      setState(() => _validation = QuickAddStrings.addAmount);
+      return;
+    }
+
+    _saveTransaction(
+      SproutTransaction(
+        id: 'manual-${DateTime.now().microsecondsSinceEpoch}',
+        amount: amount,
+        currency: 'PKR',
+        type: TransactionType.expense,
+        category: category.label,
+        merchant: category.label,
+        note: 'Quick Add',
+        date: _date,
+        source: TransactionSource.manual,
+        needsReview: false,
+        confidence: 1.0,
+        accountId: _pocket.id,
+      ),
+    );
+  }
+
+  void _confirmIncome() {
+    final amount =
+        int.tryParse(_incomeAmount.text.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (amount == null || amount <= 0) {
+      HapticFeedback.selectionClick();
+      setState(() => _validation = QuickAddStrings.addAmount);
+      return;
+    }
+
+    _saveTransaction(
+      SproutTransaction(
+        id: 'income-${DateTime.now().microsecondsSinceEpoch}',
+        amount: amount,
+        currency: 'PKR',
+        type: TransactionType.income,
+        category: _incomeKind.label,
+        merchant: _incomeKind.label,
+        note: 'Quick Add income',
+        date: _date,
+        source: TransactionSource.manual,
+        needsReview: false,
+        confidence: 1.0,
+        accountId: _pocket.id,
+      ),
+    );
+  }
+
+  void _saveTransaction(SproutTransaction transaction) {
+    HapticFeedback.mediumImpact();
+    SystemSound.play(SystemSoundType.click);
+    ref.read(manualTransactionsProvider.notifier).add(transaction);
+    ref.read(accountsProvider.notifier).applyTransaction(transaction);
+    setState(() {
+      _lastTransaction = transaction;
+      _validation = null;
+      _step = _QuickAddStep.success;
+    });
+  }
+
+  void _resetToCategories() {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _step = _QuickAddStep.categories;
+      _category = null;
+      _amount = null;
+      _validation = null;
+      _customAmount.clear();
+      _incomeAmount.clear();
+      _customAmountOpen = false;
+      _incomeKind = _IncomeKind.salary;
+      _date = DateTime.now();
+    });
+  }
+
+  void _openDateOptions() {
+    HapticFeedback.lightImpact();
+    final colors = SproutColorScheme.of(context);
     showModalBottomSheet<void>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: colors(context).surface,
+      backgroundColor: colors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(SproutRadius.hero),
+        ),
       ),
-      builder: (context) {
-        final bottomInset = MediaQuery.paddingOf(context).bottom;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + bottomInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Import statement',
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: SproutSpacing.lg),
-              const ImportStatementCard(),
-              const SizedBox(height: SproutSpacing.xl),
-            ],
+      builder: (sheetContext) {
+        final today = DateTime.now();
+        final yesterday = today.subtract(const Duration(days: 1));
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SproutSpacing.pageHorizontal,
+              SproutSpacing.lg,
+              SproutSpacing.pageHorizontal,
+              SproutSpacing.xl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Log date',
+                    style: Theme.of(context).textTheme.headlineSmall),
+                const SizedBox(height: SproutSpacing.md),
+                _DateOptionTile(
+                  label: QuickAddStrings.today,
+                  date: today,
+                  selected: _isSameDay(_date, today),
+                  onTap: () {
+                    setState(() => _date = today);
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
+                _DateOptionTile(
+                  label: 'Yesterday',
+                  date: yesterday,
+                  selected: _isSameDay(_date, yesterday),
+                  onTap: () {
+                    setState(() => _date = yesterday);
+                    Navigator.of(sheetContext).pop();
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  SproutColorScheme colors(BuildContext context) =>
-      SproutColorScheme.of(context);
+  void _useCustomCategory() {
+    final text = _customCategory.text.trim();
+    if (text.isEmpty) {
+      setState(() => _validation = 'Name the category first.');
+      return;
+    }
+    _chooseCategory(
+      _QuickCategory(
+        label: text,
+        icon: Icons.more_horiz_rounded,
+        tint: SproutColors.tintMint,
+        smartDefault: null,
+        presets: const [100, 250, 500, 1000],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final paddingBottom =
+        keyboardInset > 0 ? keyboardInset + SproutSpacing.lg : bottomInset + 24;
+
+    return AnimatedSwitcher(
+      duration: MediaQuery.of(context).disableAnimations
+          ? Duration.zero
+          : SproutDurations.pageTransition,
+      child: switch (_step) {
+        _QuickAddStep.categories => _SheetFrame(
+            key: const ValueKey('categories'),
+            bottomInset: paddingBottom,
+            onClose: () => Navigator.of(context).maybePop(),
+            child: _CategoryStep(
+              onCategory: _chooseCategory,
+              onMore: () => setState(() {
+                _validation = null;
+                _step = _QuickAddStep.more;
+              }),
+              onIncome: () => setState(() {
+                _validation = null;
+                _step = _QuickAddStep.income;
+              }),
+              onImport: () => setState(() {
+                _validation = null;
+                _step = _QuickAddStep.import;
+              }),
+            ),
+          ),
+        _QuickAddStep.amount => _SheetFrame(
+            key: const ValueKey('amount'),
+            bottomInset: paddingBottom,
+            onClose: () => Navigator.of(context).maybePop(),
+            child: _AmountStep(
+              category: _category!,
+              amount: _customAmountOpen ? null : _amount,
+              controller: _customAmount,
+              focusNode: _customFocus,
+              customOpen: _customAmountOpen,
+              pocket: _pocket,
+              date: _date,
+              validation: _validation,
+              onBack: () => setState(() {
+                _validation = null;
+                _step = _QuickAddStep.categories;
+              }),
+              onPreset: _choosePreset,
+              onCustomTap: _openCustomAmount,
+              onPocket: (account) => setState(() => _pocket = account),
+              onDateTap: _openDateOptions,
+              onConfirm: _confirmExpense,
+            ),
+          ),
+        _QuickAddStep.more => _SheetFrame(
+            key: const ValueKey('more'),
+            bottomInset: paddingBottom,
+            onClose: () => Navigator.of(context).maybePop(),
+            child: _MoreStep(
+              controller: _customCategory,
+              validation: _validation,
+              onBack: _resetToCategories,
+              onCategory: _chooseCategory,
+              onCustom: _useCustomCategory,
+            ),
+          ),
+        _QuickAddStep.income => _SheetFrame(
+            key: const ValueKey('income'),
+            bottomInset: paddingBottom,
+            onClose: () => Navigator.of(context).maybePop(),
+            child: _IncomeStep(
+              controller: _incomeAmount,
+              kind: _incomeKind,
+              pocket: _pocket,
+              validation: _validation,
+              onBack: _resetToCategories,
+              onKind: (kind) => setState(() {
+                HapticFeedback.lightImpact();
+                _incomeKind = kind;
+              }),
+              onPocket: (account) => setState(() => _pocket = account),
+              onConfirm: _confirmIncome,
+            ),
+          ),
+        _QuickAddStep.import => _SheetFrame(
+            key: const ValueKey('import'),
+            bottomInset: paddingBottom,
+            onClose: () => Navigator.of(context).maybePop(),
+            child: _ImportStep(onBack: _resetToCategories),
+          ),
+        _QuickAddStep.success => _SheetFrame(
+            key: const ValueKey('success'),
+            bottomInset: paddingBottom,
+            onClose: () => Navigator.of(context).maybePop(),
+            child: _SuccessStep(
+              transaction: _lastTransaction!,
+              onAddAnother: _resetToCategories,
+              onDone: () => Navigator.of(context).maybePop(),
+            ),
+          ),
+      },
+    );
+  }
 }
 
-// ──────────────────────────────────────────────────────────────
-// Sheet 1: Expense chips
-// ──────────────────────────────────────────────────────────────
-
-class _ExpenseSheet extends StatelessWidget {
-  const _ExpenseSheet({
+class _SheetFrame extends StatelessWidget {
+  const _SheetFrame({
+    required this.child,
     required this.bottomInset,
     required this.onClose,
-    required this.onChipTap,
-    required this.onMoreTap,
-    required this.onIncomeTap,
-    required this.onImportTap,
     super.key,
   });
 
+  final Widget child;
   final double bottomInset;
   final VoidCallback onClose;
-  final void Function(String category) onChipTap;
-  final VoidCallback onMoreTap;
-  final VoidCallback onIncomeTap;
-  final VoidCallback onImportTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
-
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.88;
     return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
         color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(SproutRadius.hero),
+        ),
       ),
       child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + bottomInset),
+        padding: EdgeInsets.fromLTRB(
+          SproutSpacing.pageHorizontal,
+          SproutSpacing.sm,
+          SproutSpacing.pageHorizontal,
+          bottomInset,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Drag handle + close button row
-            const SizedBox(height: 8),
             Center(
               child: Container(
                 width: 40,
@@ -244,72 +451,11 @@ class _ExpenseSheet extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  QuickAddStrings.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                _CloseButton(onTap: onClose),
-              ],
-            ),
-            const SizedBox(height: SproutSpacing.xs),
-            Text(
-              QuickAddStrings.expenseHint,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: colors.muted),
-            ),
-            const SizedBox(height: SproutSpacing.xl),
-
-            // Expense chips — the 95% case, front and center.
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final chip in kExpenseChips)
-                  AddExpenseChip(
-                    label: chip.label,
-                    icon: chip.icon,
-                    tint: chip.tint,
-                    onTap: () => onChipTap(chip.label),
-                  ),
-                // "More" chip for unusual items — opens the amount sheet.
-                AddExpenseChip(
-                  label: QuickAddStrings.more,
-                  icon: Icons.add_rounded,
-                  tint: colors.line.withValues(alpha: 0.3),
-                  onTap: onMoreTap,
-                ),
-              ],
-            ),
-
-            const SizedBox(height: SproutSpacing.xxl),
-
-            // Demoted actions — small, quiet, one tap deeper.
-            Row(
-              children: [
-                Expanded(
-                  child: _SecondaryButton(
-                    label: QuickAddStrings.iGotPaid,
-                    icon: Icons.savings_rounded,
-                    onTap: onIncomeTap,
-                  ),
-                ),
-                const SizedBox(width: SproutSpacing.md),
-                Expanded(
-                  child: _SecondaryButton(
-                    label: QuickAddStrings.import,
-                    icon: Icons.upload_file_rounded,
-                    onTap: onImportTap,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: SproutSpacing.lg),
+            const SizedBox(height: SproutSpacing.md),
+            Align(
+                alignment: Alignment.centerRight,
+                child: _CloseButton(onTap: onClose)),
+            child,
           ],
         ),
       ),
@@ -317,187 +463,862 @@ class _ExpenseSheet extends StatelessWidget {
   }
 }
 
-// ──────────────────────────────────────────────────────────────
-// Sheet 2: Income form (minimal — one amount, four type chips, one button)
-// ──────────────────────────────────────────────────────────────
-
-class _IncomeSheet extends StatefulWidget {
-  const _IncomeSheet({
-    required this.bottomInset,
-    required this.onBack,
-    required this.onSaved,
-    super.key,
+class _CategoryStep extends StatelessWidget {
+  const _CategoryStep({
+    required this.onCategory,
+    required this.onMore,
+    required this.onIncome,
+    required this.onImport,
   });
 
-  final double bottomInset;
-  final VoidCallback onBack;
-  final void Function(SproutTransaction) onSaved;
-
-  @override
-  State<_IncomeSheet> createState() => _IncomeSheetState();
-}
-
-class _IncomeSheetState extends State<_IncomeSheet> {
-  final _amount = TextEditingController();
-  final _source = TextEditingController();
-  String _kind = 'Salary';
-  final _formKey = GlobalKey<FormState>();
-
-  static const _incomeTypes = ['Salary', 'Freelance', 'Gift', 'Other'];
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    _source.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    final value =
-        int.tryParse(_amount.text.replaceAll(RegExp(r'[^0-9]'), ''));
-    if (value == null || value <= 0) return;
-    widget.onSaved(
-      SproutTransaction(
-        id: 'inc-${DateTime.now().millisecondsSinceEpoch}',
-        amount: value,
-        currency: 'PKR',
-        type: TransactionType.income,
-        category: _kind,
-        merchant:
-            _source.text.trim().isEmpty ? _kind : _source.text.trim(),
-        note: '',
-        date: DateTime.now(),
-        source: TransactionSource.manual,
-        needsReview: false,
-        confidence: 1.0,
-        accountId: 'cash',
-      ),
-    );
-  }
+  final ValueChanged<_QuickCategory> onCategory;
+  final VoidCallback onMore;
+  final VoidCallback onIncome;
+  final VoidCallback onImport;
 
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(QuickAddStrings.title,
+            style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: SproutSpacing.xs),
+        Text(
+          QuickAddStrings.expenseHint,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: colors.muted),
+        ),
+        const SizedBox(height: SproutSpacing.xl),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final category in _primaryCategories)
+              AddExpenseChip(
+                label: category.label,
+                icon: category.icon,
+                tint: category.tint,
+                onTap: () => onCategory(category),
+              ),
+            AddExpenseChip(
+              label: QuickAddStrings.more,
+              icon: Icons.add_rounded,
+              tint: colors.line.withValues(alpha: 0.3),
+              onTap: onMore,
+            ),
+          ],
+        ),
+        const SizedBox(height: SproutSpacing.xxl),
+        Row(
+          children: [
+            Expanded(
+              child: _SecondaryButton(
+                label: QuickAddStrings.iGotPaid,
+                icon: Icons.savings_rounded,
+                onTap: onIncome,
+              ),
+            ),
+            const SizedBox(width: SproutSpacing.md),
+            Expanded(
+              child: _SecondaryButton(
+                label: QuickAddStrings.import,
+                icon: Icons.upload_file_rounded,
+                onTap: onImport,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 24 + widget.bottomInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+class _AmountStep extends StatelessWidget {
+  const _AmountStep({
+    required this.category,
+    required this.amount,
+    required this.controller,
+    required this.focusNode,
+    required this.customOpen,
+    required this.pocket,
+    required this.date,
+    required this.validation,
+    required this.onBack,
+    required this.onPreset,
+    required this.onCustomTap,
+    required this.onPocket,
+    required this.onDateTap,
+    required this.onConfirm,
+  });
+
+  final _QuickCategory category;
+  final int? amount;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool customOpen;
+  final SproutAccount pocket;
+  final DateTime date;
+  final String? validation;
+  final VoidCallback onBack;
+  final ValueChanged<int> onPreset;
+  final VoidCallback onCustomTap;
+  final ValueChanged<SproutAccount> onPocket;
+  final VoidCallback onDateTap;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    final displayAmount = customOpen
+        ? controller.text
+        : (amount == null ? '' : amount.toString());
+    final labelAmount = int.tryParse(displayAmount) ?? amount ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StepHeader(
+          icon: category.icon,
+          label: category.label,
+          tint: category.tint,
+          onBack: onBack,
+        ),
+        const SizedBox(height: SproutSpacing.sm),
+        Text(
+          QuickAddStrings.amountHint,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: colors.muted),
+        ),
+        const SizedBox(height: SproutSpacing.xl),
+        SproutButtonPress(
+          onTap: onCustomTap,
+          semanticLabel: QuickAddStrings.customAmount,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: SproutSpacing.lg,
+              vertical: SproutSpacing.lg,
+            ),
+            decoration: BoxDecoration(
+              color: SproutColors.tintMint,
+              borderRadius: BorderRadius.circular(SproutRadius.card),
+              border:
+                  Border.all(color: SproutColors.seed.withValues(alpha: 0.18)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Amount',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: SproutColors.leaf,
+                      ),
+                ),
+                const SizedBox(height: SproutSpacing.xs),
+                Text(
+                  labelAmount <= 0
+                      ? 'Tap to enter'
+                      : SproutFormat.currency(labelAmount),
+                  style: SproutType.moneyValue(
+                    color: colors.ink,
+                    size: SproutTypeScale.s37,
+                    weight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (customOpen) ...[
+          const SizedBox(height: SproutSpacing.md),
+          TextField(
+            controller: controller,
+            focusNode: focusNode,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(
+              labelText: QuickAddStrings.customAmount,
+              prefixText: 'PKR ',
+            ),
+            onChanged: (_) {
+              // The parent reads the controller on confirm; rebuild locally
+              // through the text field's own input state.
+            },
+          ),
+        ],
+        const SizedBox(height: SproutSpacing.lg),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final preset in category.presets)
+              _PresetChip(
+                label: SproutFormat.compactCurrency(preset),
+                selected: preset == amount && !customOpen,
+                onTap: () => onPreset(preset),
+              ),
+          ],
+        ),
+        const SizedBox(height: SproutSpacing.lg),
+        Text(QuickAddStrings.pocket,
+            style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: SproutSpacing.sm),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final account in _quickAddAccounts)
+              _PocketChip(
+                account: account,
+                selected: account.id == pocket.id,
+                onTap: () => onPocket(account),
+              ),
+          ],
+        ),
+        const SizedBox(height: SproutSpacing.lg),
+        _DateAffordance(date: date, onTap: onDateTap),
+        if (validation != null) ...[
+          const SizedBox(height: SproutSpacing.md),
+          _ValidationLine(text: validation!),
+        ],
+        const SizedBox(height: SproutSpacing.xl),
+        _PrimaryButton(
+          label: labelAmount <= 0
+              ? 'Log ${category.label}'
+              : 'Log ${SproutFormat.compactCurrency(labelAmount)} ${category.label}',
+          icon: Icons.check_rounded,
+          onTap: onConfirm,
+        ),
+      ],
+    );
+  }
+}
+
+class _IncomeStep extends StatelessWidget {
+  const _IncomeStep({
+    required this.controller,
+    required this.kind,
+    required this.pocket,
+    required this.validation,
+    required this.onBack,
+    required this.onKind,
+    required this.onPocket,
+    required this.onConfirm,
+  });
+
+  final TextEditingController controller;
+  final _IncomeKind kind;
+  final SproutAccount pocket;
+  final String? validation;
+  final VoidCallback onBack;
+  final ValueChanged<_IncomeKind> onKind;
+  final ValueChanged<SproutAccount> onPocket;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    final amount =
+        int.tryParse(controller.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PlainHeader(
+          title: QuickAddStrings.incomeTitle,
+          hint: QuickAddStrings.incomeHint,
+          onBack: onBack,
+        ),
+        const SizedBox(height: SproutSpacing.xl),
+        TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+            labelText: 'Amount',
+            prefixText: 'PKR ',
+          ),
+        ),
+        const SizedBox(height: SproutSpacing.lg),
+        Text(QuickAddStrings.incomeType,
+            style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: SproutSpacing.sm),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final incomeKind in _IncomeKind.values)
+              _IconChoiceChip(
+                label: incomeKind.label,
+                icon: incomeKind.icon,
+                selected: incomeKind == kind,
+                onTap: () => onKind(incomeKind),
+              ),
+          ],
+        ),
+        const SizedBox(height: SproutSpacing.lg),
+        Text('To', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: SproutSpacing.sm),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final account in _quickAddAccounts)
+              _PocketChip(
+                account: account,
+                selected: account.id == pocket.id,
+                onTap: () => onPocket(account),
+              ),
+          ],
+        ),
+        if (validation != null) ...[
+          const SizedBox(height: SproutSpacing.md),
+          _ValidationLine(text: validation!),
+        ],
+        const SizedBox(height: SproutSpacing.xl),
+        _PrimaryButton(
+          label: amount <= 0
+              ? 'Save income'
+              : 'Save ${SproutFormat.compactCurrency(amount)} ${kind.label}',
+          icon: Icons.check_rounded,
+          onTap: onConfirm,
+        ),
+        const SizedBox(height: SproutSpacing.sm),
+        Text(
+          'Manual income updates Money right away.',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: colors.muted),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoreStep extends StatelessWidget {
+  const _MoreStep({
+    required this.controller,
+    required this.validation,
+    required this.onBack,
+    required this.onCategory,
+    required this.onCustom,
+  });
+
+  final TextEditingController controller;
+  final String? validation;
+  final VoidCallback onBack;
+  final ValueChanged<_QuickCategory> onCategory;
+  final VoidCallback onCustom;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PlainHeader(
+          title: 'More categories',
+          hint: 'Pick one, or name your own.',
+          onBack: onBack,
+        ),
+        const SizedBox(height: SproutSpacing.xl),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final category in _moreCategories)
+              AddExpenseChip(
+                label: category.label,
+                icon: category.icon,
+                tint: category.tint,
+                onTap: () => onCategory(category),
+              ),
+          ],
+        ),
+        const SizedBox(height: SproutSpacing.xl),
+        TextField(
+          controller: controller,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Custom category',
+            hintText: 'e.g. tailor, parking',
+          ),
+        ),
+        if (validation != null) ...[
+          const SizedBox(height: SproutSpacing.md),
+          _ValidationLine(text: validation!),
+        ],
+        const SizedBox(height: SproutSpacing.lg),
+        _PrimaryButton(
+          label: 'Use custom category',
+          icon: Icons.add_rounded,
+          onTap: onCustom,
+        ),
+      ],
+    );
+  }
+}
+
+class _ImportStep extends StatelessWidget {
+  const _ImportStep({required this.onBack});
+
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PlainHeader(
+          title: QuickAddStrings.importTitle,
+          hint: QuickAddStrings.importHint,
+          onBack: onBack,
+        ),
+        const SizedBox(height: SproutSpacing.xl),
+        const ImportStatementCard(),
+      ],
+    );
+  }
+}
+
+class _SuccessStep extends StatelessWidget {
+  const _SuccessStep({
+    required this.transaction,
+    required this.onAddAnother,
+    required this.onDone,
+  });
+
+  final SproutTransaction transaction;
+  final VoidCallback onAddAnother;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    final isIncome = transaction.type == TransactionType.income;
+    final contextLine = isIncome
+        ? '${transaction.category} added to ${_accountName(transaction.accountId)}.'
+        : '${transaction.category} saved from ${_accountName(transaction.accountId)}.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              // Drag handle
-              const SizedBox(height: 8),
-              Center(
+              Container(
+                width: 96,
+                height: 96,
+                decoration: const BoxDecoration(
+                  color: SproutColors.tintMint,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SproutMascot(
+                state: SproutMascotState.thumbsUp,
+                size: 82,
+                enableBlink: false,
+              ),
+              Positioned(
+                right: 2,
+                bottom: 8,
                 child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.line,
-                    borderRadius: BorderRadius.circular(2),
+                  width: 28,
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: SproutColors.seed,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: Colors.white,
+                    size: 20,
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // Back button + title row
-              Row(
-                children: [
-                  _BackButton(onTap: widget.onBack),
-                  const SizedBox(width: SproutSpacing.md),
-                  Text(
-                    QuickAddStrings.incomeTitle,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ],
+            ],
+          ),
+        ),
+        const SizedBox(height: SproutSpacing.lg),
+        Text(
+          '${QuickAddStrings.logged} ${_categoryEmoji(transaction.category)} '
+          '${SproutFormat.currency(transaction.amount)}',
+          textAlign: TextAlign.center,
+          style: Theme.of(context)
+              .textTheme
+              .headlineSmall
+              ?.copyWith(color: colors.ink),
+        ),
+        const SizedBox(height: SproutSpacing.sm),
+        Text(
+          contextLine,
+          textAlign: TextAlign.center,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: colors.muted),
+        ),
+        const SizedBox(height: SproutSpacing.xs),
+        Text(
+          QuickAddStrings.savedNote,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: SproutColors.leaf,
+                fontSize: 12,
               ),
+        ),
+        const SizedBox(height: SproutSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: _SecondaryButton(
+                label: QuickAddStrings.addAnother,
+                icon: Icons.add_rounded,
+                onTap: onAddAnother,
+              ),
+            ),
+            const SizedBox(width: SproutSpacing.md),
+            Expanded(
+              child: _PrimaryButton(
+                label: QuickAddStrings.done,
+                icon: Icons.check_rounded,
+                onTap: onDone,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _StepHeader extends StatelessWidget {
+  const _StepHeader({
+    required this.icon,
+    required this.label,
+    required this.tint,
+    required this.onBack,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color tint;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    return Row(
+      children: [
+        _BackButton(onTap: onBack),
+        const SizedBox(width: SproutSpacing.md),
+        CircleAvatar(
+          radius: 21,
+          backgroundColor: tint,
+          child: Icon(icon, color: SproutColors.leaf, size: 20),
+        ),
+        const SizedBox(width: SproutSpacing.md),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(color: colors.ink),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlainHeader extends StatelessWidget {
+  const _PlainHeader({
+    required this.title,
+    required this.hint,
+    required this.onBack,
+  });
+
+  final String title;
+  final String hint;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _BackButton(onTap: onBack),
+        const SizedBox(width: SproutSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: SproutSpacing.xs),
               Text(
-                QuickAddStrings.incomeHint,
+                hint,
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
                     ?.copyWith(color: colors.muted),
               ),
-              const SizedBox(height: SproutSpacing.xl),
-
-              // Amount — the one field
-              TextFormField(
-                controller: _amount,
-                autofocus: true,
-                keyboardType: const TextInputType.numberWithOptions(),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: QuickAddStrings.incomeAmount,
-                  hintText: QuickAddStrings.incomeAmountHint,
-                  prefixText: 'PKR ',
-                ),
-                validator: (v) {
-                  final n = int.tryParse(
-                      (v ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
-                  if (n == null || n <= 0) return QuickAddStrings.enterAmount;
-                  return null;
-                },
-              ),
-              const SizedBox(height: SproutSpacing.md),
-
-              // Source — optional, one line
-              TextFormField(
-                controller: _source,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: QuickAddStrings.incomeSource,
-                  hintText: QuickAddStrings.incomeSourceHint,
-                ),
-              ),
-              const SizedBox(height: SproutSpacing.lg),
-
-              // Type chips — tap over type
-              Text(QuickAddStrings.incomeType,
-                  style: Theme.of(context).textTheme.labelLarge),
-              const SizedBox(height: SproutSpacing.sm),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final type in _incomeTypes)
-                    ChoiceChip(
-                      label: Text(type),
-                      selected: _kind == type,
-                      onSelected: (_) => setState(() => _kind = type),
-                    ),
-                ],
-              ),
-              const SizedBox(height: SproutSpacing.xl),
-
-              // One save button
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _save,
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text(QuickAddStrings.incomeSave),
-                ),
-              ),
-              const SizedBox(height: SproutSpacing.lg),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PresetChip extends StatelessWidget {
+  const _PresetChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: SproutColors.tintMint,
+      checkmarkColor: SproutColors.seed,
+    );
+  }
+}
+
+class _PocketChip extends StatelessWidget {
+  const _PocketChip({
+    required this.account,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final SproutAccount account;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(account.name),
+      selected: selected,
+      onSelected: (_) {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      selectedColor: SproutColors.tintMint,
+      checkmarkColor: SproutColors.seed,
+    );
+  }
+}
+
+class _IconChoiceChip extends StatelessWidget {
+  const _IconChoiceChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    return ChoiceChip(
+      avatar: Icon(icon,
+          size: 17, color: selected ? SproutColors.leaf : colors.muted),
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: SproutColors.tintMint,
+      checkmarkColor: SproutColors.seed,
+    );
+  }
+}
+
+class _DateAffordance extends StatelessWidget {
+  const _DateAffordance({required this.date, required this.onTap});
+
+  final DateTime date;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    final label = _relativeDateLabel(date);
+    return SproutButtonPress(
+      onTap: onTap,
+      semanticLabel: 'Change log date',
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SproutSpacing.md,
+          vertical: SproutSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: BorderRadius.circular(SproutRadius.card),
+          border: Border.all(color: colors.line.withValues(alpha: 0.7)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.today_rounded, color: colors.muted, size: 18),
+            const SizedBox(width: SproutSpacing.sm),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: colors.muted),
+            ),
+            const Spacer(),
+            Icon(Icons.more_horiz_rounded, color: colors.muted, size: 22),
+          ],
         ),
       ),
     );
   }
 }
 
-// ──────────────────────────────────────────────────────────────
-// Small reusable buttons for the sheet
-// ──────────────────────────────────────────────────────────────
+class _DateOptionTile extends StatelessWidget {
+  const _DateOptionTile({
+    required this.label,
+    required this.date,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final DateTime date;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: selected ? SproutColors.tintMint : colors.background,
+        child: Icon(
+          selected ? Icons.check_rounded : Icons.today_rounded,
+          color: selected ? SproutColors.leaf : colors.muted,
+        ),
+      ),
+      title: Text(label, style: Theme.of(context).textTheme.titleMedium),
+      subtitle: Text(
+        SproutFormat.date(date),
+        style: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: colors.muted),
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _ValidationLine extends StatelessWidget {
+  const _ValidationLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: SproutColors.goldInk,
+            fontWeight: FontWeight.w600,
+          ),
+    );
+  }
+}
+
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SproutButtonPress(
+      onTap: onTap,
+      scale: 0.98,
+      semanticLabel: label,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: SproutSpacing.lg,
+          vertical: SproutSpacing.lg,
+        ),
+        decoration: BoxDecoration(
+          color: SproutColors.seed,
+          borderRadius: BorderRadius.circular(SproutRadius.pill),
+          boxShadow: [
+            const BoxShadow(
+              color: SproutColors.leaf,
+              blurRadius: 0,
+              offset: Offset(0, 4),
+            ),
+            BoxShadow(
+              color: SproutColors.seed.withValues(alpha: 0.22),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: SproutSpacing.sm),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _CloseButton extends StatelessWidget {
   const _CloseButton({required this.onTap});
@@ -535,7 +1356,7 @@ class _BackButton extends StatelessWidget {
     return SproutButtonPress(
       onTap: onTap,
       scale: 0.9,
-      semanticLabel: QuickAddStrings.incomeBack,
+      semanticLabel: 'Back',
       child: Container(
         width: 36,
         height: 36,
@@ -568,7 +1389,10 @@ class _SecondaryButton extends StatelessWidget {
       scale: 0.96,
       semanticLabel: label,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+          horizontal: SproutSpacing.md,
+          vertical: SproutSpacing.lg,
+        ),
         decoration: BoxDecoration(
           color: colors.line.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(SproutRadius.tile),
@@ -578,7 +1402,7 @@ class _SecondaryButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: colors.muted, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(width: SproutSpacing.sm),
             Flexible(
               child: Text(
                 label,
@@ -586,7 +1410,7 @@ class _SecondaryButton extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: colors.ink,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
               ),
             ),
@@ -595,4 +1419,189 @@ class _SecondaryButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _QuickCategory {
+  const _QuickCategory({
+    required this.label,
+    required this.icon,
+    required this.tint,
+    required this.smartDefault,
+    required this.presets,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color tint;
+  final int? smartDefault;
+  final List<int> presets;
+}
+
+const _primaryCategories = [
+  _QuickCategory(
+    label: 'Chai',
+    icon: Icons.coffee_rounded,
+    tint: SproutColors.tintMint,
+    smartDefault: 200,
+    presets: [100, 200, 300, 500],
+  ),
+  _QuickCategory(
+    label: 'Groceries',
+    icon: Icons.shopping_cart_rounded,
+    tint: SproutColors.tintSky,
+    smartDefault: 2500,
+    presets: [1000, 2500, 5000, 7500],
+  ),
+  _QuickCategory(
+    label: 'Fuel',
+    icon: Icons.local_gas_station_rounded,
+    tint: SproutColors.tintWarm,
+    smartDefault: 5000,
+    presets: [2000, 5000, 8500, 12000],
+  ),
+  _QuickCategory(
+    label: 'Ride',
+    icon: Icons.local_taxi_rounded,
+    tint: SproutColors.tintLilac,
+    smartDefault: 450,
+    presets: [250, 450, 700, 1000],
+  ),
+  _QuickCategory(
+    label: 'Mobile Load',
+    icon: Icons.phone_android_rounded,
+    tint: SproutColors.tintGold,
+    smartDefault: 1000,
+    presets: [500, 1000, 1500, 2000],
+  ),
+  _QuickCategory(
+    label: 'Utility Bill',
+    icon: Icons.receipt_long_rounded,
+    tint: SproutColors.tintSky,
+    smartDefault: 8000,
+    presets: [3000, 5000, 8000, 12000],
+  ),
+  _QuickCategory(
+    label: 'School Fee',
+    icon: Icons.school_rounded,
+    tint: SproutColors.tintMint,
+    smartDefault: 15000,
+    presets: [10000, 15000, 25000, 40000],
+  ),
+  _QuickCategory(
+    label: 'Medicine',
+    icon: Icons.medication_rounded,
+    tint: SproutColors.tintWarm,
+    smartDefault: 1200,
+    presets: [500, 1200, 2500, 5000],
+  ),
+  _QuickCategory(
+    label: 'Shopping',
+    icon: Icons.shopping_bag_rounded,
+    tint: SproutColors.tintLilac,
+    smartDefault: 3000,
+    presets: [1500, 3000, 5000, 10000],
+  ),
+  _QuickCategory(
+    label: 'Food',
+    icon: Icons.restaurant_rounded,
+    tint: SproutColors.tintGold,
+    smartDefault: 800,
+    presets: [500, 800, 1200, 2000],
+  ),
+  _QuickCategory(
+    label: 'Zakat',
+    icon: Icons.volunteer_activism_rounded,
+    tint: SproutColors.tintMint,
+    smartDefault: null,
+    presets: [1000, 2500, 5000, 10000],
+  ),
+  _QuickCategory(
+    label: 'Sadaqah',
+    icon: Icons.favorite_rounded,
+    tint: SproutColors.tintMint,
+    smartDefault: 500,
+    presets: [100, 500, 1000, 2500],
+  ),
+  _QuickCategory(
+    label: 'Committee',
+    icon: Icons.groups_rounded,
+    tint: SproutColors.tintSky,
+    smartDefault: 10000,
+    presets: [5000, 10000, 20000, 50000],
+  ),
+];
+
+const _moreCategories = [
+  _QuickCategory(
+    label: 'Parking',
+    icon: Icons.local_parking_rounded,
+    tint: SproutColors.tintSky,
+    smartDefault: 100,
+    presets: [50, 100, 200, 500],
+  ),
+  _QuickCategory(
+    label: 'Home',
+    icon: Icons.home_repair_service_rounded,
+    tint: SproutColors.tintWarm,
+    smartDefault: 1500,
+    presets: [500, 1500, 3000, 5000],
+  ),
+  _QuickCategory(
+    label: 'Eidi',
+    icon: Icons.celebration_rounded,
+    tint: SproutColors.tintGold,
+    smartDefault: 1000,
+    presets: [500, 1000, 2500, 5000],
+  ),
+  _QuickCategory(
+    label: 'Other',
+    icon: Icons.more_horiz_rounded,
+    tint: SproutColors.tintMint,
+    smartDefault: null,
+    presets: [100, 500, 1000, 2500],
+  ),
+];
+
+List<SproutAccount> get _quickAddAccounts => mockAccounts
+    .where(
+      (account) =>
+          account.type == AccountType.cash ||
+          account.type == AccountType.bank ||
+          account.type == AccountType.wallet ||
+          account.type == AccountType.wise,
+    )
+    .toList();
+
+String _accountName(String? accountId) {
+  for (final account in mockAccounts) {
+    if (account.id == accountId) return account.name;
+  }
+  return 'Cash';
+}
+
+String _categoryEmoji(String category) {
+  return switch (category) {
+    'Chai' => '☕',
+    'Food' => '🍽',
+    'Groceries' => '🛒',
+    'Fuel' => '⛽',
+    'Ride' => '🚕',
+    'Salary' => '💼',
+    'Freelance' => '💻',
+    'Gift' => '🎁',
+    _ => '',
+  };
+}
+
+bool _isSameDay(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+String _relativeDateLabel(DateTime date) {
+  final today = DateTime.now();
+  if (_isSameDay(date, today)) return QuickAddStrings.today;
+  if (_isSameDay(date, today.subtract(const Duration(days: 1)))) {
+    return 'Yesterday';
+  }
+  return SproutFormat.date(date);
 }

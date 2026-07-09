@@ -14,6 +14,12 @@ import '../add/quick_add_sheet.dart';
 import 'today_controller.dart';
 import 'today_widgets.dart';
 
+String _formatSigned(int value) {
+  if (value == 0) return 'flat';
+  final prefix = value < 0 ? 'down' : 'up';
+  return '$prefix ${SproutFormat.compactCurrency(value.abs())}';
+}
+
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
 
@@ -47,6 +53,7 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
     final reducedMotion = MediaQuery.of(context).disableAnimations;
     final data = widget.data;
     final wealth = data.wealthSnapshot;
+    final completed = ref.watch(todayQuestCompletedProvider);
 
     // ── Above-fold: the calm 20-second glance ──
     // Mascot (compact, supporting), total wealth (hero number), movement chips,
@@ -87,7 +94,17 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
 
       // ── Standard section gap → One step ──
       const SizedBox(height: SproutSpacing.xl),
-      _OneStep(action: data.health.recommendedAction),
+      _OneStep(
+        action: data.health.recommendedAction,
+        completed: completed,
+        onComplete: () {
+          if (!reducedMotion) {
+            HapticFeedback.mediumImpact();
+            SystemSound.play(SystemSoundType.click);
+          }
+          ref.read(todayQuestCompletedProvider.notifier).state = true;
+        },
+      ),
 
       // Caption
       const SizedBox(height: SproutSpacing.sm),
@@ -113,13 +130,16 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
 
       // ── Grey divider band ──
       const SizedBox(height: SproutSpacing.xl),
-      _DividerBand(),
+      const _DividerBand(),
 
       // ── Below-fold: quiet door to depth ──
       // Standard section gap between every major block.
 
       const SizedBox(height: SproutSpacing.xl),
-      _HoldingsBreakdown(holdings: wealth.holdings),
+      _HoldingsBreakdown(
+        holdings: wealth.holdings,
+        events: data.wealthEvents,
+      ),
 
       const SizedBox(height: SproutSpacing.xl),
       _WhyItMoved(interpretation: wealth.interpretation),
@@ -135,7 +155,7 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       const SizedBox(height: SproutSpacing.xl),
       _ProvenanceFooter(text: data.provenanceSummary),
 
-      const SizedBox(height: 112),
+      const SizedBox(height: 148),
     ];
 
     return Stack(
@@ -157,6 +177,16 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
             ),
           ],
         ),
+        if (completed && !reducedMotion) ...[
+          const Positioned.fill(child: ConfettiBurst()),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 172,
+            child: XpRewardAnimation(
+                text: '+${data.health.recommendedAction.xp} XP'),
+          ),
+        ],
       ],
     );
   }
@@ -191,19 +221,19 @@ class _TodayHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
           decoration: BoxDecoration(
-            color: SproutColors.tintGold,
+            color: _todayTint(context, SproutColors.tintGold),
             borderRadius: BorderRadius.circular(SproutRadius.pill),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.local_fire_department_rounded,
-                  color: SproutColors.gold, size: 14),
+              Icon(Icons.local_fire_department_rounded,
+                  color: _todayAccent(context, SproutColors.gold), size: 14),
               const SizedBox(width: 5),
               Text(
                 '${data.user.dayStreak}',
                 style: SproutType.metricValue(
-                  color: SproutColors.goldInk,
+                  color: _todayAccent(context, SproutColors.goldInk),
                   size: SproutTypeScale.s14,
                   weight: FontWeight.w500,
                 ),
@@ -327,6 +357,7 @@ class _WealthHero extends StatelessWidget {
           const SizedBox(height: 8),
           // Movement chips: today + month-to-date
           _MovementChipsRow(
+            wealth: wealth,
             changeVsYesterday: wealth.changeVsYesterday,
             changeMtd: wealth.changeMtd,
             isDown: isDown,
@@ -340,12 +371,14 @@ class _WealthHero extends StatelessWidget {
 
 class _MovementChipsRow extends StatelessWidget {
   const _MovementChipsRow({
+    required this.wealth,
     required this.changeVsYesterday,
     required this.changeMtd,
     required this.isDown,
     required this.mtdUp,
   });
 
+  final WealthSnapshot wealth;
   final int changeVsYesterday;
   final int changeMtd;
   final bool isDown;
@@ -363,12 +396,19 @@ class _MovementChipsRow extends StatelessWidget {
             value: changeVsYesterday,
             label: 'today',
             isDown: isDown,
+            reason: wealth.interpretation.join(' '),
+            sheetTitle: 'Why today moved',
+            sheetLabel: wealth.mainReason,
           ),
           const SizedBox(width: 8),
           _MovementChip(
             value: changeMtd,
             label: 'this month',
             isDown: !mtdUp,
+            reason:
+                'Month-to-date movement is ${_formatSigned(changeMtd)}. ${wealth.mainReason} is the main driver today, and the full daily context is: ${wealth.interpretation.join(' ')}',
+            sheetTitle: 'Why this month moved',
+            sheetLabel: 'Month to date',
           ),
         ],
       ),
@@ -381,37 +421,66 @@ class _MovementChip extends StatelessWidget {
     required this.value,
     required this.label,
     required this.isDown,
+    required this.reason,
+    required this.sheetTitle,
+    required this.sheetLabel,
   });
 
   final int value;
   final String label;
   final bool isDown;
+  final String reason;
+  final String sheetTitle;
+  final String sheetLabel;
 
   @override
   Widget build(BuildContext context) {
     final isFlat = value == 0;
+    final colors = SproutColorScheme.of(context);
     final color = isFlat
-        ? SproutColors.muted
-        : (isDown ? SproutColors.gold : SproutColors.seed);
+        ? colors.muted
+        : _todayAccent(
+            context,
+            isDown ? SproutColors.goldInk : SproutColors.seed,
+          );
     final bgColor = isFlat
-        ? SproutColorScheme.of(context).line.withValues(alpha: 0.4)
-        : (isDown ? SproutColors.tintGold : SproutColors.tintMint);
+        ? _todaySubtleSurface(context)
+        : _todayTint(
+            context,
+            isDown ? SproutColors.tintGold : SproutColors.tintMint,
+          );
     final arrow = isFlat ? '—' : (isDown ? '▼' : '▲');
-    final formatted =
-        isFlat ? '—' : SproutFormat.compactCurrency(value.abs());
+    final formatted = isFlat ? '—' : SproutFormat.compactCurrency(value.abs());
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(SproutRadius.pill),
-      ),
-      child: Text(
-        '$arrow $formatted $label',
-        style: SproutType.metricValue(
-          color: color,
-          size: SproutTypeScale.s14,
-          weight: FontWeight.w500,
+    return SproutButtonPress(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        SproutBottomSheet.show(
+          context,
+          title: sheetTitle,
+          rows: [
+            SheetInfoRow(
+              icon: Icons.insights_rounded,
+              label: sheetLabel,
+              value: reason,
+            ),
+          ],
+        );
+      },
+      scale: 0.97,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(SproutRadius.pill),
+        ),
+        child: Text(
+          '$arrow $formatted $label',
+          style: SproutType.metricValue(
+            color: color,
+            size: SproutTypeScale.s14,
+            weight: FontWeight.w500,
+          ),
         ),
       ),
     );
@@ -428,13 +497,14 @@ class _SproutRead extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
-        color: SproutColors.tintMint,
+        color: _todayTint(context, SproutColors.tintMint),
         borderRadius: BorderRadius.circular(16),
+        border: _todayHairline(context),
       ),
       child: Text(
         text,
         style: SproutType.body(
-          color: SproutColors.leaf,
+          color: _todayAccent(context, SproutColors.leaf),
           size: SproutTypeScale.s14,
           weight: FontWeight.w500,
           height: 1.45,
@@ -466,8 +536,9 @@ class _SalaryStrip extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: colors.line.withValues(alpha: 0.15),
+          color: _todaySubtleSurface(context),
           borderRadius: BorderRadius.circular(12),
+          border: _todayHairline(context),
         ),
         child: Row(
           children: [
@@ -491,25 +562,29 @@ class _SalaryStrip extends StatelessWidget {
 
     // Calm reassurance: are upcoming bills covered?
     final billsCovered = upcomingBills > 0;
-    final reassurance = billsCovered
-        ? 'covers your upcoming bills'
-        : 'no bills due soon';
+    final reassurance =
+        billsCovered ? 'covers your upcoming bills' : 'no bills due soon';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: SproutColors.tintWarm.withValues(alpha: 0.5),
+        color: _todayTint(context, SproutColors.tintWarm),
         borderRadius: BorderRadius.circular(12),
+        border: _todayHairline(context),
       ),
       child: Row(
         children: [
-          Icon(Icons.savings_rounded, color: SproutColors.goldInk, size: 16),
+          Icon(
+            Icons.savings_rounded,
+            color: _todayAccent(context, SproutColors.goldInk),
+            size: 16,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Salary in $daysUntilSalary days · $reassurance',
               style: SproutType.body(
-                color: SproutColors.goldInk,
+                color: _todayAccent(context, SproutColors.goldInk),
                 size: SproutTypeScale.s14,
                 weight: FontWeight.w500,
                 height: 1.3,
@@ -523,16 +598,22 @@ class _SalaryStrip extends StatelessWidget {
 }
 
 class _OneStep extends StatelessWidget {
-  const _OneStep({required this.action});
+  const _OneStep({
+    required this.action,
+    required this.completed,
+    required this.onComplete,
+  });
 
   final RecommendedAction action;
+  final bool completed;
+  final VoidCallback onComplete;
 
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
     final isDark = colors.brightness == Brightness.dark;
     final fill = isDark ? SproutColors.darkSeed : SproutColors.seed;
-    final edgeColor = isDark ? const Color(0xFF0E5A35) : const Color(0xFF1A6B3F);
+    final edgeColor = isDark ? SproutColors.darkMint : SproutColors.leaf;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -543,7 +624,7 @@ class _OneStep extends StatelessWidget {
           child: Text(
             'YOUR ONE STEP',
             style: SproutType.body(
-              color: SproutColors.leaf.withValues(alpha: 0.85),
+              color: _todayAccent(context, SproutColors.leaf),
               size: SproutTypeScale.s14,
               weight: FontWeight.w500,
               height: 1.2,
@@ -552,28 +633,44 @@ class _OneStep extends StatelessWidget {
         ),
         // Chunky pressable button
         _ChunkyPressButton(
-          onTap: () {
-            HapticFeedback.mediumImpact();
-            SystemSound.play(SystemSoundType.click);
-          },
-          semanticLabel: action.title,
+          onTap: completed ? null : onComplete,
+          semanticLabel: completed ? 'Done today' : action.title,
           fill: fill,
           edgeColor: edgeColor,
-          edgeHeight: 5,
+          edgeHeight: 4,
           borderRadius: 16,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-            child: Text(
-              action.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: SproutType.body(
-                color: Colors.white,
-                size: SproutTypeScale.s18,
-                weight: FontWeight.w500,
-                height: 1.2,
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+            child: Column(
+              children: [
+                Text(
+                  completed ? 'Done today' : action.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: SproutType.body(
+                    color: Colors.white,
+                    size: SproutTypeScale.s18,
+                    weight: FontWeight.w500,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  completed
+                      ? 'Nice. Your car fund moved closer.'
+                      : action.impact,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: SproutType.body(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    size: SproutTypeScale.s14,
+                    weight: FontWeight.w500,
+                    height: 1.25,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -617,8 +714,8 @@ class _WhatsHappening extends StatelessWidget {
       tiles.add(_HappeningTileData(
         icon: Icons.flag_rounded,
         title: 'Car goal',
-        value: '2 lakh to go',
-        detail: 'Closest goal',
+        value: 'PKR 2 lakh',
+        detail: 'left to go',
         color: SproutColors.tintLilac,
         iconColor: SproutColors.lilac,
         severity: 'all_good',
@@ -650,11 +747,11 @@ class _WhatsHappening extends StatelessWidget {
       final thread = learnThreads.first;
       tiles.add(_HappeningTileData(
         icon: Icons.lightbulb_rounded,
-        title: 'Learn later',
-        value: 'Why funds move',
+        title: 'Learn why',
+        value: 'Fund NAVs',
         detail: '2-min read',
         color: SproutColors.tintWarm,
-        iconColor: const Color(0xFFE8923C),
+        iconColor: SproutColors.gold,
         severity: 'all_good',
         onTap: () {
           HapticFeedback.lightImpact();
@@ -701,7 +798,7 @@ class _WhatsHappening extends StatelessWidget {
             crossAxisCount: 2,
             crossAxisSpacing: SproutSpacing.lg,
             mainAxisSpacing: SproutSpacing.lg,
-            childAspectRatio: 1.55,
+            childAspectRatio: 1.76,
           ),
           itemBuilder: (context, index) {
             return _HappeningTile(tile: tiles[index]);
@@ -722,10 +819,11 @@ class _WhatsHappening extends StatelessWidget {
         : (isDown ? SproutColors.tintGold : SproutColors.tintMint);
     final iconColor = isFlat
         ? SproutColors.muted
-        : (isDown ? SproutColors.gold : SproutColors.seed);
+        : (isDown ? SproutColors.goldInk : SproutColors.seed);
 
     final icon = switch (event.kind) {
-      WealthEventKind.navMove => Icons.trending_up_rounded,
+      WealthEventKind.navMove =>
+        isDown ? Icons.trending_down_rounded : Icons.trending_up_rounded,
       WealthEventKind.fxMove => Icons.currency_exchange_rounded,
       WealthEventKind.contribution => Icons.savings_rounded,
       WealthEventKind.withdrawal => Icons.account_balance_wallet_rounded,
@@ -742,11 +840,11 @@ class _WhatsHappening extends StatelessWidget {
     // plainWhy lives behind the tap-through, not on the tile.
     final (title, description) = switch (event.kind) {
       WealthEventKind.navMove => (
-          isDown ? 'Funds dipped' : 'Funds up',
-          'NAV correction',
+          isDown ? 'Al Meezan' : 'Funds up',
+          isDown ? 'NAV cooled' : 'NAV rose',
         ),
       WealthEventKind.fxMove => (
-          isDown ? 'FX down' : 'EUR up',
+          isDown ? 'FX down' : 'EUR helped',
           'FX moved your way',
         ),
       WealthEventKind.contribution => (
@@ -837,35 +935,40 @@ class _HappeningTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
     final isDark = colors.brightness == Brightness.dark;
+    final fill = _todayTint(context, tile.color);
+    final iconColor = _todayAccent(context, tile.iconColor);
     final edgeColor = isDark
-        ? colors.line.withValues(alpha: 0.4)
-        : tile.iconColor.withValues(alpha: 0.22);
+        ? _todayEdgeColor(context, tile.color)
+        : iconColor.withValues(alpha: 0.22);
+    final isLongValue = tile.value.length > 8;
 
     return _ChunkyPressButton(
       onTap: tile.onTap,
       semanticLabel: '${tile.title}. ${tile.detail}',
-      fill: tile.color,
+      fill: fill,
       edgeColor: edgeColor,
       edgeHeight: 3,
       borderRadius: SproutRadius.tile,
       child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
-          // Low-opacity oversized icon watermark — Duolingo-style depth.
-          // Bleeds off the bottom-right corner, very subtle (~5% opacity).
+          // Low-opacity icon watermark — subtle depth without dead space.
           // Clipped to the tile bounds so it doesn't trigger layout overflow.
           Positioned(
-            right: -16,
-            bottom: -22,
+            right: -13,
+            bottom: -17,
             child: Icon(
               tile.icon,
-              size: 72,
-              color: tile.iconColor.withValues(alpha: isDark ? 0.04 : 0.05),
+              size: 68,
+              color: iconColor.withValues(alpha: isDark ? 0.14 : 0.07),
             ),
           ),
           // Content — top-aligned, tight block with even padding.
           Padding(
-            padding: const EdgeInsets.all(SproutSpacing.md),
+            padding: const EdgeInsets.symmetric(
+              horizontal: SproutSpacing.lg,
+              vertical: SproutSpacing.md,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -874,7 +977,21 @@ class _HappeningTile extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(tile.icon, color: tile.iconColor, size: 24),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: tile.iconColor.withValues(
+                          alpha: isDark ? 0.24 : 0.14,
+                        ),
+                        borderRadius: BorderRadius.circular(SproutRadius.tile),
+                      ),
+                      child: Icon(
+                        tile.icon,
+                        color: iconColor,
+                        size: 21,
+                      ),
+                    ),
                     const SizedBox(width: SproutSpacing.sm),
                     Flexible(
                       child: FittedBox(
@@ -885,8 +1002,11 @@ class _HappeningTile extends StatelessWidget {
                           maxLines: 1,
                           style: SproutType.metricValue(
                             color: colors.ink,
-                            size: SproutTypeScale.s18,
+                            size: isLongValue
+                                ? SproutTypeScale.s14
+                                : SproutTypeScale.s18,
                             weight: FontWeight.w800,
+                            height: 1.05,
                           ),
                         ),
                       ),
@@ -903,10 +1023,10 @@ class _HappeningTile extends StatelessWidget {
                     color: colors.ink,
                     size: SproutTypeScale.s14,
                     weight: FontWeight.w800,
-                    height: 1.2,
+                    height: 1.12,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 // One-line description — short, secondary color.
                 Text(
                   tile.detail,
@@ -916,7 +1036,7 @@ class _HappeningTile extends StatelessWidget {
                     color: colors.muted,
                     size: SproutTypeScale.s14,
                     weight: FontWeight.w500,
-                    height: 1.4,
+                    height: 1.18,
                   ),
                 ),
               ],
@@ -941,7 +1061,7 @@ class _DividerBand extends StatelessWidget {
     return Container(
       height: 8,
       color: colors.brightness == Brightness.dark
-          ? colors.line.withValues(alpha: 0.3)
+          ? colors.surface
           : SproutColors.background,
     );
   }
@@ -952,9 +1072,13 @@ class _DividerBand extends StatelessWidget {
 // ──────────────────────────────────────────────────────────────
 
 class _HoldingsBreakdown extends StatelessWidget {
-  const _HoldingsBreakdown({required this.holdings});
+  const _HoldingsBreakdown({
+    required this.holdings,
+    required this.events,
+  });
 
   final List<Holding> holdings;
+  final List<WealthEvent> events;
 
   @override
   Widget build(BuildContext context) {
@@ -973,7 +1097,10 @@ class _HoldingsBreakdown extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         for (final holding in holdings) ...[
-          _HoldingRow(holding: holding),
+          _HoldingRow(
+            holding: holding,
+            event: _eventForHolding(holding),
+          ),
           if (holding.id != holdings.last.id)
             Divider(
               height: 1,
@@ -1003,10 +1130,10 @@ class _HoldingsBreakdown extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: colors.line.withValues(alpha: 0.2),
+              color: _todaySubtleSurface(context),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: colors.line.withValues(alpha: 0.4),
+                color: _todayBorderColor(context),
                 width: 0.5,
               ),
             ),
@@ -1014,7 +1141,7 @@ class _HoldingsBreakdown extends StatelessWidget {
               child: Text(
                 'View 6-day trend chart →',
                 style: SproutType.body(
-                  color: SproutColors.sky,
+                  color: _todayAccent(context, SproutColors.sky),
                   size: SproutTypeScale.s14,
                   weight: FontWeight.w500,
                   height: 1.4,
@@ -1026,12 +1153,23 @@ class _HoldingsBreakdown extends StatelessWidget {
       ],
     );
   }
+
+  WealthEvent? _eventForHolding(Holding holding) {
+    for (final event in events) {
+      if (event.holdingId == holding.id) return event;
+    }
+    return null;
+  }
 }
 
 class _HoldingRow extends StatelessWidget {
-  const _HoldingRow({required this.holding});
+  const _HoldingRow({
+    required this.holding,
+    required this.event,
+  });
 
   final Holding holding;
+  final WealthEvent? event;
 
   @override
   Widget build(BuildContext context) {
@@ -1041,71 +1179,108 @@ class _HoldingRow extends StatelessWidget {
     final isFlat = change == 0;
     final changeColor = isFlat
         ? colors.muted
-        : (isDown ? SproutColors.gold : SproutColors.seed);
+        : _todayAccent(
+            context,
+            isDown ? SproutColors.goldInk : SproutColors.seed,
+          );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          // Icon
-          _HoldingIcon(holding: holding),
-          const SizedBox(width: 12),
-          // Label + detail
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return SproutButtonPress(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        SproutBottomSheet.show(
+          context,
+          title: holding.label,
+          rows: [
+            SheetInfoRow(
+              icon: Icons.account_balance_wallet_rounded,
+              label: 'Value',
+              value: _formatCompact(holding.valuePkr),
+            ),
+            SheetInfoRow(
+              icon: Icons.verified_rounded,
+              label: 'Source',
+              value: '${holding.priceSource} · ${holding.priceAsOf}',
+            ),
+            if (holding.fxRate != null)
+              SheetInfoRow(
+                icon: Icons.currency_exchange_rounded,
+                label: holding.fxRate!.pair,
+                value:
+                    '${holding.fxRate!.value} · ${holding.fxRate!.source} · ${holding.fxRate!.asOf}',
+              ),
+            SheetInfoRow(
+              icon: Icons.insights_rounded,
+              label: 'Movement reason',
+              value: event?.plainWhy ?? 'Flat today. No movement driver.',
+            ),
+          ],
+        );
+      },
+      scale: 0.985,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            // Icon
+            _HoldingIcon(holding: holding),
+            const SizedBox(width: 12),
+            // Label + detail
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    holding.label,
+                    style: SproutType.body(
+                      color: colors.ink,
+                      size: SproutTypeScale.s14,
+                      weight: FontWeight.w500,
+                      height: 1.2,
+                    ),
+                  ),
+                  if (holding.detail != null)
+                    Text(
+                      holding.detail!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: SproutType.body(
+                        color: colors.muted,
+                        size: SproutTypeScale.s14,
+                        weight: FontWeight.w500,
+                        height: 1.4,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Value + change
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  holding.label,
-                  style: SproutType.body(
+                  _formatCompact(holding.valuePkr),
+                  style: SproutType.moneyValue(
                     color: colors.ink,
                     size: SproutTypeScale.s14,
                     weight: FontWeight.w500,
-                    height: 1.2,
+                    height: 1.05,
                   ),
                 ),
-                if (holding.detail != null)
-                  Text(
-                    holding.detail!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SproutType.body(
-                      color: colors.muted,
-                      size: SproutTypeScale.s14,
-                      weight: FontWeight.w500,
-                      height: 1.4,
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  isFlat
+                      ? '—'
+                      : '${isDown ? "−" : "+"}${_formatCompact(change.abs())}',
+                  style: SproutType.metricValue(
+                    color: changeColor,
+                    size: SproutTypeScale.s14,
+                    weight: FontWeight.w500,
                   ),
+                ),
               ],
             ),
-          ),
-          // Value + change
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                _formatCompact(holding.valuePkr),
-                style: SproutType.moneyValue(
-                  color: colors.ink,
-                  size: SproutTypeScale.s14,
-                  weight: FontWeight.w500,
-                  height: 1.05,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                isFlat
-                    ? '—'
-                    : '${isDown ? "−" : "+"}${_formatCompact(change.abs())}',
-                style: SproutType.metricValue(
-                  color: changeColor,
-                  size: SproutTypeScale.s14,
-                  weight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1139,16 +1314,14 @@ class _HoldingIcon extends StatelessWidget {
       HoldingKind.mutualFund => SproutColors.seed,
       HoldingKind.cash => holding.currency == 'EUR'
           ? SproutColors.lilac
-          : (holding.currency == 'USD'
-              ? SproutColors.sky
-              : SproutColors.gold),
+          : (holding.currency == 'USD' ? SproutColors.sky : SproutColors.gold),
       HoldingKind.equity => SproutColors.sky,
       HoldingKind.other => SproutColors.muted,
     };
 
     return SizedBox(
       width: 22,
-      child: Icon(icon, color: color, size: 18),
+      child: Icon(icon, color: _todayAccent(context, color), size: 18),
     );
   }
 }
@@ -1177,7 +1350,9 @@ class _WhyItMoved extends StatelessWidget {
         Text(
           interpretation.join(' '),
           style: SproutType.body(
-            color: colors.muted,
+            color: _todayIsDark(context)
+                ? colors.ink.withValues(alpha: 0.78)
+                : colors.muted,
             size: SproutTypeScale.s18,
             weight: FontWeight.w500,
             height: 1.6,
@@ -1251,7 +1426,9 @@ class _GoalRow extends StatelessWidget {
                   ? 'complete ✓'
                   : '${_formatCompact(goal.currentAmount)} / ${_formatCompact(goal.targetAmount)}',
               style: SproutType.metricValue(
-                color: isComplete ? SproutColors.seed : colors.muted,
+                color: isComplete
+                    ? _todayAccent(context, SproutColors.seed)
+                    : colors.muted,
                 size: SproutTypeScale.s14,
                 weight: FontWeight.w500,
               ),
@@ -1265,7 +1442,7 @@ class _GoalRow extends StatelessWidget {
           child: Container(
             height: 8,
             decoration: BoxDecoration(
-              color: colors.line.withValues(alpha: 0.4),
+              color: _todayTrackColor(context),
               borderRadius: BorderRadius.circular(SproutRadius.pill),
             ),
             child: TweenAnimationBuilder<double>(
@@ -1279,7 +1456,7 @@ class _GoalRow extends StatelessWidget {
                 widthFactor: animatedProgress,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: SproutColors.seed,
+                    color: _todayAccent(context, SproutColors.seed),
                     borderRadius: BorderRadius.circular(SproutRadius.pill),
                   ),
                 ),
@@ -1291,7 +1468,9 @@ class _GoalRow extends StatelessWidget {
         Text(
           goal.paceNote,
           style: SproutType.body(
-            color: isComplete ? colors.muted : SproutColors.seed,
+            color: isComplete
+                ? colors.muted
+                : _todayAccent(context, SproutColors.seed),
             size: SproutTypeScale.s14,
             weight: FontWeight.w500,
             height: 1.4,
@@ -1357,16 +1536,17 @@ class _LearnLater extends StatelessWidget {
             },
             scale: 0.97,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: SproutColors.tintLilac,
+                color: _todayTint(context, SproutColors.tintLilac),
                 borderRadius: BorderRadius.circular(12),
+                border: _todayHairline(context),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.lightbulb_rounded,
-                      color: SproutColors.lilac, size: 20),
+                  Icon(Icons.lightbulb_rounded,
+                      color: _todayAccent(context, SproutColors.lilac),
+                      size: 20),
                   const SizedBox(width: 11),
                   Expanded(
                     child: Column(
@@ -1375,7 +1555,7 @@ class _LearnLater extends StatelessWidget {
                         Text(
                           thread.title,
                           style: SproutType.body(
-                            color: SproutColors.lilac,
+                            color: _todayAccent(context, SproutColors.lilac),
                             size: SproutTypeScale.s14,
                             weight: FontWeight.w500,
                             height: 1.4,
@@ -1386,8 +1566,8 @@ class _LearnLater extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: SproutType.body(
-                            color:
-                                SproutColors.lilac.withValues(alpha: 0.85),
+                            color: _todayAccent(context, SproutColors.lilac)
+                                .withValues(alpha: 0.85),
                             size: SproutTypeScale.s14,
                             weight: FontWeight.w500,
                             height: 1.4,
@@ -1396,8 +1576,11 @@ class _LearnLater extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded,
-                      color: SproutColors.lilac, size: 20),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: _todayAccent(context, SproutColors.lilac),
+                    size: 20,
+                  ),
                 ],
               ),
             ),
@@ -1418,13 +1601,16 @@ class _ProvenanceFooter extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: colors.line.withValues(alpha: 0.2),
+        color: _todaySubtleSurface(context),
         borderRadius: BorderRadius.circular(12),
+        border: _todayHairline(context),
       ),
       child: Text(
         text,
         style: SproutType.body(
-          color: colors.muted,
+          color: _todayIsDark(context)
+              ? colors.ink.withValues(alpha: 0.72)
+              : colors.muted,
           size: SproutTypeScale.s14,
           weight: FontWeight.w500,
           height: 1.6,
@@ -1478,9 +1664,8 @@ class _ChunkyPressButtonState extends State<_ChunkyPressButton> {
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),
       child: AnimatedContainer(
-        duration: reducedMotion
-            ? Duration.zero
-            : const Duration(milliseconds: 90),
+        duration:
+            reducedMotion ? Duration.zero : const Duration(milliseconds: 90),
         curve: Curves.easeOut,
         transform: Matrix4.translationValues(0, translateY, 0),
         decoration: BoxDecoration(
@@ -1488,9 +1673,8 @@ class _ChunkyPressButtonState extends State<_ChunkyPressButton> {
           borderRadius: BorderRadius.circular(widget.borderRadius),
         ),
         child: AnimatedPadding(
-          duration: reducedMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 90),
+          duration:
+              reducedMotion ? Duration.zero : const Duration(milliseconds: 90),
           curve: Curves.easeOut,
           padding: EdgeInsets.only(bottom: pressedEdge),
           child: DecoratedBox(
@@ -1609,4 +1793,86 @@ class _QuickActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _todayIsDark(BuildContext context) {
+  return SproutColorScheme.of(context).brightness == Brightness.dark;
+}
+
+Color _todayTint(BuildContext context, Color lightTint) {
+  if (!_todayIsDark(context)) return lightTint;
+  if (lightTint == SproutColors.tintMint) {
+    return SproutColors.darkMint.withValues(alpha: 0.78);
+  }
+  if (lightTint == SproutColors.tintGold ||
+      lightTint == SproutColors.tintWarm) {
+    return SproutColors.darkGold.withValues(alpha: 0.18);
+  }
+  if (lightTint == SproutColors.tintSky) {
+    return SproutColors.darkSky.withValues(alpha: 0.16);
+  }
+  if (lightTint == SproutColors.tintLilac) {
+    return SproutColors.darkLilac.withValues(alpha: 0.18);
+  }
+  return SproutColorScheme.of(context).surface;
+}
+
+Color _todayAccent(BuildContext context, Color lightAccent) {
+  if (!_todayIsDark(context)) return lightAccent;
+  if (lightAccent == SproutColors.seed || lightAccent == SproutColors.leaf) {
+    return SproutColors.darkSeed;
+  }
+  if (lightAccent == SproutColors.gold || lightAccent == SproutColors.goldInk) {
+    return SproutColors.darkGold;
+  }
+  if (lightAccent == SproutColors.sky) return SproutColors.darkSky;
+  if (lightAccent == SproutColors.lilac) return SproutColors.darkLilac;
+  if (lightAccent == SproutColors.muted) {
+    return SproutColorScheme.of(context).muted;
+  }
+  return lightAccent;
+}
+
+Color _todayEdgeColor(BuildContext context, Color lightTint) {
+  if (lightTint == SproutColors.tintMint) {
+    return SproutColors.darkSeed.withValues(alpha: 0.42);
+  }
+  if (lightTint == SproutColors.tintGold ||
+      lightTint == SproutColors.tintWarm) {
+    return SproutColors.darkGold.withValues(alpha: 0.38);
+  }
+  if (lightTint == SproutColors.tintSky) {
+    return SproutColors.darkSky.withValues(alpha: 0.35);
+  }
+  if (lightTint == SproutColors.tintLilac) {
+    return SproutColors.darkLilac.withValues(alpha: 0.36);
+  }
+  return SproutColorScheme.of(context).line;
+}
+
+Color _todaySubtleSurface(BuildContext context) {
+  final colors = SproutColorScheme.of(context);
+  return _todayIsDark(context)
+      ? colors.surface
+      : colors.line.withValues(alpha: 0.2);
+}
+
+Color _todayBorderColor(BuildContext context) {
+  final colors = SproutColorScheme.of(context);
+  return _todayIsDark(context)
+      ? colors.line.withValues(alpha: 0.95)
+      : colors.line.withValues(alpha: 0.45);
+}
+
+Color _todayTrackColor(BuildContext context) {
+  final colors = SproutColorScheme.of(context);
+  return _todayIsDark(context)
+      ? colors.line.withValues(alpha: 0.85)
+      : colors.line.withValues(alpha: 0.4);
+}
+
+BoxBorder? _todayHairline(BuildContext context) {
+  return _todayIsDark(context)
+      ? Border.all(color: _todayBorderColor(context), width: 0.7)
+      : null;
 }

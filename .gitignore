@@ -17,3 +17,5 @@ ios/Pods/
 # IDE
 .idea/
 .vscode/
+
+.pnpm-store/

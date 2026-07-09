@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/manual_money_store.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../domain/sprout_models.dart';
 import '../../theme/sprout_theme.dart';
@@ -28,6 +29,8 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
   @override
   Widget build(BuildContext context) {
     final accounts = ref.watch(accountsProvider);
+    final transactions = ref.watch(visibleTransactionsProvider);
+    final budget = ref.watch(adjustedBudgetProvider);
     // Cash/bank/wallet only here; investment + Wise live in the Investments
     // snapshot so a balance is never counted twice on the same screen.
     final cashAccounts = accounts
@@ -36,14 +39,15 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         .toList();
 
     // Empty state: no accounts at all means a fresh, manual-first start.
-    if (accounts.isEmpty && mockTransactions.isEmpty) {
+    if (accounts.isEmpty && transactions.isEmpty) {
       return SproutPage(
         title: 'Money',
         subtitle: 'A simple picture of your money.',
         children: [
           SproutEmptyView(
             title: 'You can start manually. No bank connection needed.',
-            subtitle: 'Add one chai, fuel, or grocery spend and Sprout builds a calm overview from there.',
+            subtitle:
+                'Add one chai, fuel, or grocery spend and Sprout builds a calm overview from there.',
             actionLabel: 'Add first transaction',
             onAction: () => QuickActionGrid.openQuickAdd(context),
           ),
@@ -60,7 +64,8 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
           title: 'Cash and accounts',
           trailing: BalanceToggle(
             visible: _balancesVisible,
-            onToggle: () => setState(() => _balancesVisible = !_balancesVisible),
+            onToggle: () =>
+                setState(() => _balancesVisible = !_balancesVisible),
           ),
         ),
         const SizedBox(height: SproutSpacing.sm),
@@ -80,7 +85,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         const SizedBox(height: SproutSpacing.xl),
         const MoneySectionHeader(title: 'Monthly budget'),
         const SizedBox(height: SproutSpacing.sm),
-        const BudgetPanel(budget: mockBudget),
+        BudgetPanel(budget: budget),
 
         // 3. Goals.
         const SizedBox(height: SproutSpacing.xl),

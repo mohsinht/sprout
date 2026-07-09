@@ -14,7 +14,7 @@ Not a dashboard. Not a bank. A character with news. If any screen stops feeling 
 
 Per screen, per day.
 
-If a screen has two things fighting to be most important, it has zero. Today resolves to Sprout, one line, and one button. The moment a second co-equal CTA appears, delete one.
+If a screen has two things fighting to be most important, it has zero. Today resolves to total wealth, Sprout's one line, and one button. Sprout carries the emotion; the wealth figure carries the answer. The moment a second co-equal CTA appears, delete one.
 
 Simplicity is not taste here. It is why the check-in takes 30 seconds instead of becoming a chore.
 
@@ -26,7 +26,7 @@ Playfulness lives in Sprout: its face, bounce, and voice. It should not come fro
 
 A calm layout with one expressive character feels delightful. A busy layout with a mascot in the corner feels like another finance app.
 
-The mascot is the fun. The interface is the calm it sits in. This contrast is the brand.
+The mascot is the warmth. The wealth figure is the user's reason for opening Today. The interface is the calm they sit in. This contrast is the brand.
 
 ### 3. Motion Is A Reward
 

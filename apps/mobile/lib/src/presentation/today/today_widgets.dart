@@ -481,14 +481,15 @@ class SourceStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
     return Semantics(
       label: '$label: ${connected ? 'connected' : 'not connected'}',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: SproutColors.mint,
+          color: _todayWidgetTint(context, SproutColors.tintMint),
           borderRadius: BorderRadius.circular(SproutRadius.pill),
-          border: Border.all(color: SproutColors.seed.withValues(alpha: 0.18)),
+          border: Border.all(color: _todayWidgetBorder(context)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -499,7 +500,9 @@ class SourceStatusPill extends StatelessWidget {
               connected
                   ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked,
-              color: connected ? SproutColors.seed : SproutColors.muted,
+              color: connected
+                  ? _todayWidgetAccent(context, SproutColors.seed)
+                  : colors.muted,
               size: 17,
             ),
           ],
@@ -669,8 +672,12 @@ class SheetInfoRow extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 20,
-          backgroundColor: SproutColors.mint,
-          child: Icon(icon, color: SproutColors.seed, size: 20),
+          backgroundColor: _todayWidgetTint(context, SproutColors.tintMint),
+          child: Icon(
+            icon,
+            color: _todayWidgetAccent(context, SproutColors.seed),
+            size: 20,
+          ),
         ),
         const SizedBox(width: SproutSpacing.md),
         Expanded(
@@ -862,4 +869,46 @@ class _ConfettiPainter extends CustomPainter {
   bool shouldRepaint(covariant _ConfettiPainter oldDelegate) {
     return oldDelegate.progress != progress;
   }
+}
+
+bool _todayWidgetIsDark(BuildContext context) {
+  return SproutColorScheme.of(context).brightness == Brightness.dark;
+}
+
+Color _todayWidgetTint(BuildContext context, Color lightTint) {
+  if (!_todayWidgetIsDark(context)) return lightTint;
+  if (lightTint == SproutColors.tintMint || lightTint == SproutColors.mint) {
+    return SproutColors.darkMint.withValues(alpha: 0.78);
+  }
+  if (lightTint == SproutColors.tintGold ||
+      lightTint == SproutColors.tintWarm) {
+    return SproutColors.darkGold.withValues(alpha: 0.18);
+  }
+  if (lightTint == SproutColors.tintSky) {
+    return SproutColors.darkSky.withValues(alpha: 0.16);
+  }
+  if (lightTint == SproutColors.tintLilac) {
+    return SproutColors.darkLilac.withValues(alpha: 0.18);
+  }
+  return SproutColorScheme.of(context).surface;
+}
+
+Color _todayWidgetAccent(BuildContext context, Color lightAccent) {
+  if (!_todayWidgetIsDark(context)) return lightAccent;
+  if (lightAccent == SproutColors.seed || lightAccent == SproutColors.leaf) {
+    return SproutColors.darkSeed;
+  }
+  if (lightAccent == SproutColors.gold || lightAccent == SproutColors.goldInk) {
+    return SproutColors.darkGold;
+  }
+  if (lightAccent == SproutColors.sky) return SproutColors.darkSky;
+  if (lightAccent == SproutColors.lilac) return SproutColors.darkLilac;
+  return lightAccent;
+}
+
+Color _todayWidgetBorder(BuildContext context) {
+  final colors = SproutColorScheme.of(context);
+  return _todayWidgetIsDark(context)
+      ? colors.line.withValues(alpha: 0.95)
+      : SproutColors.seed.withValues(alpha: 0.18);
 }

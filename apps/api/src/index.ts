@@ -1,78 +1,86 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { calculateFinancialHealthScore } from "@sprout/domain";
-import { mockTodayResponse, TodayResponseSchema, mockWealthBriefing, WealthBriefingSchema } from "@sprout/shared";
-import { budgetRoute } from "./routes/budget.js";
+import { config } from "./config.js";
+import { authRoute } from "./auth/routes.js";
 import { profileRoute } from "./routes/profile.js";
-import { learnRoute } from "./routes/learn.js";
-import { growRoute } from "./routes/grow.js";
+import { holdingsRoute } from "./routes/holdings.js";
+import { goalsRoute } from "./routes/goals.js";
+import { transactionsRoute } from "./routes/transactions.js";
+import { briefingRoute } from "./routes/briefing.js";
+import { pendingRoute } from "./routes/pending.js";
+import { incomeRoute } from "./routes/income.js";
+import { uploadRoute } from "./routes/upload.js";
+import { runDailyJobForAllUsers } from "./services/job-runner.js";
 
 const app = new Hono();
 
+// ── CORS ─────────────────────────────────────────────────────────────────────
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:3000", "http://localhost:5173"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    origin: config.corsOrigins,
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
-  }),
+  })
 );
 
+// ── Health ───────────────────────────────────────────────────────────────────
 app.get("/health", (c) =>
   c.json({
     ok: true,
     service: "sprout-api",
-    version: "0.1.0",
-  }),
+    version: "0.2.0",
+  })
 );
 
-app.get("/v1/today", (c) => {
-  const calculatedHealth = calculateFinancialHealthScore({
-    emergencyBufferMonths: 3.2,
-    spendingPaceRatio: 1.08,
-    savingsProgressRatio: 0.72,
-    debtPaymentRatio: 0.08,
-    upcomingBillsCoverageRatio: 1,
-    daysUntilSalary: mockTodayResponse.salary.daysUntilSalary,
-    investmentBuckets: 2,
-    unconfirmedTransactions: mockTodayResponse.snapshot.unconfirmedTransactions,
-    goalConsistencyRatio: 0.6,
-  });
+// ── Auth ──────────────────────────────────────────────────────────────────────
+app.route("/v1/auth", authRoute);
 
-  const response = TodayResponseSchema.parse({
-    ...mockTodayResponse,
-    health: {
-      ...calculatedHealth,
-      positiveFactors: [
-        "Emergency buffer is strong",
-        "Salary lands in 3 days",
-        "Al Meezan NAV updated yesterday",
-      ],
-    },
-  });
-
-  return c.json(response);
-});
-
-app.get("/v1/wealth", (c) => {
-  const response = WealthBriefingSchema.parse(mockWealthBriefing);
-  return c.json(response);
-});
-
-app.route("/v1/budget", budgetRoute);
+// ── Profile + Onboarding ──────────────────────────────────────────────────────
 app.route("/v1/profile", profileRoute);
-app.route("/v1/learn", learnRoute);
-app.route("/v1/grow", growRoute);
 
-const port = Number(process.env.PORT ?? 8787);
+// ── Manual Entry (the floor — app fully works here) ──────────────────────────
+app.route("/v1/holdings", holdingsRoute);
+app.route("/v1/goals", goalsRoute);
+app.route("/v1/transactions", transactionsRoute);
 
+// ── Reconciliation Model ──────────────────────────────────────────────────────
+app.route("/v1/pending", pendingRoute);
+app.route("/v1/income", incomeRoute);
+app.route("/v1/upload", uploadRoute);
+
+// ── Briefing (daily + on-demand) ─────────────────────────────────────────────
+app.route("/v1/briefing", briefingRoute);
+
+// ── Cron endpoint (secured by a shared secret) ───────────────────────────────
+// Called by a scheduled job (host cron, GitHub Actions, or Supabase scheduled fn).
+// Idempotent: running twice for the same user+date returns the existing briefing.
+app.post("/v1/cron/daily", async (c) => {
+  const cronSecret = c.req.header("X-Cron-Secret");
+  if (!cronSecret || cronSecret !== process.env.CRON_SECRET) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    await runDailyJobForAllUsers();
+    return c.json({ ok: true, message: "Daily job completed for all users" });
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return c.json({ error: "Daily job failed", detail: errorMsg }, 500);
+  }
+});
+
+// ── Serve ────────────────────────────────────────────────────────────────────
 serve(
-  {
-    fetch: app.fetch,
-    port,
-  },
+  { fetch: app.fetch, port: config.port },
   (info) => {
     console.log(`Sprout API listening on http://localhost:${info.port}`);
-  },
+    if (!config.openaiApiKey) {
+      console.log("  ⚠ OPENAI_API_KEY not set — using mock AI (deterministic fallback copy)");
+    }
+    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("sprout:sprout@localhost")) {
+      console.log("  ⚠ Using default DATABASE_URL — set DATABASE_URL for production");
+    }
+  }
 );

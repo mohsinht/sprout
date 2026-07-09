@@ -37,7 +37,7 @@
 - Opens as the default landing screen.
 - **The 13-part locked layout is present in the exact order specified** (greeting+streak → mascot → wealth → movement chips → one-line read → action button → what's happening tiles → holdings rows → depth door → why it moved → goals → learn later → provenance footer). No extra elements, no reordering.
 - **Above the fold (1–6) delivers the 20-second glance; below the fold is depth.**
-- Mascot is the largest visual element.
+- Total wealth is the Today hero and largest numeric element; mascot is the living emotional narrator, prominent and mood-driven without overpowering the wealth number.
 - **Shows total wealth with today's change and MTD change** as the hero number.
 - **Every movement has a "why"** — no change shown without its driver.
 - **"What happened" events reference prior days** to form a story, not a snapshot.

@@ -67,15 +67,15 @@ The wealth movement sentence is the *interpretation layer* — the thing that ma
 
 - **State today's change and MTD change together.** Never show one without the other. "Down PKR 38k today, still up PKR 15k this month."
 - **Every movement has a "why."** Never show a change without its driver. "Main reason: NAV movement." "EUR/PKR moved." "You added to savings."
-- **End on calm.** A dip is "a tea break, not a crash." A gain is noted without hype.
+- **End on calm.** A dip is "cooled after yesterday's jump, not a crash." A gain is noted without hype.
 - **Never hype a gain or alarm a dip.** No exclamation marks on gains. No red alarm on dips. The mascot stays calm (watchful at most).
 - **Reference prior days for continuity.** "Al Meezan pulled back after yesterday's jump." Events form a story, not a snapshot.
 
 **Do:**
-- "Down PKR 38k today — Al Meezan took a tea break after yesterday's jump, not a crash."
+- "Down PKR 38k today — Al Meezan cooled after yesterday's jump, not a crash."
 - "Up PKR 15k this month, mostly from EUR/PKR moving in your favour."
 - "Steady today. Your funds are flat and your cash is unchanged."
-- "Al Meezan pulled back after yesterday's jump (equity NAV correction). Wise EUR helped slightly but didn't offset the fund dip. Still ~PKR 13.67M — not a crash, just a tea break."
+- "Al Meezan cooled after yesterday's jump (equity NAV correction). Wise EUR helped slightly but didn't offset the fund dip. Still ~PKR 13.67M — not a crash."
 
 **Don't:**
 - "Your wealth dropped PKR 38,000!" (alarm + hype)
