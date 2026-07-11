@@ -25,9 +25,9 @@ abstract interface class TodayRepository {
 
 /// HTTP implementation — calls GET /v1/briefing and maps to TodayData.
 ///
-/// If the API is unreachable, throws an exception so the caller can fall
-/// back to cached/mock data. Never silently returns mock data as if it
-/// were real.
+/// If the API is unreachable, throws an exception so Today can render its
+/// explicit unavailable state. Never silently returns mock data as if it were
+/// real.
 class HttpTodayRepository implements TodayRepository {
   HttpTodayRepository(this._client);
 
@@ -36,9 +36,6 @@ class HttpTodayRepository implements TodayRepository {
   @override
   Future<TodayData> fetchToday() async {
     final json = await _client.get('/v1/briefing');
-    if (json == null) {
-      throw Exception('Could not reach the Sprout API. Using cached data.');
-    }
     final briefing = wealthBriefingFromApiJson(json);
     return todayDataFromWealthBriefing(briefing);
   }

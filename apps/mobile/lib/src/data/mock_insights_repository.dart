@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/insights_models.dart';
+import 'insights_validation.dart';
 
 abstract class InsightsRepository {
   Future<InsightsData> fetchInsights();
@@ -20,7 +21,7 @@ class MockInsightsRepository implements InsightsRepository {
 
   @override
   Future<InsightsData> fetchInsights() async {
-    return const InsightsData(
+    const data = InsightsData(
       refreshedLabel: 'Mock briefing · refreshed Jul 10, 2026',
       offline: false,
       thinData: false,
@@ -35,8 +36,11 @@ class MockInsightsRepository implements InsightsRepository {
           detail:
               'Rate cuts can reduce future income-fund yields, while equity funds may get support if companies borrow more cheaply. This is context for your Al Meezan mix, not a buy or sell signal.',
           relevanceTag: 'Al Meezan funds',
-          source: 'Mock SBP policy note for product demo',
-          asOf: 'Jul 9, 2026',
+          provenance: InsightProvenance(
+            sourceLabel: 'Mock SBP policy note · demo source',
+            asOf: 'Jul 9, 2026',
+            isMock: true,
+          ),
           actionLabel: 'See holdings',
           actionKind: InsightActionKind.money,
         ),
@@ -50,8 +54,11 @@ class MockInsightsRepository implements InsightsRepository {
           detail:
               'A weaker PKR raises the PKR value of your USD cash. Sprout keeps this separate from spending money so the FX move does not look like salary or income.',
           relevanceTag: 'Wise USD cash',
-          source: 'Mock Xe FX snapshot used for demo valuation',
-          asOf: 'Jul 9, 2026',
+          provenance: InsightProvenance(
+            sourceLabel: 'Mock Xe FX snapshot · demo source',
+            asOf: 'Jul 9, 2026',
+            isMock: true,
+          ),
           actionLabel: 'See Money',
           actionKind: InsightActionKind.money,
         ),
@@ -65,10 +72,14 @@ class MockInsightsRepository implements InsightsRepository {
           detail:
               'If the model you want became more expensive, your current target could understate the final gap. Treat this as a goal-planning prompt, not an urgent purchase signal.',
           relevanceTag: 'Car goal',
-          source: 'Mock Pakistan auto-market note for product demo',
-          asOf: 'Jul 8, 2026',
+          provenance: InsightProvenance(
+            sourceLabel: 'Mock Pakistan auto-market note · demo source',
+            asOf: 'Jul 8, 2026',
+            isMock: true,
+          ),
           actionLabel: 'Adjust goal',
           actionKind: InsightActionKind.goal,
+          targetId: 'car',
         ),
         MoneyInsight(
           id: 'inflation-cooler',
@@ -80,12 +91,17 @@ class MockInsightsRepository implements InsightsRepository {
           detail:
               'Lower inflation does not make prices fall, but it can slow how quickly everyday costs eat into saved cash. This matters for your emergency fund and PKR cash buffer.',
           relevanceTag: 'Emergency fund',
-          source: 'Mock CPI briefing for product demo',
-          asOf: 'Jul 5, 2026',
+          provenance: InsightProvenance(
+            sourceLabel: 'Mock Pakistan CPI briefing · demo source',
+            asOf: 'Jul 5, 2026',
+            isMock: true,
+          ),
           actionLabel: 'Learn more',
           actionKind: InsightActionKind.learn,
         ),
       ],
     );
+    validateInsights(data.items);
+    return data;
   }
 }

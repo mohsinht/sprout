@@ -34,7 +34,8 @@ class GoalEditorSheet extends ConsumerStatefulWidget {
 }
 
 class _GoalEditorSheetState extends ConsumerState<GoalEditorSheet> {
-  late final _nameController = TextEditingController(text: widget.goal?.name ?? '');
+  late final _nameController =
+      TextEditingController(text: widget.goal?.name ?? '');
   late final _targetController = TextEditingController(
     text: widget.goal != null ? '${widget.goal!.targetAmount}' : '',
   );
@@ -72,14 +73,18 @@ class _GoalEditorSheetState extends ConsumerState<GoalEditorSheet> {
 
     if (_isEditing) {
       final existing = widget.goal!;
-      store.update(existing.id, existing.copyWith(
-        name: name,
-        type: _selectedType,
-        targetAmount: target,
-        isPrimary: _isPrimary,
-        remainingToTarget: (target - existing.currentAmount).clamp(0, 999999999),
-        status: existing.currentAmount >= target ? 'complete' : existing.status,
-      ));
+      store.update(
+          existing.id,
+          existing.copyWith(
+            name: name,
+            type: _selectedType,
+            targetAmount: target,
+            isPrimary: _isPrimary,
+            remainingToTarget:
+                (target - existing.currentAmount).clamp(0, 999999999),
+            status:
+                existing.currentAmount >= target ? 'complete' : existing.status,
+          ));
     } else {
       final id = 'goal-${DateTime.now().millisecondsSinceEpoch}';
       store.add(Goal(
@@ -148,230 +153,238 @@ class _GoalEditorSheetState extends ConsumerState<GoalEditorSheet> {
     final colors = SproutColorScheme.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Drag handle
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: colors.line,
-                      borderRadius: BorderRadius.circular(2),
+    return Material(
+      color: colors.surface,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: colors.line,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                // Title
-                Text(
-                  _isEditing ? 'Edit goal' : 'New goal',
-                  style: SproutType.playfulLabel(
-                    color: colors.ink,
-                    size: SproutTypeScale.s18,
-                    weight: FontWeight.w800,
-                    height: 1.2,
+                  // Title
+                  Text(
+                    _isEditing ? 'Edit goal' : 'New goal',
+                    style: SproutType.playfulLabel(
+                      color: colors.ink,
+                      size: SproutTypeScale.s18,
+                      weight: FontWeight.w800,
+                      height: 1.2,
+                    ),
                   ),
-                ),
-                const SizedBox(height: SproutSpacing.lg),
+                  const SizedBox(height: SproutSpacing.lg),
 
-                // Type chips
-                Text(
-                  'What are you saving for?',
-                  style: SproutType.body(
-                    color: colors.muted,
-                    size: SproutTypeScale.s14,
-                    weight: FontWeight.w500,
+                  // Type chips
+                  Text(
+                    'What are you saving for?',
+                    style: SproutType.body(
+                      color: colors.muted,
+                      size: SproutTypeScale.s14,
+                      weight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: SproutSpacing.sm),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _goalTypes.map((t) {
-                    final selected = _selectedType == t.$1;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedType = t.$1),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? SproutColors.seed.withValues(alpha: 0.12)
-                              : colors.line.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(SproutRadius.pill),
-                          border: selected
-                              ? Border.all(color: SproutColors.seed, width: 1.5)
-                              : null,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(t.$2, size: 16,
-                                color: selected ? SproutColors.seed : colors.muted),
-                            const SizedBox(width: 6),
-                            Text(
-                              t.$3,
-                              style: SproutType.body(
-                                color: selected ? SproutColors.seed : colors.ink,
-                                size: SproutTypeScale.s14,
-                                weight: FontWeight.w600,
+                  const SizedBox(height: SproutSpacing.sm),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _goalTypes.map((t) {
+                      final selected = _selectedType == t.$1;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedType = t.$1),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? SproutColors.seed.withValues(alpha: 0.12)
+                                : colors.line.withValues(alpha: 0.2),
+                            borderRadius:
+                                BorderRadius.circular(SproutRadius.pill),
+                            border: selected
+                                ? Border.all(
+                                    color: SproutColors.seed, width: 1.5)
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(t.$2,
+                                  size: 16,
+                                  color: selected
+                                      ? SproutColors.seed
+                                      : colors.muted),
+                              const SizedBox(width: 6),
+                              Text(
+                                t.$3,
+                                style: SproutType.body(
+                                  color:
+                                      selected ? SproutColors.seed : colors.ink,
+                                  size: SproutTypeScale.s14,
+                                  weight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: SproutSpacing.lg),
+
+                  // Name field
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Goal name',
+                      labelStyle: SproutType.body(
+                        color: colors.muted,
+                        size: SproutTypeScale.s14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    style: SproutType.body(
+                      color: colors.ink,
+                      size: SproutTypeScale.s14,
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Give your goal a name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: SproutSpacing.md),
+
+                  // Target amount field
+                  TextFormField(
+                    controller: _targetController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Target amount (PKR)',
+                      labelStyle: SproutType.body(
+                        color: colors.muted,
+                        size: SproutTypeScale.s14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    style: SproutType.body(
+                      color: colors.ink,
+                      size: SproutTypeScale.s14,
+                    ),
+                    validator: (value) {
+                      final parsed = int.tryParse(value ?? '');
+                      if (parsed == null || parsed <= 0) {
+                        return 'Enter a target amount';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: SproutSpacing.md),
+
+                  // Primary goal toggle
+                  if (_isEditing || ref.watch(goalStoreProvider).isEmpty)
+                    CheckboxListTile(
+                      value: _isPrimary,
+                      onChanged: (v) => setState(() => _isPrimary = v ?? false),
+                      title: Text(
+                        'Make this the goal Today references',
+                        style: SproutType.body(
+                          color: colors.ink,
+                          size: SproutTypeScale.s14,
+                          weight: FontWeight.w500,
                         ),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: SproutSpacing.lg),
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: SproutColors.seed,
+                    ),
 
-                // Name field
-                TextFormField(
-                  controller: _nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Goal name',
-                    labelStyle: SproutType.body(
-                      color: colors.muted,
-                      size: SproutTypeScale.s14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  style: SproutType.body(
-                    color: colors.ink,
-                    size: SproutTypeScale.s14,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Give your goal a name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: SproutSpacing.md),
-
-                // Target amount field
-                TextFormField(
-                  controller: _targetController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Target amount (PKR)',
-                    labelStyle: SproutType.body(
-                      color: colors.muted,
-                      size: SproutTypeScale.s14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  style: SproutType.body(
-                    color: colors.ink,
-                    size: SproutTypeScale.s14,
-                  ),
-                  validator: (value) {
-                    final parsed = int.tryParse(value ?? '');
-                    if (parsed == null || parsed <= 0) {
-                      return 'Enter a target amount';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: SproutSpacing.md),
-
-                // Primary goal toggle
-                if (_isEditing || ref.watch(goalStoreProvider).isEmpty)
-                  CheckboxListTile(
-                    value: _isPrimary,
-                    onChanged: (v) => setState(() => _isPrimary = v ?? false),
-                    title: Text(
-                      'Make this the goal Today references',
-                      style: SproutType.body(
-                        color: colors.ink,
-                        size: SproutTypeScale.s14,
-                        weight: FontWeight.w500,
+                  // Editing-only actions
+                  if (_isEditing) ...[
+                    const SizedBox(height: SproutSpacing.md),
+                    // Contribute
+                    OutlinedButton.icon(
+                      onPressed: () => _showContributeDialog(),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add to this goal'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SproutColors.seed,
+                        side: BorderSide(
+                            color: SproutColors.seed.withValues(alpha: 0.4)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
-                    contentPadding: EdgeInsets.zero,
-                    activeColor: SproutColors.seed,
-                  ),
+                    const SizedBox(height: SproutSpacing.sm),
+                    // Complete
+                    if (widget.goal!.status != 'complete')
+                      TextButton.icon(
+                        onPressed: _complete,
+                        icon: const Icon(Icons.check_circle_rounded, size: 18),
+                        label: const Text('Mark as complete'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: SproutColors.seed,
+                        ),
+                      ),
+                    const SizedBox(height: SproutSpacing.sm),
+                    // Delete
+                    TextButton.icon(
+                      onPressed: _delete,
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      label: const Text('Remove this goal'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: SproutColors.tomato,
+                      ),
+                    ),
+                  ],
 
-                // Editing-only actions
-                if (_isEditing) ...[
-                  const SizedBox(height: SproutSpacing.md),
-                  // Contribute
-                  OutlinedButton.icon(
-                    onPressed: () => _showContributeDialog(),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Add to this goal'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: SproutColors.seed,
-                      side: BorderSide(color: SproutColors.seed.withValues(alpha: 0.4)),
+                  const SizedBox(height: SproutSpacing.lg),
+                  // Save button
+                  FilledButton(
+                    onPressed: _save,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: SproutColors.seed,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: SproutSpacing.sm),
-                  // Complete
-                  if (widget.goal!.status != 'complete')
-                    TextButton.icon(
-                      onPressed: _complete,
-                      icon: const Icon(Icons.check_circle_rounded, size: 18),
-                      label: const Text('Mark as complete'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: SproutColors.seed,
+                    child: Text(
+                      _isEditing ? 'Save changes' : 'Add goal',
+                      style: SproutType.body(
+                        color: Colors.white,
+                        size: SproutTypeScale.s14,
+                        weight: FontWeight.w700,
                       ),
-                    ),
-                  const SizedBox(height: SproutSpacing.sm),
-                  // Delete
-                  TextButton.icon(
-                    onPressed: _delete,
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                    label: const Text('Remove this goal'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: SproutColors.tomato,
                     ),
                   ),
                 ],
-
-                const SizedBox(height: SproutSpacing.lg),
-                // Save button
-                FilledButton(
-                  onPressed: _save,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: SproutColors.seed,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    _isEditing ? 'Save changes' : 'Add goal',
-                    style: SproutType.body(
-                      color: Colors.white,
-                      size: SproutTypeScale.s14,
-                      weight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

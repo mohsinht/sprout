@@ -82,6 +82,11 @@ export async function generateBriefing(params: {
     .from(schema.holdings)
     .where(eq(schema.holdings.userId, userId));
 
+  const accountRows = await db
+    .select()
+    .from(schema.accounts)
+    .where(eq(schema.accounts.userId, userId));
+
   const txRows = await db
     .select()
     .from(schema.transactions)
@@ -119,6 +124,22 @@ export async function generateBriefing(params: {
       if (rate) fxCache.set(h.currency, rate);
     }
   }
+  for (const account of accountRows) {
+    if (account.currency !== "PKR" && !fxCache.has(account.currency)) {
+      const rate = await fxSource.fetchRate(`${account.currency}/PKR`);
+      if (rate) fxCache.set(account.currency, rate);
+    }
+  }
+
+  for (const rate of fxCache.values()) {
+    await db.insert(schema.fxRates).values({
+      pair: rate.pair,
+      rate: rate.value.toString(),
+      asOf: rate.asOf,
+      source: rate.source,
+      sourceUrl: rate.sourceUrl,
+    }).onConflictDoNothing();
+  }
 
   const navCache = new Map<string, import("@sprout/shared").PriceQuote>();
   for (const h of holdingRows) {
@@ -126,6 +147,17 @@ export async function generateBriefing(params: {
       const nav = await navSource.fetchNav(h.fundCode);
       if (nav) navCache.set(h.fundCode, nav);
     }
+  }
+
+  for (const [instrument, quote] of navCache.entries()) {
+    await db.insert(schema.priceQuotes).values({
+      instrument,
+      value: quote.value.toString(),
+      asOf: quote.asOf,
+      source: quote.source,
+      sourceUrl: quote.sourceUrl,
+      currency: quote.currency,
+    }).onConflictDoNothing();
   }
 
   // ── 3. Build manual adjustments from transactions since last baseline ───────
@@ -143,7 +175,9 @@ export async function generateBriefing(params: {
     const fxRate = h.currency !== "PKR" ? fxCache.get(h.currency) : undefined;
 
     const priceAsOf = price?.asOf ?? fxRate?.asOf ?? h.priceAsOf ?? null;
-    const freshness = determineFreshness(priceAsOf, h.kind);
+    const freshness = h.kind === "cash" && h.currency === "PKR"
+      ? "manual" as const
+      : determineFreshness(priceAsOf, h.kind);
 
     // Determine if there are adjustments since the baseline
     const hasAdjustmentsSinceBaseline =
@@ -192,16 +226,48 @@ export async function generateBriefing(params: {
       units: h.units ? parseFloat(h.units) : undefined,
       unitsConfirmedAsOf: h.unitsConfirmedAsOf ?? undefined,
       valueNative,
-      valuePkr: valuePkr || h.valuePkr,
+      // A missing dated quote/FX rate is unavailable, not a reason to reuse an
+      // old or mock number. PKR cash is the only manual valuation here.
+      valuePkr: valuePkr || (h.kind === "cash" && h.currency === "PKR" ? h.valuePkr : 0),
       price,
       fxRate,
-      priceAsOf: priceAsOf ?? new Date().toISOString().slice(0, 10),
+      priceAsOf: priceAsOf ?? "unknown",
       priceSource: price?.source ?? fxRate?.source ?? h.priceSource ?? "Manual",
       freshness,
       valuationKind,
       baselineId: h.baselineId ?? undefined,
     };
   });
+
+  for (const account of accountRows) {
+    const ledgerChange = txRows
+      .filter((transaction) => transaction.accountId === account.id)
+      .reduce((sum, transaction) => {
+        if (transaction.type === "income") return sum + transaction.amount;
+        if (transaction.type === "expense") return sum - transaction.amount;
+        return sum;
+      }, 0);
+    const valueNative = account.openingBalance + ledgerChange;
+    const fxRate = account.currency === "PKR" ? undefined : fxCache.get(account.currency);
+    const freshness = account.currency === "PKR"
+      ? "manual" as const
+      : determineFreshness(fxRate?.asOf, "cash");
+
+    enrichedHoldings.push({
+      id: account.id,
+      kind: "cash",
+      institution: account.provider,
+      label: account.label,
+      currency: account.currency,
+      valueNative,
+      valuePkr: account.currency === "PKR" ? valueNative : Math.round(valueNative * (fxRate?.value ?? 0)),
+      fxRate,
+      priceAsOf: fxRate?.asOf ?? "unknown",
+      priceSource: fxRate?.source ?? "Manual entry",
+      freshness,
+      valuationKind: "estimated",
+    });
+  }
 
   // ── 5. Build pending investments ─────────────────────────────────────────────
   const pendingInvestments: PendingInvestment[] = pendingRows.map((p) => ({
@@ -382,7 +448,6 @@ export async function generateBriefing(params: {
     interpretation = aiResult.output.interpretation?.length
       ? aiResult.output.interpretation
       : fallbackInterpretation;
-    mascotMood = (aiResult.output.mascotMood as typeof mascotMood) || scoreResult.mascotMood;
     aiCostCents = aiResult.costCents;
     aiModel = aiService.name;
   } catch {
@@ -390,12 +455,18 @@ export async function generateBriefing(params: {
   }
 
   // ── 12. Build the briefing object ───────────────────────────────────────────
+  const briefingFreshness = enrichedHoldings.some((h) => h.freshness === "unavailable")
+    ? "unavailable" as const
+    : enrichedHoldings.some((h) => h.freshness === "stale")
+      ? "stale" as const
+      : "fresh" as const;
+
   const briefing: WealthBriefing = {
     id: `briefing-${date}`,
     userId,
     briefingDate: date,
     generatedAt: new Date().toISOString(),
-    freshness: "fresh",
+    freshness: briefingFreshness,
     mascotMood,
     greeting,
     summary,
@@ -469,63 +540,64 @@ export async function storeBriefing(
   aiModel: string
 ): Promise<void> {
   const date = briefing.briefingDate;
-
-  await db.insert(schema.wealthSnapshots).values({
-    userId: briefing.userId,
-    date,
-    totalPkr: briefing.wealthSnapshot.totalPkr,
-    perHoldingJson: briefing.wealthSnapshot.perHoldingBreakdown,
-    changeVsYesterday: briefing.wealthSnapshot.changeVsYesterday,
-    changeMtd: briefing.wealthSnapshot.changeMtd,
-    mainReason: briefing.wealthSnapshot.mainReason,
-    interpretationJson: briefing.wealthSnapshot.interpretation,
-    freshness: "fresh",
-  });
-
-  for (const event of briefing.wealthEvents) {
-    await db.insert(schema.wealthEvents).values({
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.wealthEvents).where(
+      and(eq(schema.wealthEvents.userId, briefing.userId), eq(schema.wealthEvents.date, date)),
+    );
+    await tx.delete(schema.wealthSnapshots).where(
+      and(eq(schema.wealthSnapshots.userId, briefing.userId), eq(schema.wealthSnapshots.date, date)),
+    );
+    await tx.insert(schema.wealthSnapshots).values({
       userId: briefing.userId,
       date,
-      holdingId: event.holdingId,
-      kind: event.kind,
-      magnitudePkr: event.magnitudePkr,
-      direction: event.direction,
-      plainWhy: event.plainWhy,
-      learnMoreId: event.learnMoreId,
-      severity: event.severity,
+      totalPkr: briefing.wealthSnapshot.totalPkr,
+      perHoldingJson: briefing.wealthSnapshot.perHoldingBreakdown,
+      changeVsYesterday: briefing.wealthSnapshot.changeVsYesterday,
+      changeMtd: briefing.wealthSnapshot.changeMtd,
+      mainReason: briefing.wealthSnapshot.mainReason,
+      interpretationJson: briefing.wealthSnapshot.interpretation,
+      freshness: briefing.freshness === "local_fallback" ? "stale" : briefing.freshness,
     });
-  }
 
-  await db
-    .delete(schema.dailyBriefings)
-    .where(
-      and(
-        eq(schema.dailyBriefings.userId, briefing.userId),
-        eq(schema.dailyBriefings.briefingDate, date)
-      )
+    for (const event of briefing.wealthEvents) {
+      await tx.insert(schema.wealthEvents).values({
+        userId: briefing.userId,
+        date,
+        holdingId: event.holdingId,
+        kind: event.kind,
+        magnitudePkr: event.magnitudePkr,
+        direction: event.direction,
+        plainWhy: event.plainWhy,
+        learnMoreId: event.learnMoreId,
+        severity: event.severity,
+      });
+    }
+
+    await tx.delete(schema.dailyBriefings).where(
+      and(eq(schema.dailyBriefings.userId, briefing.userId), eq(schema.dailyBriefings.briefingDate, date)),
     );
-
-  await db.insert(schema.dailyBriefings).values({
-    userId: briefing.userId,
-    briefingDate: date,
-    generatedAt: new Date(briefing.generatedAt),
-    freshness: briefing.freshness,
-    mascotMood: briefing.mascotMood,
-    greeting: briefing.greeting,
-    summary: briefing.summary,
-    healthScore: briefing.healthScore,
-    healthStatus: briefing.healthStatus as "strong" | "healthy" | "watch" | "urgent",
-    wealthSnapshotJson: briefing.wealthSnapshot,
-    wealthEventsJson: briefing.wealthEvents,
-    learnThreadsJson: briefing.learnThreads,
-    recommendedActionJson: briefing.recommendedAction,
-    goalsJson: briefing.goals,
-    holdingsJson: briefing.holdings,
-    streak: briefing.streak,
-    xp: briefing.xp,
-    level: briefing.level,
-    aiModel,
-    aiCostCents,
+    await tx.insert(schema.dailyBriefings).values({
+      userId: briefing.userId,
+      briefingDate: date,
+      generatedAt: new Date(briefing.generatedAt),
+      freshness: briefing.freshness,
+      mascotMood: briefing.mascotMood,
+      greeting: briefing.greeting,
+      summary: briefing.summary,
+      healthScore: briefing.healthScore,
+      healthStatus: briefing.healthStatus as "strong" | "healthy" | "watch" | "urgent",
+      wealthSnapshotJson: briefing.wealthSnapshot,
+      wealthEventsJson: briefing.wealthEvents,
+      learnThreadsJson: briefing.learnThreads,
+      recommendedActionJson: briefing.recommendedAction,
+      goalsJson: briefing.goals,
+      holdingsJson: briefing.holdings,
+      streak: briefing.streak,
+      xp: briefing.xp,
+      level: briefing.level,
+      aiModel,
+      aiCostCents,
+    });
   });
 }
 

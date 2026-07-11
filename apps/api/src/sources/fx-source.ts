@@ -1,4 +1,5 @@
 import type { FxRate } from "@sprout/shared";
+import { config } from "../config.js";
 
 /** A swappable FX source. Every implementation carries provenance. */
 export interface FxSource {
@@ -64,10 +65,53 @@ export class ExchangeRateHostFxSource implements FxSource {
   }
 }
 
+/** Xe Currency Data API source. It is opt-in because credentials are paid/account based. */
+export class XeFxSource implements FxSource {
+  readonly name = "Xe";
+
+  async fetchRate(pair: string): Promise<FxRate | null> {
+    const [base, quote] = pair.split("/");
+    if (!base || !quote || !config.xeAccountId || !config.xeApiKey) return null;
+
+    try {
+      const url = `https://xecdapi.xe.com/v1/convert_from.json/?from=${base}&to=${quote}&amount=1`;
+      const auth = Buffer.from(`${config.xeAccountId}:${config.xeApiKey}`).toString("base64");
+      const res = await fetch(url, {
+        headers: { Authorization: `Basic ${auth}` },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { to?: Record<string, number>; timestamp?: string };
+      const rate = data.to?.[quote];
+      if (!rate || rate <= 0) return null;
+      return {
+        pair,
+        value: rate,
+        asOf: data.timestamp?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+        source: this.name,
+        sourceUrl: url,
+      };
+    } catch {
+      return null;
+    }
+  }
+}
+
+class UnavailableFxSource implements FxSource {
+  readonly name = "FX unavailable";
+  async fetchRate(_pair: string): Promise<FxRate | null> {
+    return null;
+  }
+}
+
 /** Factory: returns real source if enabled, else mock. */
 export function createFxSource(): FxSource {
-  if (process.env.FX_SOURCE === "real") {
+  if (process.env.FX_SOURCE === "xe") {
+    return new XeFxSource();
+  }
+  if (process.env.FX_SOURCE === "exchange_rate_host") {
     return new ExchangeRateHostFxSource();
   }
-  return new MockFxSource();
+  if (process.env.FX_SOURCE === "mock") return new MockFxSource();
+  return new UnavailableFxSource();
 }

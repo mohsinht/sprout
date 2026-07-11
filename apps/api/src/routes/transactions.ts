@@ -41,6 +41,7 @@ const CreateTransactionSchema = z.object({
   needsReview: z.boolean().default(false),
   reviewReason: z.string().max(500).optional(),
   accountRef: z.string().optional(), // for dedupe fingerprint only
+  accountId: z.string().uuid().optional(),
 });
 
 transactionsRoute.post("/", async (c) => {
@@ -77,12 +78,22 @@ transactionsRoute.post("/", async (c) => {
     return c.json(existing[0], 200); // idempotent: return existing
   }
 
-  const { accountRef, ...txData } = body.data;
+  const { accountRef, accountId, ...txData } = body.data;
+
+  if (accountId) {
+    const [account] = await db
+      .select({ id: schema.accounts.id })
+      .from(schema.accounts)
+      .where(and(eq(schema.accounts.id, accountId), eq(schema.accounts.userId, userId)))
+      .limit(1);
+    if (!account) return c.json({ error: "Account not found" }, 404);
+  }
 
   const [tx] = await db
     .insert(schema.transactions)
     .values({
       userId,
+      accountId,
       ...txData,
       occurredAt,
       dedupeFingerprint: fingerprint,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
@@ -33,7 +34,9 @@ class AppShell extends StatelessWidget {
     final colors = SproutColorScheme.of(context);
 
     return Scaffold(
-      body: SafeArea(child: child),
+      // Bottom content padding is explicit in every page scroll view. Keeping
+      // the body's bottom SafeArea off avoids counting the same inset twice.
+      body: SafeArea(top: true, bottom: false, child: child),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Stack(
@@ -143,8 +146,12 @@ class _NavItem extends StatelessWidget {
     final selectedColor = SproutColors.seed;
     final idleColor = colors.muted;
     final item = SproutButtonPress(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       scale: 0.9,
+      semanticLabel: tab.label,
       child: AnimatedContainer(
         duration: reducedMotion ? Duration.zero : SproutDurations.buttonPress,
         curve: SproutCurves.button,

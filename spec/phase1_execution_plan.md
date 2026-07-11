@@ -70,8 +70,8 @@ that sit alongside the mocks behind the same interfaces.
   - `get<T>(path)` and `post<T>(path, body)` methods.
   - Auth header injection (for now: a hardcoded dev token or no auth —
     single user, your app).
-  - Error handling that returns `null` on failure (so the UI falls back
-    to cached/mock data, per the failure/fallback spec).
+  - Error handling that surfaces transport/status/schema failures to the UI;
+    mock data is selected only by the explicit `USE_MOCK` build flag.
 - Create `HttpWealthBriefingRepository implements WealthBriefingRepository`:
   - Calls `GET /v1/briefing`.
   - Maps the JSON response to `WealthBriefing` via the `fromApiJson`
@@ -86,8 +86,8 @@ that sit alongside the mocks behind the same interfaces.
 - [ ] With `USE_MOCK=true` (default), the app behaves exactly as before.
 - [ ] With `USE_MOCK=false`, the app attempts to call `GET /v1/briefing`
       on the configured base URL.
-- [ ] If the API is unreachable, the app falls back to mock data and
-      shows freshness `local_fallback` (does not crash).
+- [ ] If the API is unreachable, the app shows the explicit unavailable/error
+      state and does not substitute mock data or fabricate a wealth number.
 
 ---
 

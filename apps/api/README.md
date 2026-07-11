@@ -38,6 +38,9 @@ No Redis, no queues, no microservices, no Kubernetes. One Postgres, one process.
 cp apps/api/.env.example apps/api/.env
 # Edit .env with your DATABASE_URL and JWT_SECRET
 
+# Start the local PostgreSQL service from the repository root.
+docker compose up -d postgres
+
 # 2. Install dependencies
 pnpm install
 
@@ -45,13 +48,32 @@ pnpm install
 pnpm --filter @sprout/shared build
 pnpm --filter @sprout/domain build
 
-# 4. Create database tables (using drizzle-kit)
+# 4. Apply the generated database migrations
 cd apps/api
-pnpm drizzle-kit push
+pnpm db:migrate
 
 # 5. Run the API
 pnpm --filter @sprout/api dev
 ```
+
+## Phase 1 seed
+
+The real one-user seed requires explicit values for fields that are not
+defined in the product specs. It fails before writing if any value is missing.
+
+```bash
+SEED_USER_ID=<existing-user-uuid> \
+SEED_AS_OF=YYYY-MM-DD \
+WISE_USD_BALANCE=<confirmed-usd-balance> \
+WISE_EUR_BALANCE=<confirmed-eur-balance> \
+CAR_TARGET_PKR=<target> CAR_CURRENT_PKR=<current> \
+EMERGENCY_TARGET_PKR=<target> EMERGENCY_CURRENT_PKR=<current> \
+pnpm --filter @sprout/api seed:holdings
+```
+
+The seed is idempotent by user and holding/goal identity. Fund units are
+stored with the supplied confirmation date; price and FX valuations remain
+unavailable until the real source tickets populate them.
 
 ## API Endpoints
 
@@ -67,6 +89,8 @@ pnpm --filter @sprout/api dev
 - `POST /v1/profile/onboarding` — complete onboarding (name + optional goal)
 
 ### Manual Entry (the floor — app fully works here)
+- `GET/POST /v1/accounts` — manual cash/account ledger
+- `PATCH/DELETE /v1/accounts/:id`
 - `GET/POST /v1/holdings` — manage holdings
 - `PATCH/DELETE /v1/holdings/:id`
 - `GET/POST /v1/goals` — manage goals
@@ -103,3 +127,5 @@ pnpm --filter @sprout/api dev
 7. **Projected income is never in wealth** — it's a side note (days-remaining + approx PKR).
 8. **Pending investments are in-transit** — included in total but flagged, never double-counted.
 9. **Statements/screenshots are truth** — between them, everything is a labelled estimate.
+10. **Missing market data is explicit** — an unavailable NAV or FX rate is never replaced with a fabricated valuation.
+11. **AI writes copy only** — GPT-5.6 Luna receives deterministic facts and returns schema-validated greeting/summary/interpretation text; it cannot alter money, scores, sources, or actions.

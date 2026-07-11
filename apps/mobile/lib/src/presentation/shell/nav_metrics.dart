@@ -7,13 +7,17 @@ class NavMetrics {
 
   static const barHeight = 82.0;
   static const barBottomMargin = 10.0;
-  static const contentGap = 34.0;
+  static const contentGap = 24.0;
+
+  /// Space reserved after the last scrollable item so the floating shell can
+  /// never cover it. The shell owns the bottom safe area; page content uses
+  /// this same contract instead of guessing at the device inset.
+  static double shellExtent(BuildContext context) {
+    return barHeight + barBottomMargin + MediaQuery.paddingOf(context).bottom;
+  }
 
   static double bottomContentPadding(BuildContext context) {
-    return MediaQuery.paddingOf(context).bottom +
-        barHeight +
-        barBottomMargin +
-        contentGap;
+    return shellExtent(context) + contentGap;
   }
 
   static EdgeInsets pagePadding(BuildContext context) {

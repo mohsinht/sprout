@@ -1,0 +1,63 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'api/sprout_api_client.dart';
+
+final authSessionProvider =
+    StateNotifierProvider<AuthSessionStore, AuthSession?>((ref) {
+  return AuthSessionStore(ref.read(apiClientProvider));
+});
+
+class AuthSessionStore extends StateNotifier<AuthSession?> {
+  AuthSessionStore(this._client) : super(null) {
+    _restore();
+  }
+
+  static const _accessKey = 'auth.accessToken';
+  static const _refreshKey = 'auth.refreshToken';
+  static const _userIdKey = 'auth.userId';
+  final SproutApiClient _client;
+
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final access = prefs.getString(_accessKey);
+    final refresh = prefs.getString(_refreshKey);
+    final userId = prefs.getString(_userIdKey);
+    if (access != null && refresh != null && userId != null) {
+      _client.setAuthToken(access);
+      state = AuthSession(accessToken: access, refreshToken: refresh, userId: userId);
+    }
+  }
+
+  Future<void> register({required String email, required String password, String? name}) async {
+    final result = await _client.register(email: email, password: password, name: name);
+    await _save(result);
+  }
+
+  Future<void> login({required String email, required String password}) async {
+    final result = await _client.login(email: email, password: password);
+    await _save(result);
+  }
+
+  Future<void> _save(AuthSession session) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accessKey, session.accessToken);
+    await prefs.setString(_refreshKey, session.refreshToken);
+    await prefs.setString(_userIdKey, session.userId);
+    _client.setAuthToken(session.accessToken);
+    state = session;
+  }
+
+  Future<void> logout() async {
+    final session = state;
+    if (session != null) {
+      await _client.logout(session.refreshToken);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_accessKey);
+    await prefs.remove(_refreshKey);
+    await prefs.remove(_userIdKey);
+    _client.clearAuthToken();
+    state = null;
+  }
+}

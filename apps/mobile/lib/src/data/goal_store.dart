@@ -15,7 +15,7 @@ final goalStoreProvider = StateNotifierProvider<GoalStore, List<Goal>>((ref) {
 
 class GoalStore extends StateNotifier<List<Goal>> {
   GoalStore()
-      : super([
+      : super(const bool.fromEnvironment('USE_MOCK', defaultValue: true) ? [
           const Goal(
             id: 'car',
             name: 'Car fund',
@@ -41,7 +41,7 @@ class GoalStore extends StateNotifier<List<Goal>> {
             remainingToTarget: 0,
             paceNote: '6 months of cover. Doing its job.',
           ),
-        ]);
+        ] : const []);
 
   /// Add a new goal.
   void add(Goal goal) {

@@ -1,5 +1,12 @@
 import OpenAI from "openai";
+import { z } from "zod";
 import { config } from "../config.js";
+
+const AiBriefingOutputSchema = z.object({
+  greeting: z.string().min(1).max(120),
+  summary: z.string().min(1).max(320),
+  interpretation: z.array(z.string().min(1).max(240)).min(2).max(3),
+});
 
 export interface AiBriefingInput {
   greeting: string;
@@ -35,7 +42,6 @@ export interface AiBriefingOutput {
   greeting: string;
   summary: string;
   interpretation: string[];
-  mascotMood: string;
 }
 
 export interface AiService {
@@ -53,14 +59,13 @@ export class MockAiService implements AiService {
         greeting: input.greeting,
         summary: input.summary,
         interpretation: input.wealthSnapshot.interpretation,
-        mascotMood: input.mascotMood,
       },
       costCents: 0,
     };
   }
 }
 
-/** OpenAI service — uses a cheap model (gpt-4o-mini) for light copywriting. */
+/** OpenAI service — writes only copy; code owns every financial decision. */
 export class OpenAiService implements AiService {
   readonly name = config.openaiModel;
   private client: OpenAI | null = null;
@@ -77,16 +82,20 @@ export class OpenAiService implements AiService {
     try {
       const client = this.getClient();
 
-      const systemPrompt = `You are Sprout, a calm, practical financial companion for Pakistani earners.
-Write warm, short, honest copy. Rules:
-- No shame, guilt, panic, or FOMO.
-- No guaranteed returns or investment advice.
-- State today's change and MTD change together.
-- Every movement has a "why."
-- End on calm. Never hype a gain or alarm a dip.
-- Use PKR naturally.
-- Keep sentences short.
-- Return ONLY valid JSON matching the requested shape.`;
+      const systemPrompt = `You are Sprout's calm financial copy editor for Pakistani earners.
+
+Use only the supplied facts. Never recalculate money, scores, dates, sources,
+severity, or actions. Never invent a fact, prediction, source, or certainty.
+
+Write concise, plain English for one daily wealth briefing. Be warm and calm:
+celebrate gently, describe losses without alarm, and never use shame, urgency,
+FOMO, guaranteed outcomes, buy/sell instructions, or payment instructions.
+
+If data is stale or unavailable, state that uncertainty plainly. The user can
+always use manual entry; never imply a connection is required.
+
+Return JSON only with greeting, summary, and interpretation. Do not include
+mascot mood, health score, action choice, or any field not requested.`;
 
       const userPrompt = `Given this pre-computed wealth data, write the briefing copy.
 The numbers are FINAL — do not recompute, invent, or change any number.
@@ -97,28 +106,43 @@ ${JSON.stringify(input, null, 2)}
 Return JSON with exactly these fields:
 {
   "greeting": string,
-  "summary": string (movement + reason + reassurance, today and MTD together),
-  "interpretation": string[] (2-3 lines in Sprout's voice),
-  "mascotMood": "thriving" | "content" | "watchful" | "concerned"
+  "summary": string,
+  "interpretation": string[]
 }`;
 
-      const response = await client.chat.completions.create({
+      const response = await client.responses.create({
         model: config.openaiModel,
-        messages: [
+        reasoning: { effort: config.openaiReasoningEffort as "low" | "medium" | "high" },
+        store: false,
+        input: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 500,
-        temperature: 0.7,
-        response_format: { type: "json_object" },
+        text: {
+          format: {
+            type: "json_schema",
+            name: "sprout_briefing_copy",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                greeting: { type: "string" },
+                summary: { type: "string" },
+                interpretation: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 3 },
+              },
+              required: ["greeting", "summary", "interpretation"],
+            },
+          },
+        },
       });
 
-      const content = response.choices[0]?.message?.content ?? "{}";
-      const parsed = JSON.parse(content) as AiBriefingOutput;
+      const content = response.output_text || "{}";
+      const parsed = AiBriefingOutputSchema.parse(JSON.parse(content));
 
       // Estimate cost (gpt-4o-mini: ~$0.15/1M input, ~$0.60/1M output)
-      const inputTokens = response.usage?.prompt_tokens ?? 0;
-      const outputTokens = response.usage?.completion_tokens ?? 0;
+      const inputTokens = response.usage?.input_tokens ?? 0;
+      const outputTokens = response.usage?.output_tokens ?? 0;
       const costCents = Math.ceil(
         (inputTokens * 0.00000015 + outputTokens * 0.0000006) * 100
       );
@@ -131,7 +155,6 @@ Return JSON with exactly these fields:
           greeting: input.greeting,
           summary: input.summary,
           interpretation: input.wealthSnapshot.interpretation,
-          mascotMood: input.mascotMood,
         },
         costCents: 0,
       };

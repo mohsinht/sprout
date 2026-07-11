@@ -7,15 +7,22 @@ import '../presentation/insights/insights_screen.dart';
 import '../presentation/mascot_lab/mascot_lab_screen.dart';
 import '../presentation/money/money_screen.dart';
 import '../presentation/onboarding/onboarding_screen.dart';
+import '../presentation/auth/auth_screen.dart';
 import '../presentation/settings/settings_screen.dart';
 import '../presentation/shell/app_shell.dart';
 import '../presentation/today/today_screen.dart';
+import '../presentation/today/today_controller.dart';
+import '../data/auth_store.dart';
 import '../theme/sprout_theme.dart';
 import 'theme_mode_controller.dart';
 
 final _router = GoRouter(
   initialLocation: '/today',
   routes: [
+    GoRoute(
+      path: '/auth',
+      pageBuilder: (context, state) => const NoTransitionPage(child: AuthScreen()),
+    ),
     // Dev-only mascot lab — not part of the product shell.
     GoRoute(
       path: '/mascot-lab',
@@ -69,6 +76,14 @@ class SproutApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Restore the persisted session at app startup. If Today started loading
+    // before restoration completed, retry it once the access token is ready.
+    ref.watch(authSessionProvider);
+    ref.listen(authSessionProvider, (previous, next) {
+      if (next != null && previous?.accessToken != next.accessToken) {
+        ref.invalidate(todayControllerProvider);
+      }
+    });
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'Sprout',

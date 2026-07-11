@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../domain/learn_models.dart';
+import '../shell/nav_metrics.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_theme.dart';
 import '../../theme/sprout_tokens.dart';
@@ -476,11 +477,11 @@ class _LearnLessonPlayerState extends State<LearnLessonPlayer> {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             SproutSpacing.pageHorizontal,
             SproutSpacing.md,
             SproutSpacing.pageHorizontal,
-            SproutSpacing.xxl,
+            NavMetrics.bottomContentPadding(context),
           ),
           sliver: SliverList.list(
             children: [

@@ -17,6 +17,7 @@ dependencies:
   intl: ^0.20.1
   lottie: ^3.3.1
   rive: ^0.13.20
+  shared_preferences: ^2.5.3
   video_player: ^2.9.2
   sprout_motion:
     path: ../../packages/sprout_motion

@@ -17,14 +17,17 @@ briefingRoute.use("*", authMiddleware);
 briefingRoute.get("/", async (c) => {
   const userId = c.get("userId") as string;
 
-  const { briefing, freshness } = await getBriefingWithFallback(userId);
+  let { briefing, freshness } = await getBriefingWithFallback(userId);
 
   if (!briefing) {
-    // Empty/zero-connection state: return a manual-first briefing
-    return c.json({
-      freshness: "unavailable",
-      message: "Sprout works even with nothing connected. Add one holding to start today's picture.",
-    }, 200);
+    // A first-time/zero-connection user still receives the complete contract.
+    // The pipeline produces a manual-first zero briefing without requiring a
+    // connection or fabricating a wealth value.
+    await runOnDemandBriefing(userId);
+    ({ briefing, freshness } = await getBriefingWithFallback(userId));
+    if (!briefing) {
+      return c.json({ error: "Briefing unavailable" }, 503);
+    }
   }
 
   return c.json({ ...briefing, freshness });

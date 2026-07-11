@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { authMiddleware } from "../auth/middleware.js";
 
@@ -30,7 +30,10 @@ profileRoute.get("/", async (c) => {
     locale: profile.locale,
     reduceMotion: profile.reduceMotion,
     hideBalances: profile.hideBalances,
+    soundEffects: profile.soundEffects,
+    haptics: profile.haptics,
     displayCurrency: profile.displayCurrency,
+    notificationPreferences: profile.notificationPreferencesJson,
     onboardingComplete: profile.onboardingComplete,
   });
 });
@@ -44,7 +47,10 @@ const UpdateProfileSchema = z.object({
   locale: z.string().max(10).optional(),
   reduceMotion: z.boolean().optional(),
   hideBalances: z.boolean().optional(),
+  soundEffects: z.boolean().optional(),
+  haptics: z.boolean().optional(),
   displayCurrency: z.string().length(3).optional(),
+  notificationPreferences: z.record(z.boolean()).optional(),
 });
 
 profileRoute.patch("/", async (c) => {
@@ -56,7 +62,9 @@ profileRoute.patch("/", async (c) => {
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   for (const [key, val] of Object.entries(body.data)) {
-    if (val !== undefined) updates[key] = val;
+    if (val !== undefined) {
+      updates[key === "notificationPreferences" ? "notificationPreferencesJson" : key] = val;
+    }
   }
 
   await db
@@ -65,6 +73,21 @@ profileRoute.patch("/", async (c) => {
     .where(eq(schema.profiles.userId, userId));
 
   return c.json({ ok: true });
+});
+
+// Delete imported/reconciled material while preserving manual entries.
+profileRoute.delete("/imported-data", async (c) => {
+  const userId = c.get("userId") as string;
+
+  await db.delete(schema.baselines).where(eq(schema.baselines.userId, userId));
+  await db.delete(schema.wealthEvents).where(eq(schema.wealthEvents.userId, userId));
+  await db.delete(schema.wealthSnapshots).where(eq(schema.wealthSnapshots.userId, userId));
+  await db.delete(schema.dailyBriefings).where(eq(schema.dailyBriefings.userId, userId));
+  await db.delete(schema.transactions).where(
+    and(eq(schema.transactions.userId, userId), ne(schema.transactions.source, "manual")),
+  );
+
+  return c.json({ ok: true, message: "Imported data removed. Manual entries were preserved." });
 });
 
 // ── POST /v1/profile/onboarding ──────────────────────────────────────────────
@@ -99,14 +122,29 @@ profileRoute.post("/onboarding", async (c) => {
     .where(eq(schema.profiles.userId, userId));
 
   if (goal) {
-    await db.insert(schema.goals).values({
-      userId,
-      name: goal.name,
-      type: goal.type,
-      targetAmount: goal.targetAmount,
-      currentAmount: 0,
-      status: "active",
-    });
+    const [existingGoal] = await db
+      .select({ id: schema.goals.id })
+      .from(schema.goals)
+      .where(
+        and(
+          eq(schema.goals.userId, userId),
+          eq(schema.goals.name, goal.name),
+          eq(schema.goals.type, goal.type),
+          eq(schema.goals.status, "active"),
+        ),
+      )
+      .limit(1);
+
+    if (!existingGoal) {
+      await db.insert(schema.goals).values({
+        userId,
+        name: goal.name,
+        type: goal.type,
+        targetAmount: goal.targetAmount,
+        currentAmount: 0,
+        status: "active",
+      });
+    }
   }
 
   return c.json({ ok: true, onboardingComplete: true });

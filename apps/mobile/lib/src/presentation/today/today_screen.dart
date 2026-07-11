@@ -115,6 +115,7 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       const SizedBox(height: SproutSpacing.md),
       _SalaryStrip(
         daysUntilSalary: data.salary.daysUntilSalary,
+        salaryKnown: data.salary.isKnown,
         upcomingBills: data.snapshot.upcomingBills,
         nextPayday: data.salary.nextPayday,
         availableCash: data.snapshot.availableCash,
@@ -637,12 +638,14 @@ class _SproutRead extends StatelessWidget {
 class _SalaryStrip extends StatelessWidget {
   const _SalaryStrip({
     required this.daysUntilSalary,
+    required this.salaryKnown,
     required this.upcomingBills,
     required this.nextPayday,
     required this.availableCash,
   });
 
   final int daysUntilSalary;
+  final bool salaryKnown;
   final int upcomingBills;
   final DateTime nextPayday;
   final int availableCash;
@@ -653,7 +656,10 @@ class _SalaryStrip extends StatelessWidget {
 
     // Irregular income fallback: if no valid salary date, degrade gracefully.
     // Never show a broken countdown-to-nothing.
-    if (daysUntilSalary <= 0) {
+    final salaryLabel = salaryKnown
+        ? 'Salary in $daysUntilSalary days'
+        : 'No salary timing set';
+    if (salaryKnown && daysUntilSalary <= 0) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -721,7 +727,7 @@ class _SalaryStrip extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Salary in $daysUntilSalary days · $reassurance',
+                '$salaryLabel · $reassurance',
                 style: SproutType.body(
                   color: _todayAccent(context, SproutColors.goldInk),
                   size: SproutTypeScale.s14,

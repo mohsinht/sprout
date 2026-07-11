@@ -5,12 +5,15 @@ import 'package:go_router/go_router.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../data/mock_insights_repository.dart';
+import '../../data/goal_store.dart';
 import '../../domain/insights_models.dart';
+import '../../domain/today_models.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
 import '../../widgets/sprout_page.dart';
 import '../../widgets/sprout_panel.dart';
 import '../../widgets/sprout_states.dart';
+import '../goals/goal_editor_sheet.dart';
 
 class InsightsScreen extends ConsumerWidget {
   const InsightsScreen({super.key});
@@ -307,7 +310,7 @@ class _InsightDetailSheet extends StatelessWidget {
           _DetailBlock(
             icon: Icons.verified_rounded,
             label: 'Source',
-            value: '${insight.source} · ${insight.asOf}',
+            value: insight.provenance.displayLabel,
             color: accent,
           ),
           if (insight.actionLabel != null) ...[
@@ -350,7 +353,16 @@ class _InsightDetailSheet extends StatelessWidget {
       case InsightActionKind.money:
         context.go('/money');
       case InsightActionKind.goal:
-        context.go('/money');
+        final goals =
+            ProviderScope.containerOf(context).read(goalStoreProvider);
+        Goal? goal;
+        for (final candidate in goals) {
+          if (candidate.id == insight.targetId) {
+            goal = candidate;
+            break;
+          }
+        }
+        GoalEditorSheet.open(context, goal: goal);
       case InsightActionKind.learn:
         context.go('/learn');
       case InsightActionKind.none:

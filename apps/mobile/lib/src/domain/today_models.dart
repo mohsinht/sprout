@@ -76,10 +76,11 @@ class SproutUser {
 }
 
 class SalaryInfo {
-  const SalaryInfo({required this.nextPayday, required this.daysUntilSalary});
+  const SalaryInfo({required this.nextPayday, required this.daysUntilSalary, this.isKnown = true});
 
   final DateTime nextPayday;
   final int daysUntilSalary;
+  final bool isKnown;
 }
 
 class FinancialHealthScore {
@@ -493,8 +494,9 @@ TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
     ),
     currency: 'PKR',
     salary: SalaryInfo(
-      nextPayday: DateTime.now().add(const Duration(days: 30)),
-      daysUntilSalary: 30,
+      nextPayday: DateTime.now(),
+      daysUntilSalary: 0,
+      isKnown: false,
     ),
     health: health,
     autoCapture: const [],

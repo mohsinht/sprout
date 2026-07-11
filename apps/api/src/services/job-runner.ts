@@ -1,4 +1,4 @@
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, gte } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { config } from "../config.js";
 import { generateBriefing, storeBriefing, getLatestBriefing } from "./briefing-pipeline.js";
@@ -77,7 +77,10 @@ export async function runOnDemandBriefing(userId: string): Promise<JobResult> {
       and(
         eq(schema.jobRuns.userId, userId),
         eq(schema.jobRuns.type, "on_demand"),
-        eq(schema.jobRuns.status, "succeeded")
+        eq(schema.jobRuns.status, "succeeded"),
+        // Keep the limiter hourly; counting the user's lifetime refreshes
+        // would permanently disable refresh after the first few uses.
+        gte(schema.jobRuns.startedAt, oneHourAgo),
       )
     );
 

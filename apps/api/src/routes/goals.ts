@@ -29,6 +29,7 @@ const CreateGoalSchema = z.object({
   targetAmount: z.number().int().positive(),
   currentAmount: z.number().int().nonnegative().default(0),
   deadline: z.string().optional(),
+  isPrimary: z.boolean().optional(),
 });
 
 goalsRoute.post("/", async (c) => {
@@ -36,6 +37,10 @@ goalsRoute.post("/", async (c) => {
   const body = CreateGoalSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
+  }
+
+  if (body.data.isPrimary) {
+    await db.update(schema.goals).set({ isPrimary: false }).where(eq(schema.goals.userId, userId));
   }
 
   const [goal] = await db
@@ -54,6 +59,8 @@ const UpdateGoalSchema = z.object({
   currentAmount: z.number().int().nonnegative().optional(),
   deadline: z.string().optional(),
   status: z.enum(["active", "complete", "paused"]).optional(),
+  isPrimary: z.boolean().optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
 });
 
 goalsRoute.patch("/:id", async (c) => {
@@ -65,6 +72,9 @@ goalsRoute.patch("/:id", async (c) => {
   }
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (body.data.isPrimary) {
+    await db.update(schema.goals).set({ isPrimary: false }).where(eq(schema.goals.userId, userId));
+  }
   for (const [key, val] of Object.entries(body.data)) {
     if (val !== undefined) updates[key] = val;
   }
@@ -80,6 +90,44 @@ goalsRoute.patch("/:id", async (c) => {
   }
 
   return c.json(updated);
+});
+
+goalsRoute.post("/:id/contribute", async (c) => {
+  const userId = c.get("userId") as string;
+  const goalId = c.req.param("id");
+  const body = z.object({ amount: z.number().int().positive() }).safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
+
+  const [goal] = await db
+    .select()
+    .from(schema.goals)
+    .where(and(eq(schema.goals.id, goalId), eq(schema.goals.userId, userId)))
+    .limit(1);
+  if (!goal) return c.json({ error: "Goal not found" }, 404);
+
+  const currentAmount = Math.min(goal.targetAmount, goal.currentAmount + body.data.amount);
+  const [updated] = await db
+    .update(schema.goals)
+    .set({ currentAmount, status: currentAmount >= goal.targetAmount ? "complete" : goal.status, updatedAt: new Date() })
+    .where(and(eq(schema.goals.id, goalId), eq(schema.goals.userId, userId)))
+    .returning();
+  return c.json(updated);
+});
+
+goalsRoute.post("/reorder", async (c) => {
+  const userId = c.get("userId") as string;
+  const body = z.object({ ids: z.array(z.string().uuid()).min(1) }).safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
+
+  const goals = await db.select({ id: schema.goals.id }).from(schema.goals).where(eq(schema.goals.userId, userId));
+  const allowed = new Set(goals.map((goal) => goal.id));
+  if (body.data.ids.some((id) => !allowed.has(id)) || new Set(body.data.ids).size !== body.data.ids.length) {
+    return c.json({ error: "Goal order does not match this user" }, 400);
+  }
+  for (const [sortOrder, id] of body.data.ids.entries()) {
+    await db.update(schema.goals).set({ sortOrder, updatedAt: new Date() }).where(and(eq(schema.goals.id, id), eq(schema.goals.userId, userId)));
+  }
+  return c.json({ ok: true });
 });
 
 // ── DELETE /v1/goals/:id ──────────────────────────────────────────────────────

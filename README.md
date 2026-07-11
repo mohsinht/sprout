@@ -61,11 +61,13 @@ flutter build web                            # production build into apps/mobile
 
 ## Current MVP Scope
 
-- Today screen only
+- Regression-protected four-tab shell: Today · Money · [＋] · Insights · Settings
+- Today, Money, Insights, Settings, Quick Add, and Sprout Explains surfaces
+- Finite Insights backed by a mock repository in Phase 1; nightly AI generation
+  with the briefing guardrails is a Phase 2 integration
 - Mock repositories and mock ingestion state
-- Transparent Financial Health Score model
+- Transparent wealth and Financial Health Score models
 - API health endpoint and Today payload endpoint
-- Bottom navigation with placeholder tabs for future MVP screens
 
 ## Security Notes
 

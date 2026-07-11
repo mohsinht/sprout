@@ -4,6 +4,20 @@ enum InsightCategory { funds, goals, cash, wealth }
 
 enum InsightActionKind { none, money, goal, learn }
 
+class InsightProvenance {
+  const InsightProvenance({
+    required this.sourceLabel,
+    required this.asOf,
+    required this.isMock,
+  });
+
+  final String sourceLabel;
+  final String asOf;
+  final bool isMock;
+
+  String get displayLabel => '$sourceLabel · $asOf';
+}
+
 class MoneyInsight {
   const MoneyInsight({
     required this.id,
@@ -13,10 +27,10 @@ class MoneyInsight {
     required this.personalMeaning,
     required this.detail,
     required this.relevanceTag,
-    required this.source,
-    required this.asOf,
+    required this.provenance,
     required this.actionLabel,
     required this.actionKind,
+    this.targetId,
   });
 
   final String id;
@@ -26,10 +40,10 @@ class MoneyInsight {
   final String personalMeaning;
   final String detail;
   final String relevanceTag;
-  final String source;
-  final String asOf;
+  final InsightProvenance provenance;
   final String? actionLabel;
   final InsightActionKind actionKind;
+  final String? targetId;
 }
 
 class InsightsData {

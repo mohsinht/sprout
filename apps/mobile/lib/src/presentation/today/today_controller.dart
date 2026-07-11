@@ -10,6 +10,8 @@ import '../../domain/today_models.dart';
 /// input the AI uses — editing a goal changes the next recommendation.
 final todayControllerProvider = FutureProvider<TodayData>((ref) async {
   final base = await ref.watch(todayRepositoryProvider).fetchToday();
+  const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+  if (!useMock) return base;
   final storeGoals = ref.watch(goalStoreProvider);
 
   // If the user has managed goals in the store, use those instead of the

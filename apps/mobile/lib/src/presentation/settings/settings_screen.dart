@@ -6,6 +6,8 @@ import 'package:sprout_motion/sprout_motion.dart';
 import '../../app/theme_mode_controller.dart';
 import '../../data/goal_store.dart';
 import '../../data/mock_sprout_data.dart';
+import '../../data/api/sprout_api_client.dart';
+import '../../data/auth_store.dart';
 import '../../domain/today_models.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
@@ -127,6 +129,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _dataSourcesKey = GlobalKey();
 
   late bool _freelanceIncome = mockProfile.hasFreelanceIncome;
+  String _profileName = mockProfile.name;
+  int? _monthlyIncome = mockProfile.monthlyIncome;
+  String _salaryDate = mockProfile.salaryDate;
+  bool _profileLoaded = false;
   late List<SproutDataSource> _sources = List.of(mockDataSources);
 
   late final Map<String, bool> _notifications = {
@@ -149,25 +155,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool get _hasExternalConnection =>
       _sources.any((s) => s.id != 'manual' && s.connected);
 
+  @override
+  void initState() {
+    super.initState();
+    const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+    if (!useMock) {
+      _profileName = 'friend';
+      _monthlyIncome = null;
+      _salaryDate = 'Not set';
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await ref.read(apiClientProvider).get('/v1/profile');
+      if (!mounted) return;
+      setState(() {
+        _profileName = profile['name'] as String? ?? 'friend';
+        final salaryDay = profile['salaryDate'] as int?;
+        _salaryDate = salaryDay == null ? 'Not set' : 'Day $salaryDay';
+        _freelanceIncome = profile['incomeType'] == 'freelance';
+      });
+    } catch (_) {
+      // Settings remains usable with local preferences while offline.
+    }
+  }
+
   Future<void> _openProfileSheet() async {
     await SproutBottomSheet.show(
       context,
-      title: mockProfile.name,
+      title: _profileName,
       rows: [
         SheetInfoRow(
           icon: Icons.person_rounded,
           label: _SettingsStrings.profile,
-          value: mockProfile.name,
+          value: _profileName,
         ),
         SheetInfoRow(
           icon: Icons.savings_rounded,
           label: _SettingsStrings.monthlyIncome,
-          value: SproutFormat.currency(mockProfile.monthlyIncome),
+          value: _monthlyIncome == null ? 'Not set' : SproutFormat.currency(_monthlyIncome!),
         ),
         SheetInfoRow(
           icon: Icons.event_rounded,
           label: _SettingsStrings.salaryDate,
-          value: mockProfile.salaryDate,
+          value: _salaryDate,
         ),
         SheetInfoRow(
           icon: Icons.work_outline_rounded,
@@ -319,6 +351,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+    final session = ref.watch(authSessionProvider);
+    if (!useMock && session != null && !_profileLoaded) {
+      _profileLoaded = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+    }
     final colors = SproutColorScheme.of(context);
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
@@ -374,7 +412,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      mockProfile.name,
+                      _profileName,
                       style: Theme.of(context)
                           .textTheme
                           .titleLarge
@@ -382,7 +420,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${SproutFormat.currency(mockProfile.monthlyIncome)} / month',
+                      _monthlyIncome == null
+                          ? 'Income not set'
+                          : '${SproutFormat.currency(_monthlyIncome!)} / month',
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall

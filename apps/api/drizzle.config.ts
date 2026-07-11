@@ -1,4 +1,11 @@
+import { loadEnvFile } from "node:process";
 import { defineConfig } from "drizzle-kit";
+
+try {
+  loadEnvFile(".env");
+} catch {
+  // CI and production inject DATABASE_URL directly.
+}
 
 export default defineConfig({
   schema: "./src/db/schema.ts",

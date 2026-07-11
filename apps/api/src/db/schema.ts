@@ -31,6 +31,16 @@ export const holdingKindEnum = pgEnum("holding_kind", [
   "other",
 ]);
 
+export const accountTypeEnum = pgEnum("account_type", [
+  "cash",
+  "bank",
+  "wallet",
+  "wise",
+  "investment",
+  "foreign_balance",
+  "other",
+]);
+
 export const holdingFreshnessEnum = pgEnum("holding_freshness", [
   "fresh",
   "stale",
@@ -165,7 +175,17 @@ export const profiles = pgTable("profiles", {
   locale: varchar("locale", { length: 10 }).notNull().default("en"),
   reduceMotion: boolean("reduce_motion").notNull().default(false),
   hideBalances: boolean("hide_balances").notNull().default(false),
+  soundEffects: boolean("sound_effects").notNull().default(true),
+  haptics: boolean("haptics").notNull().default(true),
   displayCurrency: varchar("display_currency", { length: 3 }).notNull().default("PKR"),
+  notificationPreferencesJson: jsonb("notification_preferences_json").notNull().default({
+    dailyCheckIn: true,
+    billReminders: true,
+    salaryIncomeReminders: true,
+    weeklySummary: true,
+    streakProtection: true,
+    hideSensitiveAmounts: true,
+  }),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -182,6 +202,24 @@ export const goals = pgTable("goals", {
   currentAmount: integer("current_amount").notNull().default(0),
   deadline: date("deadline"),
   status: goalStatusEnum("status").notNull().default("active"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const accounts = pgTable("accounts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull().default("Manual"),
+  label: text("label").notNull(),
+  maskedRef: text("masked_ref"),
+  type: accountTypeEnum("type").notNull().default("cash"),
+  openingBalance: integer("opening_balance").notNull().default(0),
+  currency: varchar("currency", { length: 3 }).notNull().default("PKR"),
+  isManual: boolean("is_manual").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -218,7 +256,7 @@ export const priceQuotes = pgTable("price_quotes", {
   sourceUrl: text("source_url"),
   currency: varchar("currency", { length: 3 }).notNull().default("PKR"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("price_quotes_source_instrument_date_idx").on(t.instrument, t.asOf, t.source)]);
 
 export const fxRates = pgTable("fx_rates", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -228,13 +266,14 @@ export const fxRates = pgTable("fx_rates", {
   source: text("source").notNull(),
   sourceUrl: text("source_url"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("fx_rates_source_pair_date_idx").on(t.pair, t.asOf, t.source)]);
 
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
+  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
   amount: integer("amount").notNull(), // whole PKR
   currency: varchar("currency", { length: 3 }).notNull().default("PKR"),
   type: transactionTypeEnum("type").notNull(),
@@ -250,7 +289,7 @@ export const transactions = pgTable("transactions", {
   needsReview: boolean("needs_review").notNull().default(false),
   reviewReason: text("review_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [index("transactions_user_fingerprint_idx").on(t.userId, t.dedupeFingerprint)]);
 
 export const wealthSnapshots = pgTable("wealth_snapshots", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -266,7 +305,7 @@ export const wealthSnapshots = pgTable("wealth_snapshots", {
   interpretationJson: jsonb("interpretation_json"),
   freshness: holdingFreshnessEnum("freshness").notNull().default("fresh"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("wealth_snapshots_user_date_idx").on(t.userId, t.date)]);
 
 export const wealthEvents = pgTable("wealth_events", {
   id: uuid("id").defaultRandom().primaryKey(),

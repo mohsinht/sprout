@@ -5,6 +5,7 @@ import { config } from "./config.js";
 import { authRoute } from "./auth/routes.js";
 import { profileRoute } from "./routes/profile.js";
 import { holdingsRoute } from "./routes/holdings.js";
+import { accountsRoute } from "./routes/accounts.js";
 import { goalsRoute } from "./routes/goals.js";
 import { transactionsRoute } from "./routes/transactions.js";
 import { briefingRoute } from "./routes/briefing.js";
@@ -12,6 +13,7 @@ import { pendingRoute } from "./routes/pending.js";
 import { incomeRoute } from "./routes/income.js";
 import { uploadRoute } from "./routes/upload.js";
 import { runDailyJobForAllUsers } from "./services/job-runner.js";
+import { pool } from "./db/client.js";
 
 const app = new Hono();
 
@@ -34,6 +36,15 @@ app.get("/health", (c) =>
   })
 );
 
+app.get("/ready", async (c) => {
+  try {
+    await pool.query("select 1");
+    return c.json({ ok: true, database: "ready" });
+  } catch {
+    return c.json({ ok: false, database: "unavailable" }, 503);
+  }
+});
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 app.route("/v1/auth", authRoute);
 
@@ -41,6 +52,7 @@ app.route("/v1/auth", authRoute);
 app.route("/v1/profile", profileRoute);
 
 // ── Manual Entry (the floor — app fully works here) ──────────────────────────
+app.route("/v1/accounts", accountsRoute);
 app.route("/v1/holdings", holdingsRoute);
 app.route("/v1/goals", goalsRoute);
 app.route("/v1/transactions", transactionsRoute);

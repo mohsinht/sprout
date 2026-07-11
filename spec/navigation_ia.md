@@ -3,7 +3,7 @@
 > **Realignment note (2026-07-09):** Money tab is confirmed as the holdings
 > + trend + provenance depth surface — where the 6-day chart, per-fund
 > detail, and dated price/FX provenance live. Today links into it. The
-> 3-tab + center "+" shell is unchanged.
+> Four tabs + center "+" is the required shell.
 >
 > **Insights note (2026-07-10):** The shell is updated to four required tabs
 > plus the center quick-add action: Today · Money · [＋] · Insights ·
@@ -29,7 +29,9 @@ Today is the default route on every app open.
 
 ## Current Code Note
 
-The current Flutter shell includes `Today`, `Add`, `Money`, `Learn`, and `Settings` as bottom tabs. The target product IA moves Add into a center action sheet and removes Learn as a primary tab. Learning content should appear inside Sprout Explains and contextual recommendations unless the product direction changes.
+The Flutter shell renders the target four tabs. Quick Add is a center action
+sheet, not a tab, and Learn remains an internal destination reached from
+contextual explanations.
 
 Relevant current files:
 

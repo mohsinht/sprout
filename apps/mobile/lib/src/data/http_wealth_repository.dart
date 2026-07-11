@@ -29,9 +29,9 @@ abstract interface class WealthBriefingRepository {
 
 /// HTTP implementation — calls GET /v1/briefing on the real backend.
 ///
-/// If the API is unreachable, throws an exception so the caller can fall
-/// back to cached/mock data. Never silently returns mock data as if it
-/// were real — that would give the user a fabricated wealth number.
+/// If the API is unreachable, throws an exception so Today can render its
+/// explicit unavailable state. Never silently returns mock data as if it were
+/// real — that would give the user a fabricated wealth number.
 class HttpWealthBriefingRepository implements WealthBriefingRepository {
   HttpWealthBriefingRepository(this._client);
 
@@ -40,9 +40,6 @@ class HttpWealthBriefingRepository implements WealthBriefingRepository {
   @override
   Future<WealthBriefing> fetchWealthBriefing() async {
     final json = await _client.get('/v1/briefing');
-    if (json == null) {
-      throw Exception('Could not reach the Sprout API. Using cached data.');
-    }
     return wealthBriefingFromApiJson(json);
   }
 }
