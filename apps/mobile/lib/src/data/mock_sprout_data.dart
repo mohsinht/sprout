@@ -209,11 +209,9 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 20,
     completed: true,
-    concept:
-        'A cash buffer is money you keep aside for the days just before '
+    concept: 'A cash buffer is money you keep aside for the days just before '
         'salary. It stops you from borrowing or skipping bills.',
-    example:
-        'Keeping PKR 10,000 aside means a surprise bill on the 28th does '
+    example: 'Keeping PKR 10,000 aside means a surprise bill on the 28th does '
         'not scare you.',
     tinyAction: 'Move PKR 2,000 to your cash buffer today.',
   ),
@@ -224,11 +222,9 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 20,
     completed: true,
-    concept:
-        'If prices rise 10 percent and your money earns 0 percent, your '
+    concept: 'If prices rise 10 percent and your money earns 0 percent, your '
         'buying power quietly shrinks.',
-    example:
-        'PKR 100,000 saved for a year at 0 percent buys about PKR 90,000 '
+    example: 'PKR 100,000 saved for a year at 0 percent buys about PKR 90,000 '
         'worth of things after 10 percent inflation.',
     tinyAction: 'Keep some savings in places that can grow.',
   ),
@@ -239,8 +235,7 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 25,
     completed: false,
-    concept:
-        'Employers in Pakistan deduct tax from your salary and send it to '
+    concept: 'Employers in Pakistan deduct tax from your salary and send it to '
         'FBR. Your take-home is what remains after this.',
     example: 'A PKR 200,000 salary may show PKR 170,000 in your account.',
     tinyAction: 'Check your latest payslip and note the tax line.',
@@ -252,8 +247,7 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 20,
     completed: false,
-    concept:
-        'A mutual fund pools money from many people and invests it. You '
+    concept: 'A mutual fund pools money from many people and invests it. You '
         'own small units of the whole pool.',
     example: 'Al Meezan and NBP funds let you start with a few thousand.',
     tinyAction: 'Look up one mutual fund name you have heard of.',
@@ -265,8 +259,7 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 20,
     completed: false,
-    concept:
-        'Raast is Pakistan\'s instant payment system, often free. IBFT '
+    concept: 'Raast is Pakistan\'s instant payment system, often free. IBFT '
         'moves money between banks and may have a small fee.',
     example: 'Sending to a friend on Raast can be instant and free.',
     tinyAction: 'Check if your bank app offers Raast transfers.',
@@ -278,8 +271,7 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 20,
     completed: false,
-    concept:
-        'A debit card spends money already in your account. A credit card '
+    concept: 'A debit card spends money already in your account. A credit card '
         'borrows money you must pay back.',
     example: 'Debit = your money now. Credit = borrowed, repay later.',
     tinyAction: 'Use debit for daily spend to stay in control.',
@@ -291,8 +283,7 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 25,
     completed: false,
-    concept:
-        'Zakat is 2.5 percent of savings you have held for a lunar year '
+    concept: 'Zakat is 2.5 percent of savings you have held for a lunar year '
         'above a threshold (nisab).',
     example: 'On PKR 500,000 of qualifying savings, zakat is PKR 12,500.',
     tinyAction: 'Note roughly how much savings you have held for a year.',
@@ -304,8 +295,7 @@ const mockLessons = <SproutLesson>[
     durationSeconds: 30,
     xp: 25,
     completed: false,
-    concept:
-        'An emergency fund is 1 to 3 months of expenses kept aside for '
+    concept: 'An emergency fund is 1 to 3 months of expenses kept aside for '
         'real surprises, not treats.',
     example: 'If you spend PKR 80,000 a month, aim for PKR 80,000+ first.',
     tinyAction: 'Pick one amount to start your emergency fund this month.',

@@ -64,10 +64,12 @@ export async function runDailyBriefingJob(userId: string, date?: string): Promis
 }
 
 /** Run on-demand briefing refresh. Rate-limited per user per hour. */
-export async function runOnDemandBriefing(userId: string): Promise<JobResult> {
+export async function runOnDemandBriefing(userId: string, contextChanged = false): Promise<JobResult> {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-  const idempotencyKey = `on_demand:${userId}:${now.toISOString().slice(0, 13)}`; // hourly key
+  const idempotencyKey = contextChanged
+    ? `context:${userId}:${now.getTime()}`
+    : `on_demand:${userId}:${now.toISOString().slice(0, 13)}`; // hourly key
 
   // Rate limit: check how many on-demand jobs in the last hour
   const recentJobs = await db
@@ -85,7 +87,7 @@ export async function runOnDemandBriefing(userId: string): Promise<JobResult> {
     );
 
   const recentCount = recentJobs[0]?.count ?? 0;
-  if (recentCount >= config.onDemandRateLimitPerHour) {
+  if (!contextChanged && recentCount >= config.onDemandRateLimitPerHour) {
     // Rate limited — return the current briefing, don't error
     return { briefingId: "rate_limited", status: "skipped" };
   }
@@ -97,7 +99,7 @@ export async function runOnDemandBriefing(userId: string): Promise<JobResult> {
     .where(eq(schema.jobRuns.idempotencyKey, idempotencyKey))
     .limit(1);
 
-  if (existingJob.length > 0 && existingJob[0].status === "succeeded") {
+  if (!contextChanged && existingJob.length > 0 && existingJob[0].status === "succeeded") {
     return { briefingId: existingJob[0].id, status: "skipped" };
   }
 

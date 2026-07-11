@@ -24,13 +24,16 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     final refresh = prefs.getString(_refreshKey);
     final userId = prefs.getString(_userIdKey);
     if (access != null && refresh != null && userId != null) {
-      _client.setAuthToken(access);
-      state = AuthSession(accessToken: access, refreshToken: refresh, userId: userId);
+      _client.setAuthSession(access, refresh, onRefreshed: _saveRefreshed);
+      state = AuthSession(
+          accessToken: access, refreshToken: refresh, userId: userId);
     }
   }
 
-  Future<void> register({required String email, required String password, String? name}) async {
-    final result = await _client.register(email: email, password: password, name: name);
+  Future<void> register(
+      {required String email, required String password, String? name}) async {
+    final result =
+        await _client.register(email: email, password: password, name: name);
     await _save(result);
   }
 
@@ -44,14 +47,36 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     await prefs.setString(_accessKey, session.accessToken);
     await prefs.setString(_refreshKey, session.refreshToken);
     await prefs.setString(_userIdKey, session.userId);
-    _client.setAuthToken(session.accessToken);
+    _client.setAuthSession(
+      session.accessToken,
+      session.refreshToken,
+      onRefreshed: _saveRefreshed,
+    );
     state = session;
+  }
+
+  Future<void> _saveRefreshed(String accessToken, String refreshToken) async {
+    final current = state;
+    if (current == null) return;
+    final refreshed = AuthSession(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      userId: current.userId,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accessKey, accessToken);
+    await prefs.setString(_refreshKey, refreshToken);
+    state = refreshed;
   }
 
   Future<void> logout() async {
     final session = state;
     if (session != null) {
-      await _client.logout(session.refreshToken);
+      try {
+        await _client.logout(session.refreshToken);
+      } catch (_) {
+        // Local sign-out must remain available while offline or expired.
+      }
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accessKey);

@@ -301,6 +301,11 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final accounts = ref.watch(accountsProvider);
+    if (accounts.isNotEmpty &&
+        !accounts.any((account) => account.id == _pocket.id)) {
+      _pocket = accounts.first;
+    }
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final paddingBottom =

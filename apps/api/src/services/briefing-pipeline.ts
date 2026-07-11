@@ -338,7 +338,15 @@ export async function generateBriefing(params: {
   });
 
   // ── 8. Compute score ────────────────────────────────────────────────────────
-  const activeGoals = goalRows.filter((g) => g.status === "active");
+  const activeGoals = goalRows
+    .filter((g) => g.status === "active")
+    .sort((a, b) => {
+      if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+      if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+      const aProgress = a.targetAmount > 0 ? a.currentAmount / a.targetAmount : 0;
+      const bProgress = b.targetAmount > 0 ? b.currentAmount / b.targetAmount : 0;
+      return bProgress - aProgress;
+    });
   const goalPaceRatio = activeGoals.length > 0
     ? activeGoals.reduce((sum, g) => sum + g.currentAmount / g.targetAmount, 0) / activeGoals.length
     : 0;

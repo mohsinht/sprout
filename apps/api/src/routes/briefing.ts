@@ -38,8 +38,9 @@ briefingRoute.get("/", async (c) => {
 
 briefingRoute.post("/refresh", async (c) => {
   const userId = c.get("userId") as string;
+  const body = await c.req.json().catch(() => ({})) as { contextChanged?: boolean };
 
-  const result = await runOnDemandBriefing(userId);
+  const result = await runOnDemandBriefing(userId, body.contextChanged === true);
 
   if (result.status === "skipped") {
     // Rate limited or already run this hour — return current briefing

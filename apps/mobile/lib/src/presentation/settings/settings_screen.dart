@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../app/theme_mode_controller.dart';
@@ -69,8 +70,10 @@ class _SettingsStrings {
   static const manageSources = 'Manage sources';
   static const sourceDetailDisconnect = 'Disconnect this source';
   static const sourceDetailDelete = 'Delete imported data';
-  static const sourceDetailAlwaysOn = 'Manual entries are always on and cannot be disconnected.';
-  static const sourceDetailSoon = 'This source is coming soon. You will be able to enable it here.';
+  static const sourceDetailAlwaysOn =
+      'Manual entries are always on and cannot be disconnected.';
+  static const sourceDetailSoon =
+      'This source is coming soon. You will be able to enable it here.';
 
   // Privacy
   static const privacy = 'Privacy';
@@ -163,6 +166,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _profileName = 'friend';
       _monthlyIncome = null;
       _salaryDate = 'Not set';
+      _sources = const [
+        SproutDataSource(
+            id: 'manual',
+            label: 'Manual entries',
+            detail: 'Always on',
+            connected: true),
+        SproutDataSource(
+            id: 'email',
+            label: 'Email connection',
+            detail: 'Not connected',
+            connected: false),
+        SproutDataSource(
+            id: 'statement',
+            label: 'Statement imports',
+            detail: 'No imports yet',
+            connected: false),
+        SproutDataSource(
+            id: 'sms',
+            label: 'SMS detection',
+            detail: 'Android only — coming soon',
+            connected: false,
+            comingSoon: true),
+      ];
     }
   }
 
@@ -175,40 +201,121 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final salaryDay = profile['salaryDate'] as int?;
         _salaryDate = salaryDay == null ? 'Not set' : 'Day $salaryDay';
         _freelanceIncome = profile['incomeType'] == 'freelance';
+        _currency = profile['displayCurrency'] as String? ?? 'PKR';
+        _prefs[_SettingsStrings.reducedMotion] =
+            profile['reduceMotion'] as bool? ?? false;
+        _prefs[_SettingsStrings.soundEffects] =
+            profile['soundEffects'] as bool? ?? true;
+        _prefs[_SettingsStrings.haptics] = profile['haptics'] as bool? ?? true;
+        final notifications =
+            profile['notificationPreferences'] as Map<String, dynamic>? ??
+                const {};
+        _notifications[_SettingsStrings.dailyReminder] =
+            notifications['dailyCheckIn'] as bool? ?? true;
+        _notifications[_SettingsStrings.billReminder] =
+            notifications['billReminders'] as bool? ?? true;
+        _notifications[_SettingsStrings.weeklySummary] =
+            notifications['weeklySummary'] as bool? ?? true;
       });
     } catch (_) {
       // Settings remains usable with local preferences while offline.
     }
   }
 
-  Future<void> _openProfileSheet() async {
-    await SproutBottomSheet.show(
-      context,
-      title: _profileName,
-      rows: [
-        SheetInfoRow(
-          icon: Icons.person_rounded,
-          label: _SettingsStrings.profile,
-          value: _profileName,
-        ),
-        SheetInfoRow(
-          icon: Icons.savings_rounded,
-          label: _SettingsStrings.monthlyIncome,
-          value: _monthlyIncome == null ? 'Not set' : SproutFormat.currency(_monthlyIncome!),
-        ),
-        SheetInfoRow(
-          icon: Icons.event_rounded,
-          label: _SettingsStrings.salaryDate,
-          value: _salaryDate,
-        ),
-        SheetInfoRow(
-          icon: Icons.work_outline_rounded,
-          label: _SettingsStrings.freelanceIncome,
-          value: _freelanceIncome ? 'On' : 'Off',
-        ),
-      ],
-    );
+  Future<void> _loadSources() async {
+    try {
+      final response =
+          await ref.read(apiClientProvider).get('/v1/briefing/sources');
+      final rows = response['sources'] as List? ?? const [];
+      if (!mounted) return;
+      final live = rows.map((row) {
+        final source = row as Map<String, dynamic>;
+        final kind = source['kind'] as String? ?? 'source';
+        final synced = source['lastSyncedAt'] as String?;
+        return SproutDataSource(
+          id: kind,
+          label: _sourceLabel(kind),
+          detail: synced == null
+              ? 'Connected — not synced yet'
+              : 'Last synced ${synced.substring(0, 10)}',
+          connected: source['status'] == 'connected',
+        );
+      });
+      setState(() {
+        _sources = [
+          const SproutDataSource(
+              id: 'manual',
+              label: 'Manual entries',
+              detail: 'Always on',
+              connected: true),
+          ...live,
+          if (!live.any((s) => s.id == 'email'))
+            const SproutDataSource(
+                id: 'email',
+                label: 'Email connection',
+                detail: 'Not connected',
+                connected: false),
+          if (!live.any((s) => s.id == 'statement'))
+            const SproutDataSource(
+                id: 'statement',
+                label: 'Statement imports',
+                detail: 'No imports yet',
+                connected: false),
+          const SproutDataSource(
+              id: 'sms',
+              label: 'SMS detection',
+              detail: 'Android only — coming soon',
+              connected: false,
+              comingSoon: true),
+        ];
+      });
+    } catch (_) {}
   }
+
+  String _sourceLabel(String kind) => switch (kind) {
+        'email' => 'Email connection',
+        'statement' => 'Statement imports',
+        'wise' => 'Wise',
+        'al_meezan' => 'Al Meezan',
+        _ => kind,
+      };
+
+  Future<void> _patchProfile(Map<String, dynamic> values) async {
+    try {
+      await ref.read(apiClientProvider).patch('/v1/profile', values);
+    } catch (_) {
+      _showSnack('Saved on this device. Sprout will sync when you are online.');
+    }
+  }
+
+  Future<void> _editProfileName() async {
+    final controller = TextEditingController(
+        text: _profileName == 'friend' ? '' : _profileName);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('What should Sprout call you?'),
+        content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Name or nickname')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Not now')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || value.isEmpty || !mounted) return;
+    setState(() => _profileName = value);
+    await _patchProfile({'name': value});
+  }
+
+  Future<void> _openProfileSheet() => _editProfileName();
 
   Future<void> _confirmDisconnect(SproutDataSource source) async {
     if (source.id == 'manual') {
@@ -324,6 +431,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         false;
 
     if (!mounted || !shouldDelete) return;
+    try {
+      await ref.read(apiClientProvider).delete('/v1/profile/imported-data');
+    } catch (_) {
+      _showSnack(
+          'Could not delete imported data while offline. Try again when connected.');
+      return;
+    }
     _showSnack(_SettingsStrings.deleteDoneSnack);
   }
 
@@ -355,13 +469,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final session = ref.watch(authSessionProvider);
     if (!useMock && session != null && !_profileLoaded) {
       _profileLoaded = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadProfile();
+        _loadSources();
+      });
     }
     final colors = SproutColorScheme.of(context);
     final themeMode = ref.watch(themeModeProvider);
     final isDark = themeMode == ThemeMode.dark;
 
-    const gap = SizedBox(height: SproutSpacing.xl, key: ValueKey('section-gap'));
+    const gap =
+        SizedBox(height: SproutSpacing.xl, key: ValueKey('section-gap'));
 
     return SproutPage(
       title: _SettingsStrings.title,
@@ -386,6 +504,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _preferencesSection(colors, isDark: isDark),
         gap,
         _deleteSection(colors),
+        if (session != null) ...[
+          gap,
+          SettingsSection(
+            header: 'Account',
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () async {
+                  await ref.read(authSessionProvider.notifier).logout();
+                  if (context.mounted) context.go('/auth');
+                },
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Sign out'),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -431,8 +566,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: colors.muted, size: 24),
+              Icon(Icons.chevron_right_rounded, color: colors.muted, size: 24),
             ],
           ),
         ),
@@ -531,7 +665,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: SproutColors.seed.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(SproutRadius.pill),
+                            borderRadius:
+                                BorderRadius.circular(SproutRadius.pill),
                           ),
                           child: Text(
                             'Primary',
@@ -681,8 +816,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: i == 0
                   ? Icons.notifications_active_rounded
                   : Icons.notifications_none_rounded,
-              onChanged: (v) =>
-                  setState(() => _notifications[labels[i]] = v),
+              onChanged: (v) {
+                setState(() => _notifications[labels[i]] = v);
+                _patchProfile({
+                  'notificationPreferences': {
+                    'dailyCheckIn':
+                        _notifications[_SettingsStrings.dailyReminder] ?? true,
+                    'billReminders':
+                        _notifications[_SettingsStrings.billReminder] ?? true,
+                    'weeklySummary':
+                        _notifications[_SettingsStrings.weeklySummary] ?? true,
+                  }
+                });
+              },
             ),
             if (i != labels.length - 1) _rowDivider,
           ],
@@ -736,8 +882,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _preferencesSection(SproutColorScheme colors,
-      {required bool isDark}) {
+  Widget _preferencesSection(SproutColorScheme colors, {required bool isDark}) {
     return SettingsSection(
       header: _SettingsStrings.appPreferences,
       child: Column(
@@ -746,31 +891,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             label: _SettingsStrings.reducedMotion,
             value: _prefs[_SettingsStrings.reducedMotion] ?? false,
             icon: Icons.animation_rounded,
-            onChanged: (v) =>
-                setState(() => _prefs[_SettingsStrings.reducedMotion] = v),
+            onChanged: (v) {
+              setState(() => _prefs[_SettingsStrings.reducedMotion] = v);
+              _patchProfile({'reduceMotion': v});
+            },
           ),
           _rowDivider,
-          const PreferenceToggle(
+          PreferenceToggle(
             label: _SettingsStrings.soundEffects,
-            value: false,
+            value: _prefs[_SettingsStrings.soundEffects] ?? true,
             icon: Icons.volume_up_rounded,
-            comingSoon: true,
+            onChanged: (v) {
+              setState(() => _prefs[_SettingsStrings.soundEffects] = v);
+              _patchProfile({'soundEffects': v});
+            },
           ),
           _rowDivider,
-          const PreferenceToggle(
+          PreferenceToggle(
             label: _SettingsStrings.haptics,
-            value: false,
+            value: _prefs[_SettingsStrings.haptics] ?? true,
             icon: Icons.vibration_rounded,
-            comingSoon: true,
+            onChanged: (v) {
+              setState(() => _prefs[_SettingsStrings.haptics] = v);
+              _patchProfile({'haptics': v});
+            },
           ),
           _rowDivider,
           PreferenceToggle(
             label: _SettingsStrings.darkMode,
             value: isDark,
             icon: Icons.dark_mode_rounded,
-            onChanged: (v) => ref
-                .read(themeModeProvider.notifier)
-                .state = v ? ThemeMode.dark : ThemeMode.light,
+            onChanged: (v) => ref.read(themeModeProvider.notifier).state =
+                v ? ThemeMode.dark : ThemeMode.light,
           ),
         ],
       ),
@@ -873,8 +1025,7 @@ class _DataSourceRow extends StatelessWidget {
             ),
             if (!source.comingSoon) ...[
               const SizedBox(width: SproutSpacing.sm),
-              Icon(Icons.chevron_right_rounded,
-                  color: colors.muted, size: 24),
+              Icon(Icons.chevron_right_rounded, color: colors.muted, size: 24),
             ],
           ],
         ),
@@ -933,7 +1084,8 @@ class _SourceControl extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_rounded, color: SproutColors.leaf, size: 13),
+            Icon(Icons.check_circle_rounded,
+                color: SproutColors.leaf, size: 13),
             const SizedBox(width: 5),
             Text(
               _SettingsStrings.on,
