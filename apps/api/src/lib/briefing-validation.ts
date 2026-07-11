@@ -80,20 +80,18 @@ export function selectRecommendedAction(params: {
   // Priority 1: needs_attention bill coverage or cash runway
   if (score.attentionFactors.some((f) => f.id === "cash_buffer" && f.contribution < 5)) {
     const emergencyGoal = goals.find((g) => g.name.toLowerCase().includes("emergency"));
-    return {
-      id: "action-emergency",
-      label: emergencyGoal
-        ? `Add PKR 10,000 to your ${emergencyGoal.name}`
-        : "Build your emergency fund — add a small amount this month",
-      severity: "needs_attention",
-      effect: "Strengthens your cash buffer",
-      xp: 25,
-      completionKind: "contribute_to_goal",
-      targetId: emergencyGoal?.id,
-      goalRelativeNote: emergencyGoal
-        ? `PKR ${emergencyGoal.remainingToTarget.toLocaleString()} to go`
-        : undefined,
-    };
+    if (emergencyGoal) {
+      return {
+        id: "action-emergency",
+        label: `Add PKR 10,000 to your ${emergencyGoal.name}`,
+        severity: "needs_attention",
+        effect: "Strengthens your cash buffer",
+        xp: 25,
+        completionKind: "contribute_to_goal",
+        targetId: emergencyGoal.id,
+        goalRelativeNote: `PKR ${emergencyGoal.remainingToTarget.toLocaleString()} to go`,
+      };
+    }
   }
 
   // Priority 2: needs_attention data quality (stale prices or unconfirmed)
