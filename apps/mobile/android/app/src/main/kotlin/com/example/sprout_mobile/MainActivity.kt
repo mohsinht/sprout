@@ -1,4 +1,4 @@
-package com.example.sprout_mobile
+package pk.sproutfinancial.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
