@@ -32,10 +32,10 @@ opsRoute.get("/release-readiness", async (c) => {
       count(*) filter (where freshness in ('stale', 'unavailable'))::int as stale_or_unavailable,
       coalesce(sum(duplicate_count - 1), 0)::int as duplicates
     from (
-      select date, freshness, count(*) as duplicate_count
+      select user_id, date, freshness, count(*) as duplicate_count
       from wealth_snapshots
       where date >= (now() at time zone 'Asia/Karachi')::date - 13
-      group by date, freshness
+      group by user_id, date, freshness
     ) snapshot_days`);
   const quoteResult = await pool.query<{ nav_dates: number; nav_sources: number }>(
     `select count(distinct as_of)::int as nav_dates,
@@ -46,6 +46,11 @@ opsRoute.get("/release-readiness", async (c) => {
     `select count(distinct as_of)::int as fx_dates,
       count(distinct source)::int as fx_sources
     from fx_rates where as_of >= (now() at time zone 'Asia/Karachi')::date - 13`,
+  );
+  const validationResult = await pool.query<{ total: number; matched: number; mismatched: number }>(
+    `select count(*)::int total, count(*) filter (where matched)::int matched,
+      count(*) filter (where not matched)::int mismatched from nav_cross_validations
+      where as_of >= (now() at time zone 'Asia/Karachi')::date - 13`,
   );
   const jobRow = jobsResult.rows[0];
   const snapshotRow = snapshotResult.rows[0];
@@ -77,7 +82,8 @@ opsRoute.get("/release-readiness", async (c) => {
     dailyJobs: jobs,
     snapshots,
     observations: { ...quotes, ...fx },
-    crossValidationImplemented: false,
+    crossValidation: validationResult.rows[0] ?? { total: 0, matched: 0, mismatched: 0 },
+    crossValidationImplemented: true,
     realValuationExposureEnabled: config.features.valuationExposureEnabled,
   };
   const prerequisitesPassed =
@@ -87,7 +93,7 @@ opsRoute.get("/release-readiness", async (c) => {
     snapshots.duplicates === 0 &&
     quotes.navDates >= 14 &&
     quotes.navSources >= 2 &&
-    fx.fxDates >= 14;
+    fx.fxDates >= 14 && (validationResult.rows[0]?.mismatched ?? 0) === 0 && (validationResult.rows[0]?.matched ?? 0) >= 14;
 
   // Cross-validation is intentionally false until the primary Al Meezan and
   // MUFAP validation parsers are implemented and independently observed.

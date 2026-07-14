@@ -43,7 +43,7 @@ incomeRoute.get("/projected", async (c) => {
 const CreateProjectedSchema = z.object({
   amount: z.number().positive(),
   currency: z.string().length(3).default("USD"),
-  expectedOn: z.string(),
+  expectedOn: z.string().date(),
   note: z.string().max(500).optional(),
 });
 

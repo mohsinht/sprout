@@ -28,7 +28,7 @@ const CreateGoalSchema = z.object({
   type: z.enum(["emergency", "car", "home", "education", "eidi", "zakat", "travel", "custom"]),
   targetAmount: z.number().int().positive(),
   currentAmount: z.number().int().nonnegative().default(0),
-  deadline: z.string().optional(),
+  deadline: z.string().date().optional(),
   isPrimary: z.boolean().optional(),
 });
 
@@ -57,7 +57,7 @@ const UpdateGoalSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   targetAmount: z.number().int().positive().optional(),
   currentAmount: z.number().int().nonnegative().optional(),
-  deadline: z.string().optional(),
+  deadline: z.string().date().optional(),
   status: z.enum(["active", "complete", "paused"]).optional(),
   isPrimary: z.boolean().optional(),
   sortOrder: z.number().int().nonnegative().optional(),

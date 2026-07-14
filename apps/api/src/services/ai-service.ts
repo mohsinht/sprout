@@ -34,8 +34,8 @@ export interface AiBriefingInput {
     goalRelativeNote?: string;
   };
   mascotMood: string;
-  score: number;
-  band: string;
+  score: number | null;
+  band: string | null;
 }
 
 export interface AiBriefingOutput {

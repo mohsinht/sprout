@@ -162,7 +162,9 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       // as one tight visual cluster — small gaps within, then a standard
       // section gap before the next block.
       const SizedBox(height: SproutSpacing.md),
-      _MascotHero(healthScore: data.health.score),
+      _MascotHero(
+          healthScore: data.health.score,
+          scoreAvailable: data.health.scoreAvailable),
 
       const SizedBox(height: SproutSpacing.md),
       _WealthHero(wealth: wealth),
@@ -371,9 +373,10 @@ class _Greeting extends StatelessWidget {
 }
 
 class _MascotHero extends StatelessWidget {
-  const _MascotHero({required this.healthScore});
+  const _MascotHero({required this.healthScore, required this.scoreAvailable});
 
   final int healthScore;
+  final bool scoreAvailable;
 
   @override
   Widget build(BuildContext context) {
@@ -403,12 +406,18 @@ class _MascotHero extends StatelessWidget {
             // not a code change.
             SproutMascot(
               size: 80,
-              state: SproutMascotState.fromHealthScore(healthScore),
+              state: SproutMascotState.fromHealthScore(
+                  scoreAvailable ? healthScore : 75),
               animate: true,
               playOnMount: true,
-              playKey: healthScore,
+              playKey: scoreAvailable ? healthScore : -1,
               enableBlink: true,
             ),
+            if (!scoreAvailable)
+              const Padding(
+                padding: EdgeInsets.only(top: SproutSpacing.sm),
+                child: Text('Sprout is still getting to know your money'),
+              ),
           ],
         ),
       ),

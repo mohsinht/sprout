@@ -96,6 +96,8 @@ class FinancialHealthScore {
     required this.positiveFactors,
     required this.attentionFactors,
     required this.recommendedAction,
+    this.scoreAvailable = true,
+    this.scoreExplanation = '',
   });
 
   final int score;
@@ -104,6 +106,8 @@ class FinancialHealthScore {
   final List<String> positiveFactors;
   final List<String> attentionFactors;
   final RecommendedAction recommendedAction;
+  final bool scoreAvailable;
+  final String scoreExplanation;
 }
 
 class RecommendedAction {
@@ -481,12 +485,16 @@ TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
 
   // Map health score
   final health = FinancialHealthScore(
-    score: b.healthScore,
-    status: b.healthStatus.name,
-    summary: b.summary,
+    score: b.healthScore ?? 0,
+    status: b.healthStatus?.name ?? 'insufficient_data',
+    summary: b.scoreState == 'insufficient_data'
+        ? 'Sprout is still getting to know your money.'
+        : b.summary,
     positiveFactors: const [],
     attentionFactors: const [],
     recommendedAction: recommendedAction,
+    scoreAvailable: b.scoreState == 'available',
+    scoreExplanation: b.scoreExplanation,
   );
 
   return TodayData(

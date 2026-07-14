@@ -9,7 +9,8 @@ import 'auth_store.dart';
 import 'context_refresh.dart';
 import 'mock_sprout_data.dart';
 
-const _useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+const _useMock =
+    String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') == 'dev';
 
 final accountsProvider =
     StateNotifierProvider<AccountsNotifier, List<SproutAccount>>((ref) {

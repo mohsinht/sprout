@@ -8,7 +8,7 @@ import 'package:http/http.dart' as http;
 /// Base URL is configured via --dart-define=API_BASE_URL=...
 /// Transport and response failures are thrown so the caller can render its
 /// explicit unavailable/error state. Mock data is selected only through the
-/// USE_MOCK build flag; it is never a silent network fallback.
+/// SPROUT_ENV=dev build flag; it is never a silent network fallback.
 final apiClientProvider = Provider<SproutApiClient>((ref) {
   const authToken = String.fromEnvironment('AUTH_TOKEN', defaultValue: '');
   return SproutApiClient(authToken: authToken.isEmpty ? null : authToken);
@@ -19,11 +19,13 @@ class AuthSession {
     required this.accessToken,
     required this.refreshToken,
     required this.userId,
+    required this.onboardingComplete,
   });
 
   final String accessToken;
   final String refreshToken;
   final String userId;
+  final bool onboardingComplete;
 }
 
 class SproutApiClient {
@@ -115,7 +117,10 @@ class SproutApiClient {
       throw const SproutApiException('Authentication response was incomplete');
     }
     return AuthSession(
-        accessToken: accessToken, refreshToken: refreshToken, userId: userId);
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        userId: userId,
+        onboardingComplete: json['onboardingComplete'] as bool? ?? false);
   }
 
   /// Completes the small, personalization-only onboarding contract.

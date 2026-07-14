@@ -38,4 +38,27 @@ void main() {
     expect(find.text('Needs review'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('audit_d4_injection_description_renders_as_inert_text',
+      (tester) async {
+    const shaped = '<script>alert("wealth")</script>';
+    final transaction = SproutTransaction(
+      id: 'inert',
+      merchant: shaped,
+      amount: 1,
+      currency: 'PKR',
+      date: DateTime(2026, 7, 15),
+      category: "'); DROP TABLE users; --",
+      note: '',
+      type: TransactionType.expense,
+      source: TransactionSource.manual,
+      needsReview: false,
+    );
+    await tester.pumpWidget(MaterialApp(
+        theme: buildSproutTheme(),
+        home: Scaffold(body: TransactionRow(transaction: transaction))));
+    expect(find.text(shaped), findsOneWidget);
+    expect(find.byType(Text), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
 }

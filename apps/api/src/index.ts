@@ -15,6 +15,7 @@ import { pendingRoute } from "./routes/pending.js";
 import { incomeRoute } from "./routes/income.js";
 import { uploadRoute } from "./routes/upload.js";
 import { opsRoute } from "./routes/ops.js";
+import { recurringRoute } from "./routes/recurring.js";
 import { runDailyJobForAllUsers } from "./services/job-runner.js";
 import { pool } from "./db/client.js";
 
@@ -73,6 +74,9 @@ app.get("/ready", async (c) => {
 });
 
 app.onError((error, c) => {
+  if (error instanceof SyntaxError) {
+    return c.json({ error: "Malformed JSON", code: "INVALID_JSON" }, 400);
+  }
   console.error(JSON.stringify({
     event: "unhandled_error",
     requestId: c.res.headers.get("X-Request-Id"),
@@ -98,6 +102,7 @@ app.route("/v1/pending", pendingRoute);
 app.route("/v1/income", incomeRoute);
 app.route("/v1/upload", uploadRoute);
 app.route("/v1/ops", opsRoute);
+app.route("/v1/recurring", recurringRoute);
 
 // ── Briefing (daily + on-demand) ─────────────────────────────────────────────
 app.route("/v1/briefing", briefingRoute);

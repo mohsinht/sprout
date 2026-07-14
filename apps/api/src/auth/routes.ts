@@ -78,7 +78,7 @@ authRoute.post("/register", async (c) => {
   const refreshToken = await issueRefreshToken(user.id, { id: deviceId, name: deviceName });
   auditEvent("account_registered", user.id, { deviceId, deviceName: deviceName ?? null });
 
-  return c.json({ accessToken, refreshToken, userId: user.id }, 201);
+  return c.json({ accessToken, refreshToken, userId: user.id, onboardingComplete: false }, 201);
 });
 
 const LoginSchema = z.object({
@@ -112,7 +112,9 @@ authRoute.post("/login", async (c) => {
   const refreshToken = await issueRefreshToken(user.id, { id: deviceId, name: deviceName });
   auditEvent("session_created", user.id, { deviceId, deviceName: deviceName ?? null });
 
-  return c.json({ accessToken, refreshToken, userId: user.id });
+  const [profile] = await db.select({ onboardingComplete: schema.profiles.onboardingComplete })
+    .from(schema.profiles).where(eq(schema.profiles.userId, user.id)).limit(1);
+  return c.json({ accessToken, refreshToken, userId: user.id, onboardingComplete: profile?.onboardingComplete ?? false });
 });
 
 const RefreshSchema = z.object({
@@ -134,7 +136,9 @@ authRoute.post("/refresh", async (c) => {
   const accessToken = signAccessToken(result.userId);
   const refreshToken = await issueRefreshToken(result.userId, { id: body.data.deviceId });
 
-  return c.json({ accessToken, refreshToken });
+  const [profile] = await db.select({ onboardingComplete: schema.profiles.onboardingComplete })
+    .from(schema.profiles).where(eq(schema.profiles.userId, result.userId)).limit(1);
+  return c.json({ accessToken, refreshToken, onboardingComplete: profile?.onboardingComplete ?? false });
 });
 
 authRoute.post("/logout", async (c) => {

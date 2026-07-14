@@ -33,29 +33,48 @@ const HoldingValuesSchema = z.object({
   units: z.number().nonnegative().optional(),
   valueNative: z.number().nonnegative().optional(),
   valuePkr: z.number().int().nonnegative().default(0),
-  priceAsOf: z.string().optional(),
+  priceAsOf: z.string().date().optional(),
   priceSource: z.string().optional(),
   freshness: z.enum(["fresh", "stale", "manual", "unavailable"]).default("manual"),
 });
 
-function hasValidProvenance(value: {
+function provenanceIssue(value: {
   kind?: string;
   currency?: string;
   freshness?: string;
   priceAsOf?: string;
   priceSource?: string;
-}): boolean {
-  if (value.freshness !== "fresh") return true;
-  if (value.kind === "cash" && value.currency === "PKR") return false;
-  return Boolean(value.priceAsOf?.trim() && value.priceSource?.trim());
+}): string | null {
+  if (value.priceAsOf) {
+    const asOf = new Date(`${value.priceAsOf}T00:00:00Z`);
+    const ageDays = Math.floor((Date.now() - asOf.getTime()) / 86_400_000);
+    if (ageDays < 0) return "Valuation dates cannot be in the future";
+    if (ageDays > 400) return "Valuation date is beyond the supported history horizon";
+  }
+  if (value.kind === "cash" && value.currency === "PKR" && value.freshness === "fresh") {
+    return "Manual PKR cash must use manual freshness";
+  }
+  if (value.freshness !== "fresh") return null;
+  if (!value.priceAsOf?.trim() || !value.priceSource?.trim()) {
+    return "Fresh valuations require a dated price/FX source";
+  }
+  return null;
+}
+
+function computedFreshness(value: { kind: string; currency: string; priceAsOf?: string }) {
+  if (value.kind === "cash" && value.currency === "PKR") return "manual" as const;
+  if (!value.priceAsOf) return "unavailable" as const;
+  const ageDays = Math.floor((Date.now() - new Date(`${value.priceAsOf}T00:00:00Z`).getTime()) / 86_400_000);
+  return ageDays <= (value.kind === "cash" ? 1 : 2) ? "fresh" as const : "stale" as const;
 }
 
 const CreateHoldingSchema = HoldingValuesSchema.superRefine((value, ctx) => {
-  if (!hasValidProvenance(value)) {
+  const issue = provenanceIssue(value);
+  if (issue) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["freshness"],
-      message: "Fresh valuations require a dated price/FX source; manual PKR cash must use manual freshness.",
+      message: issue,
     });
   }
 });
@@ -72,6 +91,7 @@ holdingsRoute.post("/", async (c) => {
     .values({
       userId,
       ...body.data,
+      freshness: computedFreshness(body.data),
       units: body.data.units?.toString(),
       valueNative: body.data.valueNative?.toString(),
     })
@@ -86,7 +106,7 @@ const UpdateHoldingSchema = z.object({
   units: z.number().nonnegative().optional(),
   valueNative: z.number().nonnegative().optional(),
   valuePkr: z.number().int().nonnegative().optional(),
-  priceAsOf: z.string().optional(),
+  priceAsOf: z.string().date().optional(),
   priceSource: z.string().optional(),
   freshness: z.enum(["fresh", "stale", "manual", "unavailable"]).optional(),
   label: z.string().min(1).max(200).optional(),
@@ -108,14 +128,15 @@ holdingsRoute.patch("/:id", async (c) => {
     .limit(1);
   if (!existing) return c.json({ error: "Holding not found" }, 404);
 
-  if (!hasValidProvenance({
+  const issue = provenanceIssue({
     kind: existing.kind,
     currency: existing.currency,
     freshness: body.data.freshness ?? existing.freshness,
     priceAsOf: body.data.priceAsOf ?? existing.priceAsOf ?? undefined,
     priceSource: body.data.priceSource ?? existing.priceSource ?? undefined,
-  })) {
-    return c.json({ error: "Fresh valuations require a dated price/FX source" }, 400);
+  });
+  if (issue) {
+    return c.json({ error: issue }, 400);
   }
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -124,7 +145,13 @@ holdingsRoute.patch("/:id", async (c) => {
   if (body.data.valuePkr !== undefined) updates.valuePkr = body.data.valuePkr;
   if (body.data.priceAsOf !== undefined) updates.priceAsOf = body.data.priceAsOf;
   if (body.data.priceSource !== undefined) updates.priceSource = body.data.priceSource;
-  if (body.data.freshness !== undefined) updates.freshness = body.data.freshness;
+  if (body.data.freshness !== undefined || body.data.priceAsOf !== undefined) {
+    updates.freshness = computedFreshness({
+      kind: existing.kind,
+      currency: existing.currency,
+      priceAsOf: body.data.priceAsOf ?? existing.priceAsOf ?? undefined,
+    });
+  }
   if (body.data.label !== undefined) updates.label = body.data.label;
   if (body.data.institution !== undefined) updates.institution = body.data.institution;
 

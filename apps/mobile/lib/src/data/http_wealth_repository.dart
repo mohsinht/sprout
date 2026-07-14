@@ -6,13 +6,14 @@ import 'mock_wealth_repository.dart';
 
 /// Whether to use mock data or the real API.
 ///
-/// Set via --dart-define=USE_MOCK=false to use the real backend.
+/// Set via --dart-define=SPROUT_ENV=dev=false to use the real backend.
 /// Default is true (mock) so the app works offline without a backend.
-const _useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+const _useMock =
+    String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') == 'dev';
 
 /// Provider for the wealth briefing repository.
 ///
-/// Returns the HTTP implementation when USE_MOCK=false, otherwise the mock.
+/// Returns the HTTP implementation when SPROUT_ENV=dev=false, otherwise the mock.
 /// This is the single swap point — screens consume this provider, never the
 /// concrete implementation.
 final wealthBriefingRepositoryProvider =

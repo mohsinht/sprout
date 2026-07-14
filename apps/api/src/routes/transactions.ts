@@ -4,6 +4,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { authMiddleware } from "../auth/middleware.js";
 import { dedupeFingerprint } from "../lib/dedupe.js";
+import { materializeSalaryDayOccurrences } from "../services/recurring-service.js";
 
 export const transactionsRoute = new Hono<{ Variables: { userId: string } }>();
 
@@ -34,7 +35,7 @@ const CreateTransactionSchema = z.object({
   category: z.string().min(1).max(100),
   merchant: z.string().max(200).optional(),
   note: z.string().max(500).optional(),
-  occurredAt: z.string().optional(), // ISO; defaults to now
+  occurredAt: z.string().datetime({ offset: true }).optional(), // ISO; defaults to now
   source: z.enum(["manual", "sms", "email", "statement", "wise", "al_meezan"]).default("manual"),
   provider: z.string().max(200).optional(),
   confidence: z.number().min(0).max(1).default(1),
@@ -100,6 +101,10 @@ transactionsRoute.post("/", async (c) => {
       confidence: txData.confidence.toString(),
     })
     .returning();
+
+  if (tx.type === "income" && tx.category.toLowerCase() === "salary") {
+    await materializeSalaryDayOccurrences(userId, tx.occurredAt);
+  }
 
   return c.json(tx, 201);
 });

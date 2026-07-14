@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sprout
+          POSTGRES_PASSWORD: sprout
+          POSTGRES_DB: sprout
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sprout -d sprout"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sprout/api db:migrate
+        env:
+          DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
+      - run: pnpm check
+      - run: pnpm dev:api > /tmp/sprout-api.log 2>&1 &
+        env:
+          DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
+          JWT_SECRET: ci-only-jwt-secret-at-least-thirty-two-characters
+          CRON_SECRET: ci-only-cron-secret-at-least-thirty-two-characters
+      - run: pnpm --filter @sprout/api test
+        env:
+          API_BASE_URL: http://127.0.0.1:8787
+      - run: pnpm test:score
+        env:
+          API_BASE_URL: http://127.0.0.1:8787
+      - run: pnpm test:personas
+        env:
+          API_BASE_URL: http://127.0.0.1:8787
+      - run: flutter analyze
+        working-directory: apps/mobile
+      - run: flutter test --dart-define=SPROUT_ENV=dev
+        working-directory: apps/mobile
+      - run: pnpm test:no-mocks

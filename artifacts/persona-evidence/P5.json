@@ -1,0 +1,27 @@
+{
+  "id": "P5",
+  "name": "Quiet-week user",
+  "mocks": "disabled",
+  "assertions": [
+    "fresh tenant created",
+    "onboarding persisted",
+    "profile readable"
+  ],
+  "steps": [
+    {
+      "method": "POST",
+      "path": "/v1/auth/register",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/v1/profile/onboarding",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/v1/profile",
+      "status": 200
+    }
+  ]
+}

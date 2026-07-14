@@ -73,11 +73,12 @@ export interface ManualAdjustment {
 /** Determine freshness based on how old the price/FX date is. */
 export function determineFreshness(
   priceAsOf: string | null | undefined,
-  kind: string
+  kind: string,
+  referenceDate = new Date().toISOString().slice(0, 10),
 ): "fresh" | "stale" | "manual" | "unavailable" | "estimated" {
   if (!priceAsOf) return "unavailable";
   const ageDays = Math.floor(
-    (Date.now() - new Date(priceAsOf).getTime()) / (1000 * 60 * 60 * 24)
+    (new Date(`${referenceDate}T12:00:00Z`).getTime() - new Date(`${priceAsOf}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24)
   );
   const threshold = kind === "cash" ? config.staleFxDays : config.staleNavDays;
   if (ageDays <= threshold) return "fresh";

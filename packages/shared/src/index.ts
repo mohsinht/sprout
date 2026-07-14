@@ -9,4 +9,5 @@ export * from "./mock-profile.js";
 export * from "./grow.js";
 export * from "./mock-grow.js";
 export * from "./wealth.js";
+export * from "./scoring.js";
 export * from "./mock-wealth.js";

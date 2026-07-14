@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/api/sprout_api_client.dart';
 import '../../data/onboarding_store.dart';
+import '../../data/auth_store.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
 import '../../widgets/sprout_mascot.dart';
@@ -98,6 +99,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         goalType: amount == null ? null : _goalType,
         targetAmount: amount,
       );
+      await ref.read(authSessionProvider.notifier).markOnboardingComplete();
     } on SproutApiException catch (error) {
       if (error.statusCode != 401 && error.statusCode != 403) {
         // Sync is intentionally non-blocking; the local draft is safe.

@@ -1,0 +1,27 @@
+{
+  "id": "P1",
+  "name": "Empty-handed",
+  "mocks": "disabled",
+  "assertions": [
+    "skip-all onboarding completes",
+    "Today is populated",
+    "zero external connections works"
+  ],
+  "steps": [
+    {
+      "method": "POST",
+      "path": "/v1/auth/register",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/v1/profile/onboarding",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/v1/briefing/refresh",
+      "status": 200
+    }
+  ]
+}

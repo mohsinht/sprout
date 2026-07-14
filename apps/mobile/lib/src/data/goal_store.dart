@@ -22,7 +22,8 @@ class GoalStore extends StateNotifier<List<Goal>> {
   }
 
   static const _storageKey = 'goals.local.v1';
-  static const _useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+  static const _useMock =
+      String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') == 'dev';
   final Ref _ref;
 
   static final List<Goal> _mockInitial = _useMock

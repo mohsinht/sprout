@@ -152,7 +152,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+    const useMock =
+        String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') ==
+            'dev';
     if (!useMock) {
       _profileName = 'friend';
       _monthlyIncome = null;
@@ -650,7 +652,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+    const useMock =
+        String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') ==
+            'dev';
     final session = ref.watch(authSessionProvider);
     if (!useMock && session != null && !_profileLoaded) {
       _profileLoaded = true;

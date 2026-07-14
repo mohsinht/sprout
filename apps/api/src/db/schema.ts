@@ -139,6 +139,9 @@ export const dataSourceStatusEnum = pgEnum("data_source_status", [
   "not_connected",
   "error",
 ]);
+export const recurringKindEnum = pgEnum("recurring_kind", ["liability", "expected_income"]);
+export const recurringFrequencyEnum = pgEnum("recurring_frequency", ["monthly", "on_salary_day"]);
+export const occurrenceStatusEnum = pgEnum("occurrence_status", ["upcoming", "ask_pending", "confirmed", "skipped", "stopped"]);
 
 // ── Tables ──────────────────────────────────────────────────────────────────
 
@@ -190,6 +193,7 @@ export const profiles = pgTable("profiles", {
     hideSensitiveAmounts: true,
   }),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  timezone: varchar("timezone", { length: 100 }).notNull().default("Asia/Karachi"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -271,6 +275,19 @@ export const fxRates = pgTable("fx_rates", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [uniqueIndex("fx_rates_source_pair_date_idx").on(t.pair, t.asOf, t.source)]);
 
+export const navCrossValidations = pgTable("nav_cross_validations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  instrument: varchar("instrument", { length: 100 }).notNull(),
+  asOf: date("as_of").notNull(),
+  primarySource: text("primary_source").notNull(),
+  validationSource: text("validation_source").notNull(),
+  primaryValue: numeric("primary_value", { precision: 20, scale: 8 }).notNull(),
+  validationValue: numeric("validation_value", { precision: 20, scale: 8 }).notNull(),
+  differenceRatio: numeric("difference_ratio", { precision: 12, scale: 8 }).notNull(),
+  matched: boolean("matched").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("nav_cross_validation_instrument_date_idx").on(t.instrument, t.asOf, t.primarySource, t.validationSource)]);
+
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
@@ -337,8 +354,11 @@ export const dailyBriefings = pgTable("daily_briefings", {
   mascotMood: mascotMoodEnum("mascot_mood").notNull().default("content"),
   greeting: text("greeting").notNull(),
   summary: text("summary").notNull(),
-  healthScore: integer("health_score").notNull(),
-  healthStatus: varchar("health_status", { length: 20 }).notNull(),
+  healthScore: integer("health_score"),
+  healthStatus: varchar("health_status", { length: 20 }),
+  scoreState: varchar("score_state", { length: 30 }).notNull().default("available"),
+  scoreExplanation: text("score_explanation").notNull().default(""),
+  scoreFactorsJson: jsonb("score_factors_json").notNull().default([]),
   wealthSnapshotJson: jsonb("wealth_snapshot_json").notNull(),
   wealthEventsJson: jsonb("wealth_events_json").notNull(),
   learnThreadsJson: jsonb("learn_threads_json"),
@@ -431,3 +451,29 @@ export const projectedIncome = pgTable("projected_income", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const recurringSeries = pgTable("recurring_series", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  kind: recurringKindEnum("kind").notNull(),
+  frequency: recurringFrequencyEnum("frequency").notNull(),
+  amount: integer("amount").notNull(),
+  label: text("label").notNull(),
+  timezone: varchar("timezone", { length: 100 }).notNull(),
+  anchorDay: integer("anchor_day"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const recurringOccurrences = pgTable("recurring_occurrences", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  seriesId: uuid("series_id").notNull().references(() => recurringSeries.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  localDate: date("local_date").notNull(),
+  status: occurrenceStatusEnum("status").notNull().default("upcoming"),
+  askEmittedAt: timestamp("ask_emitted_at", { withTimezone: true }),
+  confirmedTransactionId: uuid("confirmed_transaction_id").references(() => transactions.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("recurring_occurrence_series_date_idx").on(t.seriesId, t.localDate)]);

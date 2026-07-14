@@ -379,6 +379,9 @@ export const mockRecommendedAction: WealthBriefingAction = {
 // ── Full Wealth Briefing ─────────────────────────────────────────────────────
 
 export const mockWealthBriefing: WealthBriefing = {
+  scoreState: "available",
+  scoreExplanation: "Score based on 8 of 8 factors.",
+  scoreFactors: [],
   id: "briefing-2026-07-08",
   userId: "user-mohsin",
   briefingDate: "2026-07-08",

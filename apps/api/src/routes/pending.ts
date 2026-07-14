@@ -27,7 +27,7 @@ pendingRoute.get("/", async (c) => {
 const CreatePendingSchema = z.object({
   amountPkr: z.number().int().positive(),
   destination: z.string().min(1).max(300),
-  initiatedOn: z.string(),
+  initiatedOn: z.string().date(),
   note: z.string().max(500).optional(),
 });
 

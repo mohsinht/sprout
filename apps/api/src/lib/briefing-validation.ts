@@ -1,6 +1,5 @@
 import type { WealthBriefing, WealthBriefingAction } from "@sprout/shared";
 import { WealthBriefingSchema } from "@sprout/shared";
-import type { ScoreResult, Severity } from "./scoring.js";
 
 /** Validate the final briefing against the Zod schema. Reject invalid output. */
 export function validateBriefing(briefing: unknown): WealthBriefing {
@@ -64,12 +63,20 @@ export function checkGuardrails(briefing: WealthBriefing): string[] {
     violations.push("WealthSnapshot missing changeVsYesterday or changeMtd");
   }
 
+  const hasMovement = briefing.wealthSnapshot.changeVsYesterday !== 0 || briefing.wealthSnapshot.changeMtd !== 0;
+  if (hasMovement) {
+    const reason = briefing.wealthSnapshot.mainReason.trim().toLowerCase();
+    if (!reason || !briefing.summary.toLowerCase().includes(reason)) {
+      violations.push("Movement summary is missing its plain-language driver");
+    }
+  }
+
   return violations;
 }
 
 /** Select the recommended action per scoring_model.md priority order. */
 export function selectRecommendedAction(params: {
-  score: ScoreResult;
+  score: { attentionFactors: { id: string; contribution: number }[] };
   goals: { id: string; name: string; targetAmount: number; currentAmount: number; remainingToTarget: number }[];
   holdings: { id: string; label: string; valuePkr: number }[];
   unconfirmedCount: number;
@@ -204,10 +211,17 @@ export function deterministicSummary(params: {
 }): string {
   const { changeVsYesterday, changeMtd, mainReason } = params;
   const todayDir = changeVsYesterday > 0 ? "Up" : changeVsYesterday < 0 ? "Down" : "Steady";
-  const mtdDir = changeMtd > 0 ? "still up" : changeMtd < 0 ? "still down" : "flat";
+  const mtdPhrase = changeMtd > 0
+    ? `still up PKR ${Math.abs(changeMtd).toLocaleString()} this month`
+    : changeMtd < 0
+      ? `still down PKR ${Math.abs(changeMtd).toLocaleString()} this month`
+      : "steady this month";
 
   if (changeVsYesterday < 0) {
-    return `${todayDir} PKR ${Math.abs(changeVsYesterday).toLocaleString()} today — ${mainReason.toLowerCase()}, not a crash. ${mtdDir} PKR ${Math.abs(changeMtd).toLocaleString()} this month.`;
+    return `${todayDir} PKR ${Math.abs(changeVsYesterday).toLocaleString()} today — ${mainReason.toLowerCase()}, not a crash. ${mtdPhrase}.`;
   }
-  return `${todayDir} PKR ${Math.abs(changeVsYesterday).toLocaleString()} today. ${mtdDir} PKR ${Math.abs(changeMtd).toLocaleString()} this month.`;
+  if (changeVsYesterday > 0) {
+    return `${todayDir} PKR ${Math.abs(changeVsYesterday).toLocaleString()} today — ${mainReason.toLowerCase()}. ${mtdPhrase}. Calm progress.`;
+  }
+  return `Steady today. ${mtdPhrase[0].toUpperCase()}${mtdPhrase.slice(1)}.`;
 }

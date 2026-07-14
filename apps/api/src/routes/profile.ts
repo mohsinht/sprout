@@ -7,6 +7,10 @@ import { auditEvent } from "../lib/audit.js";
 
 export const profileRoute = new Hono<{ Variables: { userId: string } }>();
 
+const IanaTimezoneSchema = z.string().refine((zone) => {
+  try { new Intl.DateTimeFormat("en", { timeZone: zone }); return true; } catch { return false; }
+}, "Invalid IANA timezone");
+
 profileRoute.use("*", authMiddleware);
 
 // ── GET /v1/profile ──────────────────────────────────────────────────────────
@@ -51,6 +55,7 @@ const UpdateProfileSchema = z.object({
   soundEffects: z.boolean().optional(),
   haptics: z.boolean().optional(),
   displayCurrency: z.string().length(3).optional(),
+  timezone: IanaTimezoneSchema.optional(),
   notificationPreferences: z.record(z.boolean()).optional(),
 });
 

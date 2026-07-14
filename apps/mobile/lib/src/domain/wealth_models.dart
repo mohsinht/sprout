@@ -289,6 +289,8 @@ class WealthBriefing {
     required this.mascotMood,
     required this.greeting,
     required this.summary,
+    required this.scoreState,
+    required this.scoreExplanation,
     required this.healthScore,
     required this.healthStatus,
     required this.wealthSnapshot,
@@ -310,8 +312,10 @@ class WealthBriefing {
   final WealthMascotMood mascotMood;
   final String greeting;
   final String summary;
-  final int healthScore;
-  final WealthHealthStatus healthStatus;
+  final String scoreState;
+  final String scoreExplanation;
+  final int? healthScore;
+  final WealthHealthStatus? healthStatus;
   final WealthSnapshot wealthSnapshot;
   final List<WealthEvent> wealthEvents;
   final List<LearnThread> learnThreads;
@@ -493,8 +497,12 @@ WealthBriefing wealthBriefingFromApiJson(Map<String, dynamic> json) {
     mascotMood: _wealthMascotMoodFromString(json['mascotMood'] as String),
     greeting: json['greeting'] as String,
     summary: json['summary'] as String,
-    healthScore: json['healthScore'] as int,
-    healthStatus: _wealthHealthStatusFromString(json['healthStatus'] as String),
+    scoreState: json['scoreState'] as String? ?? 'available',
+    scoreExplanation: json['scoreExplanation'] as String? ?? '',
+    healthScore: json['healthScore'] as int?,
+    healthStatus: json['healthStatus'] == null
+        ? null
+        : _wealthHealthStatusFromString(json['healthStatus'] as String),
     wealthSnapshot: wealthSnapshotFromApiJson(
       json['wealthSnapshot'] as Map<String, dynamic>,
     ),

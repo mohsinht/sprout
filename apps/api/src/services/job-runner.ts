@@ -2,6 +2,7 @@ import { eq, and, desc, count, gte } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { config } from "../config.js";
 import { generateBriefing, storeBriefing, getLatestBriefing } from "./briefing-pipeline.js";
+import { localDateAt } from "../lib/recurring.js";
 
 /**
  * Job runner with idempotency. The daily job can run twice without duplicating data.
@@ -16,7 +17,8 @@ export interface JobResult {
 
 /** Run the daily briefing job for a user. Idempotent. */
 export async function runDailyBriefingJob(userId: string, date?: string): Promise<JobResult> {
-  const briefingDate = date ?? new Date().toISOString().slice(0, 10);
+  const [profile] = await db.select({ timezone: schema.profiles.timezone }).from(schema.profiles).where(eq(schema.profiles.userId, userId)).limit(1);
+  const briefingDate = date ?? localDateAt(new Date(), profile?.timezone ?? "Asia/Karachi");
   const idempotencyKey = `daily:${userId}:${briefingDate}`;
 
   // Check for existing job run with same idempotency key

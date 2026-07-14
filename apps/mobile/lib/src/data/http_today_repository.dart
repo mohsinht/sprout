@@ -10,7 +10,7 @@ import 'mock_today_repository.dart';
 
 /// Provider for the today repository.
 ///
-/// Returns the HTTP implementation when USE_MOCK=false, otherwise the mock.
+/// Returns the HTTP implementation when SPROUT_ENV=dev=false, otherwise the mock.
 /// The HTTP implementation fetches a WealthBriefing from the API and maps
 /// it to TodayData via the bridge mapper.
 final todayRepositoryProvider = Provider<TodayRepository>((ref) {
@@ -20,7 +20,8 @@ final todayRepositoryProvider = Provider<TodayRepository>((ref) {
   return HttpTodayRepository(ref.read(apiClientProvider));
 });
 
-const _useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+const _useMock =
+    String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') == 'dev';
 
 abstract interface class TodayRepository {
   Future<TodayData> fetchToday();

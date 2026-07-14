@@ -196,6 +196,20 @@ await request("/v1/holdings", {
 });
 check(true, "fresh holdings require valid provenance and manual PKR cash stays manual");
 
+await request("/v1/holdings", {
+  method: "POST", expected: 400,
+  body: { kind: "mutual_fund", institution: "Audit", label: "Stale", currency: "PKR", units: 1, valuePkr: 100, priceAsOf: "2000-01-01", priceSource: "Audit", freshness: "fresh" },
+});
+await request("/v1/holdings", {
+  method: "POST", expected: 400,
+  body: { kind: "mutual_fund", institution: "Audit", label: "Invalid", currency: "PKR", units: 1, valuePkr: 100, priceAsOf: "not-a-date", priceSource: "Audit", freshness: "fresh" },
+});
+await request("/v1/holdings", {
+  method: "POST", expected: 400,
+  body: { kind: "mutual_fund", institution: "Audit", label: "Source only", currency: "PKR", units: 1, valuePkr: 100, priceSource: "Audit", freshness: "fresh" },
+});
+check(true, "audit_a6_stale_provenance_rejected");
+
 const refresh = await request("/v1/briefing/refresh", {
   method: "POST",
   body: { contextChanged: true },
@@ -207,11 +221,50 @@ check(refresh.data.projectedIncome?.every((row) => row.inCurrentWealth === false
 const current = await request("/v1/briefing");
 check(current.data.goals.length === 2 && current.data.wealthSnapshot, "Today briefing is fetchable end to end");
 
+const wealthBeforeRecurring = current.data.wealthSnapshot.totalPkr;
+await request("/v1/recurring/series", {
+  method: "POST", expected: 201,
+  body: { kind: "liability", frequency: "monthly", amount: 9000, label: "Rent", anchorDay: 1, timezone: "Asia/Karachi" },
+});
+await request("/v1/recurring/generate", { method: "POST", body: {} });
+let asks = await request("/v1/recurring/asks");
+const rentAsk = asks.data.asks.find((ask) => ask.question.startsWith("Rent "));
+check(Boolean(rentAsk), "audit_b5_missed_occurrence_emits_one_contextual_ask");
+await request(`/v1/recurring/occurrences/${rentAsk.id}/respond`, { method: "POST", body: { outcome: "no" } });
+const afterSkip = await request("/v1/briefing/refresh", { method: "POST", body: { contextChanged: true } });
+check(afterSkip.data.wealthSnapshot.totalPkr === wealthBeforeRecurring, "audit_b5_skip_does_not_mutate_wealth");
+
+await request("/v1/recurring/series", {
+  method: "POST", expected: 201,
+  body: { kind: "liability", frequency: "monthly", amount: 9000, label: "Utilities", anchorDay: 1, timezone: "Asia/Karachi" },
+});
+await request("/v1/recurring/generate", { method: "POST", body: {} });
+asks = await request("/v1/recurring/asks");
+const utilityAsk = asks.data.asks.find((ask) => ask.question.startsWith("Utilities "));
+await request(`/v1/recurring/occurrences/${utilityAsk.id}/respond`, { method: "POST", body: { outcome: "yes", accountId: account.data.id } });
+const afterYes = await request("/v1/briefing/refresh", { method: "POST", body: { contextChanged: true } });
+check(afterYes.data.wealthSnapshot.totalPkr === wealthBeforeRecurring - 9000, "audit_b5_only_yes_changes_wealth_via_confirmed_transaction");
+
 const importsDisabled = await request("/v1/upload/baselines", { expected: 503 });
 check(
   importsDisabled.data.code === "FEATURE_DISABLED",
   "structured imports fail closed until explicitly enabled",
 );
+
+await request("/v1/transactions", {
+  method: "POST", expected: 400,
+  body: { amount: -1, currency: "PKR", type: "expense", category: "Food" },
+});
+await request("/v1/transactions", {
+  method: "POST", expected: 400,
+  body: { amount: 1, currency: "PKR", type: "expense", category: "Food", occurredAt: "not-a-date" },
+});
+const malformed = await fetch(`${baseUrl}/v1/transactions`, {
+  method: "POST",
+  headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+  body: '{"amount":',
+});
+check(malformed.status === 400, "audit_d4_malformed_input_never_500");
 
 let lastLoginStatus = 0;
 for (let index = 0; index < 11; index += 1) {

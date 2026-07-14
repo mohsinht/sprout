@@ -15,6 +15,13 @@
       "when": 1784059831346,
       "tag": "0001_lush_vector",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784063658919,
+      "tag": "0002_sudden_calypso",
+      "breakpoints": true
     }
   ]
 }

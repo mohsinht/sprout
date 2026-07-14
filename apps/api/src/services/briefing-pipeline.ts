@@ -1,9 +1,13 @@
 import { eq, and, desc } from "drizzle-orm";
-import type { WealthBriefing, WealthTrendPoint } from "@sprout/shared";
+import { calculatePresenceScore, type FactorPresenceInputs, type WealthBriefing, type WealthTrendPoint } from "@sprout/shared";
 import { db, schema } from "../db/client.js";
 import { config } from "../config.js";
 import { createFxSource } from "../sources/fx-source.js";
 import { createNavSource } from "../sources/nav-source.js";
+import type { NavSource } from "../sources/nav-source.js";
+import type { FxSource } from "../sources/fx-source.js";
+import { MufapNavSource } from "../sources/nav-source.js";
+import { compareNavs } from "../lib/nav-validation.js";
 import {
   computeHoldingValuePkr,
   determineFreshness,
@@ -16,10 +20,8 @@ import {
   type ManualAdjustment,
 } from "../lib/wealth.js";
 import {
-  calculateWealthHealthScore,
   computeTrendStability,
   computeDiversification,
-  type ScoreInputs,
 } from "../lib/scoring.js";
 import {
   selectRecommendedAction,
@@ -59,6 +61,9 @@ export async function generateBriefing(params: {
   userId: string;
   date?: string;
   aiService?: AiService;
+  navSource?: NavSource;
+  fxSource?: FxSource;
+  validationNavSource?: NavSource;
 }): Promise<BriefingResult> {
   const { userId } = params;
   const date = params.date ?? new Date().toISOString().slice(0, 10);
@@ -81,6 +86,10 @@ export async function generateBriefing(params: {
     .select()
     .from(schema.holdings)
     .where(eq(schema.holdings.userId, userId));
+  const recurringRows = await db.select({ occurrence: schema.recurringOccurrences, series: schema.recurringSeries })
+    .from(schema.recurringOccurrences)
+    .innerJoin(schema.recurringSeries, eq(schema.recurringSeries.id, schema.recurringOccurrences.seriesId))
+    .where(eq(schema.recurringOccurrences.userId, userId));
 
   const accountRows = await db
     .select()
@@ -114,8 +123,9 @@ export async function generateBriefing(params: {
   const monthStartSnapshot = priorSnapshots.find((s) => s.date === monthStart);
 
   // ── 2. Fetch prices/FX ──────────────────────────────────────────────────────
-  const fxSource = createFxSource();
-  const navSource = createNavSource();
+  const fxSource = params.fxSource ?? createFxSource();
+  const navSource = params.navSource ?? createNavSource();
+  const validationNavSource = params.validationNavSource ?? (config.features.valuationExposureEnabled ? new MufapNavSource() : undefined);
 
   const fxCache = new Map<string, import("@sprout/shared").FxRate>();
   for (const h of holdingRows) {
@@ -145,7 +155,20 @@ export async function generateBriefing(params: {
   for (const h of holdingRows) {
     if (h.kind === "mutual_fund" && h.fundCode && !navCache.has(h.fundCode)) {
       const nav = await navSource.fetchNav(h.fundCode);
-      if (nav) navCache.set(h.fundCode, nav);
+      if (nav && validationNavSource) {
+        const validation = await validationNavSource.fetchNav(h.fundCode);
+        if (validation && validation.asOf === nav.asOf) {
+          const compared = compareNavs(nav.value, validation.value);
+          await db.insert(schema.navCrossValidations).values({
+            instrument: h.fundCode, asOf: nav.asOf, primarySource: nav.source,
+            validationSource: validation.source, primaryValue: String(nav.value), validationValue: String(validation.value),
+            differenceRatio: String(compared.differenceRatio), matched: compared.matched,
+          }).onConflictDoNothing();
+          if (compared.matched) navCache.set(h.fundCode, nav);
+        }
+      } else if (nav && !config.features.valuationExposureEnabled) {
+        navCache.set(h.fundCode, nav);
+      }
     }
   }
 
@@ -177,7 +200,7 @@ export async function generateBriefing(params: {
     const priceAsOf = price?.asOf ?? fxRate?.asOf ?? h.priceAsOf ?? null;
     const freshness = h.kind === "cash" && h.currency === "PKR"
       ? "manual" as const
-      : determineFreshness(priceAsOf, h.kind);
+      : determineFreshness(priceAsOf, h.kind, date);
 
     // Determine if there are adjustments since the baseline
     const hasAdjustmentsSinceBaseline =
@@ -251,7 +274,7 @@ export async function generateBriefing(params: {
     const fxRate = account.currency === "PKR" ? undefined : fxCache.get(account.currency);
     const freshness = account.currency === "PKR"
       ? "manual" as const
-      : determineFreshness(fxRate?.asOf, "cash");
+      : determineFreshness(fxRate?.asOf, "cash", date);
 
     enrichedHoldings.push({
       id: account.id,
@@ -336,6 +359,28 @@ export async function generateBriefing(params: {
     priorHoldings: priorHoldingsMap,
     pendingInvestments,
   });
+  for (const holding of enrichedHoldings.filter((item) => item.kind === "cash" && item.currency !== "PKR" && item.freshness === "unavailable")) {
+    wealthEvents.push({
+      id: `event-unavailable-fx-${holding.id}-${date}`,
+      date,
+      holdingId: holding.id,
+      kind: "fx_move",
+      magnitudePkr: 0,
+      direction: "flat",
+      plainWhy: `${holding.label} is excluded from total wealth because a dated ${holding.currency}/PKR FX rate is unavailable.`,
+      severity: "heads_up",
+    });
+  }
+  const upcomingLiabilities = recurringRows.filter(({ occurrence, series }) =>
+    series.kind === "liability" && (occurrence.status === "upcoming" || occurrence.status === "ask_pending"));
+  if (upcomingLiabilities.length > 0) {
+    const total = upcomingLiabilities.reduce((sum, row) => sum + row.series.amount, 0);
+    wealthEvents.push({
+      id: `event-upcoming-liability-${date}`, date, kind: "bill", magnitudePkr: 0, direction: "flat",
+      plainWhy: `PKR ${total.toLocaleString()} in recurring liabilities is upcoming. Nothing is deducted until you confirm it.`,
+      severity: "heads_up",
+    });
+  }
 
   // ── 8. Compute score ────────────────────────────────────────────────────────
   const activeGoals = goalRows
@@ -349,36 +394,30 @@ export async function generateBriefing(params: {
     });
   const goalPaceRatio = activeGoals.length > 0
     ? activeGoals.reduce((sum, g) => sum + g.currentAmount / g.targetAmount, 0) / activeGoals.length
-    : 0;
+    : null;
 
   const holdingValues = enrichedHoldings.map((h) => h.valuePkr);
-  const diversificationRatio = computeDiversification(holdingValues);
+  const diversificationRatio = holdingValues.length > 0 && !enrichedHoldings.some((h) => h.freshness === "unavailable")
+    ? computeDiversification(holdingValues) : null;
   const dailyTotals = recentTrend.map((t) => t.totalPkr);
-  const trendStabilityRatio = computeTrendStability(dailyTotals);
+  const trendStabilityRatio = dailyTotals.length >= 2 ? computeTrendStability(dailyTotals) : null;
 
   const unconfirmedCount = txRows.filter((t) => t.needsReview).length;
-  const stalePriceCount = enrichedHoldings.filter((h) => h.freshness === "stale").length;
-
-  const pkrCash = enrichedHoldings
-    .filter((h) => h.kind === "cash" && h.currency === "PKR")
-    .reduce((sum, h) => sum + h.valuePkr, 0);
-  const monthlyExpensesEstimate = 100000;
-  const emergencyBufferMonths = pkrCash / monthlyExpensesEstimate;
-  const contributionConsistencyRatio = 0.5;
-
-  const scoreInputs: ScoreInputs = {
-    goalPaceRatio,
-    emergencyBufferMonths,
-    contributionConsistencyRatio,
-    diversificationRatio,
-    trendStabilityRatio,
-    upcomingBillsCoverageRatio: 1,
-    debtPaymentRatio: 0,
-    unconfirmedImportantTransactions: unconfirmedCount,
-    stalePriceCount,
-  };
-
-  const scoreResult = calculateWealthHealthScore(scoreInputs);
+  const stalePriceCount = enrichedHoldings.filter((h) => h.freshness === "stale" || h.freshness === "unavailable").length;
+  const missing = (reason: string) => ({ available: false as const, reason });
+  const confirmedPkrCash = enrichedHoldings.filter((h) => h.kind === "cash" && h.currency === "PKR").reduce((sum, h) => sum + h.valuePkr, 0);
+  const upcomingLiabilityTotal = upcomingLiabilities.reduce((sum, row) => sum + row.series.amount, 0);
+  const scoreResult = calculatePresenceScore({
+    goalPace: goalPaceRatio == null ? missing("no active goal") : { available: true, value: goalPaceRatio },
+    cashBuffer: missing("monthly confirmed expenses are unavailable"),
+    contributionConsistency: missing("contribution history is unavailable"),
+    diversification: diversificationRatio == null ? missing("holding values are unavailable") : { available: true, value: diversificationRatio },
+    trendStability: trendStabilityRatio == null ? missing("fewer than two daily snapshots") : { available: true, value: trendStabilityRatio },
+    billCoverage: upcomingLiabilityTotal === 0 ? missing("no upcoming recurring liabilities") : { available: true, value: confirmedPkrCash / upcomingLiabilityTotal },
+    debtCommitments: missing("no confirmed debt commitment input"),
+    dataConfidence: { available: true, value: 1 - (unconfirmedCount + stalePriceCount) / 8 },
+  } satisfies FactorPresenceInputs);
+  const actionScore = { attentionFactors: [] as { id: string; contribution: number }[] };
 
   // ── 9. Select recommended action ────────────────────────────────────────────
   const goalsForAction = activeGoals.map((g) => ({
@@ -390,7 +429,7 @@ export async function generateBriefing(params: {
   }));
 
   const recommendedAction = selectRecommendedAction({
-    score: scoreResult,
+    score: actionScore,
     goals: goalsForAction,
     holdings: enrichedHoldings.map((h) => ({ id: h.id, label: h.label, valuePkr: h.valuePkr })),
     unconfirmedCount,
@@ -478,6 +517,9 @@ export async function generateBriefing(params: {
     mascotMood,
     greeting,
     summary,
+    scoreState: scoreResult.scoreState,
+    scoreExplanation: scoreResult.explanation,
+    scoreFactors: scoreResult.factors,
     healthScore: scoreResult.score,
     healthStatus: scoreResult.band,
     wealthSnapshot: {
@@ -552,9 +594,6 @@ export async function storeBriefing(
     await tx.delete(schema.wealthEvents).where(
       and(eq(schema.wealthEvents.userId, briefing.userId), eq(schema.wealthEvents.date, date)),
     );
-    await tx.delete(schema.wealthSnapshots).where(
-      and(eq(schema.wealthSnapshots.userId, briefing.userId), eq(schema.wealthSnapshots.date, date)),
-    );
     await tx.insert(schema.wealthSnapshots).values({
       userId: briefing.userId,
       date,
@@ -565,6 +604,17 @@ export async function storeBriefing(
       mainReason: briefing.wealthSnapshot.mainReason,
       interpretationJson: briefing.wealthSnapshot.interpretation,
       freshness: briefing.freshness === "local_fallback" ? "stale" : briefing.freshness,
+    }).onConflictDoUpdate({
+      target: [schema.wealthSnapshots.userId, schema.wealthSnapshots.date],
+      set: {
+        totalPkr: briefing.wealthSnapshot.totalPkr,
+        perHoldingJson: briefing.wealthSnapshot.perHoldingBreakdown,
+        changeVsYesterday: briefing.wealthSnapshot.changeVsYesterday,
+        changeMtd: briefing.wealthSnapshot.changeMtd,
+        mainReason: briefing.wealthSnapshot.mainReason,
+        interpretationJson: briefing.wealthSnapshot.interpretation,
+        freshness: briefing.freshness === "local_fallback" ? "stale" : briefing.freshness,
+      },
     });
 
     for (const event of briefing.wealthEvents) {
@@ -593,7 +643,10 @@ export async function storeBriefing(
       greeting: briefing.greeting,
       summary: briefing.summary,
       healthScore: briefing.healthScore,
-      healthStatus: briefing.healthStatus as "strong" | "healthy" | "watch" | "urgent",
+      healthStatus: briefing.healthStatus,
+      scoreState: briefing.scoreState,
+      scoreExplanation: briefing.scoreExplanation,
+      scoreFactorsJson: briefing.scoreFactors,
       wealthSnapshotJson: briefing.wealthSnapshot,
       wealthEventsJson: briefing.wealthEvents,
       learnThreadsJson: briefing.learnThreads,
@@ -631,7 +684,10 @@ export async function getLatestBriefing(userId: string): Promise<WealthBriefing 
     greeting: row.greeting,
     summary: row.summary,
     healthScore: row.healthScore,
-    healthStatus: row.healthStatus as "strong" | "healthy" | "watch" | "urgent",
+    healthStatus: row.healthStatus as WealthBriefing["healthStatus"],
+    scoreState: row.scoreState as WealthBriefing["scoreState"],
+    scoreExplanation: row.scoreExplanation,
+    scoreFactors: row.scoreFactorsJson as WealthBriefing["scoreFactors"],
     wealthSnapshot: row.wealthSnapshotJson as WealthBriefing["wealthSnapshot"],
     wealthEvents: row.wealthEventsJson as WealthBriefing["wealthEvents"],
     learnThreads: (row.learnThreadsJson ?? []) as WealthBriefing["learnThreads"],

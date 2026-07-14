@@ -25,7 +25,8 @@ final todayControllerProvider = FutureProvider<TodayData>((ref) async {
       goals: storeGoals,
     );
   }
-  const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+  const useMock =
+      String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') == 'dev';
 
   // If the user has managed goals in the store, use those instead of the
   // mock briefing goals. This makes the "goals drive the AI" connection

@@ -20,6 +20,7 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
   static const _accessKey = 'auth.accessToken';
   static const _refreshKey = 'auth.refreshToken';
   static const _userIdKey = 'auth.userId';
+  static const _onboardingKey = 'auth.onboardingComplete';
   static const _deviceIdKey = 'auth.deviceId.v1';
   static const _secureStorage = FlutterSecureStorage();
   final SproutApiClient _client;
@@ -56,7 +57,10 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     if (access != null && refresh != null && userId != null) {
       _client.setAuthSession(access, refresh, onRefreshed: _saveRefreshed);
       state = AuthSession(
-          accessToken: access, refreshToken: refresh, userId: userId);
+          accessToken: access,
+          refreshToken: refresh,
+          userId: userId,
+          onboardingComplete: prefs.getBool(_onboardingKey) ?? false);
     }
   }
 
@@ -78,6 +82,7 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     final prefs = await SharedPreferences.getInstance();
     await _writeTokens(session.accessToken, session.refreshToken);
     await prefs.setString(_userIdKey, session.userId);
+    await prefs.setBool(_onboardingKey, session.onboardingComplete);
     _client.setAuthSession(
       session.accessToken,
       session.refreshToken,
@@ -93,6 +98,7 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
       accessToken: accessToken,
       refreshToken: refreshToken,
       userId: current.userId,
+      onboardingComplete: current.onboardingComplete,
     );
     await _writeTokens(accessToken, refreshToken);
     state = refreshed;
@@ -115,8 +121,21 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     await prefs.remove(_accessKey);
     await prefs.remove(_refreshKey);
     await prefs.remove(_userIdKey);
+    await prefs.remove(_onboardingKey);
     _client.clearAuthToken();
     state = null;
+  }
+
+  Future<void> markOnboardingComplete() async {
+    final current = state;
+    if (current == null) return;
+    final completed = AuthSession(
+      accessToken: current.accessToken,
+      refreshToken: current.refreshToken,
+      userId: current.userId,
+      onboardingComplete: true,
+    );
+    await _save(completed);
   }
 
   Future<void> _writeTokens(String accessToken, String refreshToken) async {
