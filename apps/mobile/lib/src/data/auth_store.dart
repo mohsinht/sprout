@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/sprout_api_client.dart';
@@ -16,12 +18,28 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
   static const _accessKey = 'auth.accessToken';
   static const _refreshKey = 'auth.refreshToken';
   static const _userIdKey = 'auth.userId';
+  static const _secureStorage = FlutterSecureStorage();
   final SproutApiClient _client;
 
   Future<void> _restore() async {
     final prefs = await SharedPreferences.getInstance();
-    final access = prefs.getString(_accessKey);
-    final refresh = prefs.getString(_refreshKey);
+    String? access;
+    String? refresh;
+    try {
+      access = await _secureStorage.read(key: _accessKey);
+      refresh = await _secureStorage.read(key: _refreshKey);
+      // One-time migration from the pre-hardening SharedPreferences storage.
+      access ??= prefs.getString(_accessKey);
+      refresh ??= prefs.getString(_refreshKey);
+      if (access != null && refresh != null) {
+        await _writeTokens(access, refresh);
+      }
+    } catch (_) {
+      if (!kReleaseMode) {
+        access = prefs.getString(_accessKey);
+        refresh = prefs.getString(_refreshKey);
+      }
+    }
     final userId = prefs.getString(_userIdKey);
     if (access != null && refresh != null && userId != null) {
       _client.setAuthSession(access, refresh, onRefreshed: _saveRefreshed);
@@ -44,8 +62,7 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
 
   Future<void> _save(AuthSession session) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_accessKey, session.accessToken);
-    await prefs.setString(_refreshKey, session.refreshToken);
+    await _writeTokens(session.accessToken, session.refreshToken);
     await prefs.setString(_userIdKey, session.userId);
     _client.setAuthSession(
       session.accessToken,
@@ -63,9 +80,7 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
       refreshToken: refreshToken,
       userId: current.userId,
     );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_accessKey, accessToken);
-    await prefs.setString(_refreshKey, refreshToken);
+    await _writeTokens(accessToken, refreshToken);
     state = refreshed;
   }
 
@@ -79,10 +94,29 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
       }
     }
     final prefs = await SharedPreferences.getInstance();
+    try {
+      await _secureStorage.delete(key: _accessKey);
+      await _secureStorage.delete(key: _refreshKey);
+    } catch (_) {}
     await prefs.remove(_accessKey);
     await prefs.remove(_refreshKey);
     await prefs.remove(_userIdKey);
     _client.clearAuthToken();
     state = null;
+  }
+
+  Future<void> _writeTokens(String accessToken, String refreshToken) async {
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      await _secureStorage.write(key: _accessKey, value: accessToken);
+      await _secureStorage.write(key: _refreshKey, value: refreshToken);
+      await prefs.remove(_accessKey);
+      await prefs.remove(_refreshKey);
+    } catch (_) {
+      if (kReleaseMode) rethrow;
+      // Desktop/web debug harnesses may not expose the native keychain plugin.
+      await prefs.setString(_accessKey, accessToken);
+      await prefs.setString(_refreshKey, refreshToken);
+    }
   }
 }

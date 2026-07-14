@@ -320,9 +320,11 @@ class _AccountEditSheetState extends ConsumerState<_AccountEditSheet> {
 
 /// The monthly budget panel — one progress bar, calm status copy.
 class BudgetPanel extends StatelessWidget {
-  const BudgetPanel({required this.budget, super.key});
+  const BudgetPanel(
+      {required this.budget, required this.balanceVisible, super.key});
 
   final SproutBudget budget;
+  final bool balanceVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -374,19 +376,24 @@ class BudgetPanel extends StatelessWidget {
           const SizedBox(height: SproutSpacing.lg),
           _BudgetLine(
               label: _MoneyStrings.income,
-              value: SproutFormat.compactCurrency(budget.monthlyIncome)),
+              value: balanceVisible
+                  ? SproutFormat.compactCurrency(budget.monthlyIncome)
+                  : '••••'),
           const SizedBox(height: SproutSpacing.sm),
           _BudgetLine(
               label: _MoneyStrings.safeToSpend,
-              value: SproutFormat.compactCurrency(budget.safeToSpend)),
+              value: balanceVisible
+                  ? SproutFormat.compactCurrency(budget.safeToSpend)
+                  : '••••'),
           const SizedBox(height: SproutSpacing.md),
           SproutProgressBar(value: progress, color: barColor, height: 10),
           const SizedBox(height: SproutSpacing.sm),
           Row(
             children: [
               Text(
-                '${SproutFormat.compactCurrency(budget.spent)} '
-                'of ${SproutFormat.compactCurrency(budget.safeToSpend)}',
+                balanceVisible
+                    ? '${SproutFormat.compactCurrency(budget.spent)} of ${SproutFormat.compactCurrency(budget.safeToSpend)}'
+                    : 'Amounts hidden',
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
@@ -394,7 +401,9 @@ class BudgetPanel extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${_MoneyStrings.leftToSpend}: ${SproutFormat.compactCurrency(budget.remaining)}',
+                balanceVisible
+                    ? '${_MoneyStrings.leftToSpend}: ${SproutFormat.compactCurrency(budget.remaining)}'
+                    : '••••',
                 style: Theme.of(context)
                     .textTheme
                     .labelLarge
@@ -504,7 +513,9 @@ class GoalTile extends StatelessWidget {
 /// The recent transactions panel. "View all" opens a calm sheet listing every
 /// transaction.
 class RecentTransactionsPanel extends ConsumerWidget {
-  const RecentTransactionsPanel({super.key});
+  const RecentTransactionsPanel({required this.balanceVisible, super.key});
+
+  final bool balanceVisible;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -529,7 +540,8 @@ class RecentTransactionsPanel extends ConsumerWidget {
                 ),
               ),
               SproutButtonPress(
-                onTap: () => _AllTransactionsSheet.show(context),
+                onTap: () =>
+                    _AllTransactionsSheet.show(context, balanceVisible),
                 semanticLabel: _MoneyStrings.viewAll,
                 child: Semantics(
                   button: true,
@@ -549,7 +561,8 @@ class RecentTransactionsPanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: SproutSpacing.sm),
-          for (final txn in preview) TransactionRow(transaction: txn),
+          for (final txn in preview)
+            TransactionRow(transaction: txn, balanceVisible: balanceVisible),
         ],
       ),
     );
@@ -557,9 +570,11 @@ class RecentTransactionsPanel extends ConsumerWidget {
 }
 
 class _AllTransactionsSheet extends StatelessWidget {
-  const _AllTransactionsSheet();
+  const _AllTransactionsSheet({required this.balanceVisible});
 
-  static Future<void> show(BuildContext context) {
+  final bool balanceVisible;
+
+  static Future<void> show(BuildContext context, bool balanceVisible) {
     final colors = SproutColorScheme.of(context);
     return showModalBottomSheet<void>(
       context: context,
@@ -572,7 +587,8 @@ class _AllTransactionsSheet extends StatelessWidget {
         borderRadius:
             BorderRadius.vertical(top: Radius.circular(SproutRadius.hero)),
       ),
-      builder: (context) => const _AllTransactionsSheet(),
+      builder: (context) =>
+          _AllTransactionsSheet(balanceVisible: balanceVisible),
     );
   }
 
@@ -597,7 +613,8 @@ class _AllTransactionsSheet extends StatelessWidget {
                 return Column(
                   children: [
                     for (final txn in transactions)
-                      TransactionRow(transaction: txn),
+                      TransactionRow(
+                          transaction: txn, balanceVisible: balanceVisible),
                   ],
                 );
               },

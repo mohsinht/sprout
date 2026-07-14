@@ -22,6 +22,9 @@ Sprout sounds like a calm, practical companion. It is warm but not childish, cle
 - Protect dignity during hard financial moments.
 - Use PKR and local terms naturally.
 - Keep Urdu-ready structure: avoid wordplay that cannot translate.
+- Use "check-in" only for the short daily behavior, notification, or humane
+  streak continuity. Never use attendance itself as evidence that the user's
+  money or health improved.
 
 ## Avoid
 
@@ -37,7 +40,7 @@ Sprout sounds like a calm, practical companion. It is warm but not childish, cle
 ## Good-Day Examples
 
 - "You're steady today. Salary is close, and your main bills look covered."
-- "Nice check-in. Your money garden has enough shade for the week."
+- "You're steady today. Your money garden has enough shade for the week."
 - "You're on track. One small review will make today's picture clearer."
 - "Your emergency fund is doing its job."
 

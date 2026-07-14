@@ -138,7 +138,9 @@ All motion comes from the `sprout_motion` primitives (`SproutButtonPress`, `Conf
 - **Celebration (loud, rare):** completed daily action, milestone, streak protected/repaired. Confetti + mascot bounce + XP burst + count-up. Capped particles. This is the peak — reserve it for real wins.
 - **Reveal (medium):** score counts up, ring sweeps, goal bars fill — on first appearance only, to communicate change. Staggered card entrance (the existing ~45ms/index) gives the screen life without chaos.
 - **Feedback (small, everywhere):** button press-scale, chip select, tap ripples, **haptics on every tap** (tile, chip, nav, action — via built-in `HapticFeedback`), a chime on completion.
-- **Ambient (subtle):** mascot idle blink/bob only — never enough to distract from reading. **The mascot must animate on Today** — idle breathing/bob + occasional blink is the minimum; static PNG is fallback only (reduce-motion, missing asset).
+- **Ambient (subtle):** on profiles that pass the motion gate, mascot idle
+  blink/bob only — never enough to distract from reading. Raster/static is the
+  baseline for low-end, reduce-motion, missing, or failed assets.
 - **Gentle (for bad news):** soft, slow, caring motion. Never alarm, never shake, never red flash.
 
 ### Motion rules (non-negotiable)
@@ -154,9 +156,13 @@ All motion comes from the `sprout_motion` primitives (`SproutButtonPress`, `Conf
 
 Sprout is the primary expressive element, not an illustration in a corner.
 
-- **Today: mascot is the living emotional narrator**, mood driven by real state (via `SproutMascotState`), animated (idle/celebrate/gentle), and visually present without overpowering the wealth figure.
+- **Today: mascot is the living emotional narrator**, mood driven by real state (via `SproutMascotState`), visually present without overpowering the wealth figure. Motion is an upgrade when the device profile passes the performance gate; expression and information never depend on animation.
 - **Money / Settings / Quick Add: mascot is a small, calm signal only** — never a second hero competing with the content.
-- **Rive first, CustomPaint fallback always available.** A missing/failed Rive asset never produces a blank box — the painted `CoinSproutMascot` renders instead. Reduce-motion shows still art.
+- **Raster/static first, Rive as a measured upgrade.** The still/raster or
+  lightweight painted mascot is the shipping baseline, including low-end
+  Android and reduce-motion. Rive may become the default only for device
+  profiles that pass the measured frame-time/memory gate. A missing, failed,
+  or disabled Rive asset never produces a blank box or changes the mood.
 - **Four product moods, one canonical expression each** (thriving / content / watchful / concerned). Bad news uses watchful or concerned — never angry, never red-faced.
 
 ---

@@ -21,6 +21,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _registering = false;
   bool _saving = false;
   String? _error;
+  String? _postAuthRoute;
 
   @override
   void dispose() {
@@ -31,19 +32,27 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    setState(() { _saving = true; _error = null; });
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       final store = ref.read(authSessionProvider.notifier);
       if (_registering) {
-        await store.register(email: _email.text, password: _password.text, name: _name.text);
+        _postAuthRoute = '/onboarding';
+        await store.register(
+            email: _email.text, password: _password.text, name: _name.text);
       } else {
+        _postAuthRoute = '/today';
         await store.login(email: _email.text, password: _password.text);
       }
-      if (mounted) context.go('/today');
+      if (mounted) context.go(_postAuthRoute!);
     } on SproutApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not sign in right now. You can still use Sprout offline.');
+      if (mounted)
+        setState(() => _error =
+            'Could not sign in right now. You can still use Sprout offline.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -54,7 +63,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final existingSession = ref.watch(authSessionProvider);
     if (existingSession != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.go('/today');
+        if (mounted) context.go(_postAuthRoute ?? '/today');
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -69,33 +78,60 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Sprout', style: Theme.of(context).textTheme.displaySmall, textAlign: TextAlign.center),
+                  Text('Sprout',
+                      style: Theme.of(context).textTheme.displaySmall,
+                      textAlign: TextAlign.center),
                   const SizedBox(height: 8),
-                  Text('Your calm daily money picture. No bank connection needed.',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: colors.muted), textAlign: TextAlign.center),
+                  Text(
+                      'Your calm daily money picture. No bank connection needed.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyLarge
+                          ?.copyWith(color: colors.muted),
+                      textAlign: TextAlign.center),
                   const SizedBox(height: 32),
                   if (_registering) ...[
-                    TextField(controller: _name, textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(labelText: 'Name or nickname (optional)')),
+                    TextField(
+                        controller: _name,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                            labelText: 'Name or nickname (optional)')),
                     const SizedBox(height: 12),
                   ],
-                  TextField(controller: _email, keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email')),
+                  TextField(
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(labelText: 'Email')),
                   const SizedBox(height: 12),
-                  TextField(controller: _password, obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Password (8+ characters)')),
+                  TextField(
+                      controller: _password,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                          labelText: 'Password (8+ characters)')),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: SproutColors.tomato)),
+                    Text(_error!,
+                        style: const TextStyle(color: SproutColors.tomato)),
                   ],
                   const SizedBox(height: 20),
                   FilledButton(
                     onPressed: _saving ? null : _submit,
-                    child: Text(_saving ? 'One moment…' : _registering ? 'Create account' : 'Log in'),
+                    child: Text(_saving
+                        ? 'One moment…'
+                        : _registering
+                            ? 'Create account'
+                            : 'Log in'),
                   ),
                   TextButton(
-                    onPressed: _saving ? null : () => setState(() { _registering = !_registering; _error = null; }),
-                    child: Text(_registering ? 'I already have an account' : 'Create an account'),
+                    onPressed: _saving
+                        ? null
+                        : () => setState(() {
+                              _registering = !_registering;
+                              _error = null;
+                            }),
+                    child: Text(_registering
+                        ? 'I already have an account'
+                        : 'Create an account'),
                   ),
                   const SizedBox(height: 8),
                   TextButton(

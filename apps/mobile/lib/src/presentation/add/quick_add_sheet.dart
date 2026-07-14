@@ -341,6 +341,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             bottomInset: paddingBottom,
             onClose: () => Navigator.of(context).maybePop(),
             child: _AmountStep(
+              accounts: accounts,
               category: _category!,
               amount: _customAmountOpen ? null : _amount,
               controller: _customAmount,
@@ -377,6 +378,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             bottomInset: paddingBottom,
             onClose: () => Navigator.of(context).maybePop(),
             child: _IncomeStep(
+              accounts: accounts,
               controller: _incomeAmount,
               kind: _incomeKind,
               pocket: _pocket,
@@ -401,6 +403,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
             bottomInset: paddingBottom,
             onClose: () => Navigator.of(context).maybePop(),
             child: _SuccessStep(
+              accounts: accounts,
               transaction: _lastTransaction!,
               onAddAnother: _resetToCategories,
               onDone: () => Navigator.of(context).maybePop(),
@@ -544,6 +547,7 @@ class _CategoryStep extends StatelessWidget {
 
 class _AmountStep extends StatelessWidget {
   const _AmountStep({
+    required this.accounts,
     required this.category,
     required this.amount,
     required this.controller,
@@ -561,6 +565,7 @@ class _AmountStep extends StatelessWidget {
   });
 
   final _QuickCategory category;
+  final List<SproutAccount> accounts;
   final int? amount;
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -678,7 +683,7 @@ class _AmountStep extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final account in _quickAddAccounts)
+            for (final account in accounts)
               _PocketChip(
                 account: account,
                 selected: account.id == pocket.id,
@@ -707,6 +712,7 @@ class _AmountStep extends StatelessWidget {
 
 class _IncomeStep extends StatelessWidget {
   const _IncomeStep({
+    required this.accounts,
     required this.controller,
     required this.kind,
     required this.pocket,
@@ -718,6 +724,7 @@ class _IncomeStep extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final List<SproutAccount> accounts;
   final _IncomeKind kind;
   final SproutAccount pocket;
   final String? validation;
@@ -774,7 +781,7 @@ class _IncomeStep extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final account in _quickAddAccounts)
+            for (final account in accounts)
               _PocketChip(
                 account: account,
                 selected: account.id == pocket.id,
@@ -894,12 +901,14 @@ class _ImportStep extends StatelessWidget {
 
 class _SuccessStep extends StatelessWidget {
   const _SuccessStep({
+    required this.accounts,
     required this.transaction,
     required this.onAddAnother,
     required this.onDone,
   });
 
   final SproutTransaction transaction;
+  final List<SproutAccount> accounts;
   final VoidCallback onAddAnother;
   final VoidCallback onDone;
 
@@ -908,8 +917,8 @@ class _SuccessStep extends StatelessWidget {
     final colors = SproutColorScheme.of(context);
     final isIncome = transaction.type == TransactionType.income;
     final contextLine = isIncome
-        ? '${transaction.category} added to ${_accountName(transaction.accountId)}.'
-        : '${transaction.category} saved from ${_accountName(transaction.accountId)}.';
+        ? '${transaction.category} added to ${_accountName(transaction.accountId, accounts)}.'
+        : '${transaction.category} saved from ${_accountName(transaction.accountId, accounts)}.';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1567,18 +1576,8 @@ const _moreCategories = [
   ),
 ];
 
-List<SproutAccount> get _quickAddAccounts => mockAccounts
-    .where(
-      (account) =>
-          account.type == AccountType.cash ||
-          account.type == AccountType.bank ||
-          account.type == AccountType.wallet ||
-          account.type == AccountType.wise,
-    )
-    .toList();
-
-String _accountName(String? accountId) {
-  for (final account in mockAccounts) {
+String _accountName(String? accountId, List<SproutAccount> accounts) {
+  for (final account in accounts) {
     if (account.id == accountId) return account.name;
   }
   return 'Cash';

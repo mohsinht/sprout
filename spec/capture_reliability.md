@@ -39,6 +39,22 @@ Every parser must have:
 
 Parser failures must not corrupt the user's money state. If confidence drops, route to confirmation.
 
+### Price And FX Fetcher Drift
+
+The parser rules also apply to public valuation inputs: Al Meezan web/PDF
+redemption prices, MUFAP validation observations, and Xe FX observations.
+Each fetcher has golden source samples, a parser/fetcher version, source-shape
+metadata, and last-success/drift metrics.
+
+For a valuation source failure:
+
+- Do not reuse the old observation while labelling it fresh.
+- Do not omit the daily WealthSnapshot.
+- Carry forward only the last trusted dated observation, label the affected
+  holding and snapshot stale, and expose its as-of date.
+- If primary and validation sources disagree outside the configured tested
+  tolerance, quarantine the new observation and alert; do not let AI choose.
+
 ## Dedupe Rule
 
 The same transaction may arrive through SMS, email, and statement import. Dedupe is mandatory.
@@ -104,6 +120,9 @@ Track:
 - Sudden drop in parsed emails/SMS per provider.
 - Top unparsed sender IDs or subjects.
 - User correction rate after confirmation.
+- NAV/FX fetch success by source and fetcher version.
+- Cross-source NAV disagreement rate and quarantined observations.
+- Percentage of user snapshots containing stale or unavailable valuations.
 
 Alert when:
 
@@ -120,3 +139,5 @@ Alert when:
 - Android SMS is optional and Android-only.
 - iOS capture works without SMS.
 - Duplicate SMS/email/import transactions merge into one transaction.
+- NAV/FX drift degrades to dated stale/unavailable data without skipping the
+  snapshot or publishing an unverified fresh value.

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../data/goal_store.dart';
+import '../../data/balance_privacy_store.dart';
 import '../../data/manual_money_store.dart';
 import '../../domain/sprout_models.dart';
 import '../../domain/today_models.dart';
@@ -29,13 +30,12 @@ class MoneyScreen extends ConsumerStatefulWidget {
 }
 
 class _MoneyScreenState extends ConsumerState<MoneyScreen> {
-  var _balancesVisible = true;
-
   @override
   Widget build(BuildContext context) {
     final accounts = ref.watch(accountsProvider);
     final transactions = ref.watch(visibleTransactionsProvider);
     final budget = ref.watch(adjustedBudgetProvider);
+    final balancesVisible = ref.watch(balancesVisibleProvider);
     // Cash/bank/wallet only here; investment + Wise live in the Investments
     // snapshot so a balance is never counted twice on the same screen.
     final cashAccounts = accounts
@@ -68,9 +68,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         MoneySectionHeader(
           title: 'Cash and accounts',
           trailing: BalanceToggle(
-            visible: _balancesVisible,
-            onToggle: () =>
-                setState(() => _balancesVisible = !_balancesVisible),
+            visible: balancesVisible,
+            onToggle: () => ref
+                .read(balancesVisibleProvider.notifier)
+                .setVisible(!balancesVisible),
           ),
         ),
         const SizedBox(height: SproutSpacing.sm),
@@ -78,7 +79,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
           child: Column(
             children: [
               for (final account in cashAccounts) ...[
-                AccountRow(account: account, balanceVisible: _balancesVisible),
+                AccountRow(account: account, balanceVisible: balancesVisible),
                 if (account.id != cashAccounts.last.id)
                   Divider(color: SproutColorScheme.of(context).line, height: 1),
               ],
@@ -90,7 +91,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         const SizedBox(height: SproutSpacing.xl),
         const MoneySectionHeader(title: 'Monthly budget'),
         const SizedBox(height: SproutSpacing.sm),
-        BudgetPanel(budget: budget),
+        BudgetPanel(budget: budget, balanceVisible: balancesVisible),
 
         // 3. Goals.
         const SizedBox(height: SproutSpacing.xl),
@@ -131,17 +132,17 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
           ),
         ),
         const SizedBox(height: SproutSpacing.sm),
-        _GoalsPanel(balanceVisible: _balancesVisible),
+        _GoalsPanel(balanceVisible: balancesVisible),
 
         // 4. Recent transactions.
         const SizedBox(height: SproutSpacing.xl),
-        const RecentTransactionsPanel(),
+        RecentTransactionsPanel(balanceVisible: balancesVisible),
 
         // 5. Investments snapshot.
         const SizedBox(height: SproutSpacing.xl),
         const MoneySectionHeader(title: 'Investments snapshot'),
         const SizedBox(height: SproutSpacing.sm),
-        InvestmentsPanel(balanceVisible: _balancesVisible),
+        InvestmentsPanel(balanceVisible: balancesVisible),
       ],
     );
   }

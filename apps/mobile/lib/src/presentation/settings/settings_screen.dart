@@ -6,6 +6,7 @@ import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../app/theme_mode_controller.dart';
 import '../../data/goal_store.dart';
+import '../../data/balance_privacy_store.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../data/api/sprout_api_client.dart';
 import '../../data/auth_store.dart';
@@ -757,6 +758,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _privacySection(SproutColorScheme colors) {
+    final balancesVisible = ref.watch(balancesVisibleProvider);
     const icons = <IconData>[
       Icons.lock_rounded,
       Icons.link_rounded,
@@ -786,6 +788,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ?.copyWith(color: colors.muted),
           ),
           const SizedBox(height: SproutSpacing.md),
+          PreferenceToggle(
+            label: balancesVisible
+                ? 'Balances are visible'
+                : 'Balances are hidden',
+            value: !balancesVisible,
+            icon: balancesVisible
+                ? Icons.visibility_rounded
+                : Icons.visibility_off_rounded,
+            onChanged: (hidden) =>
+                ref.read(balancesVisibleProvider.notifier).setVisible(!hidden),
+          ),
+          _rowDivider,
           for (var i = 0; i < mockPrivacyStatements.length; i++) ...[
             TrustBadge(
               label: mockPrivacyStatements[i],

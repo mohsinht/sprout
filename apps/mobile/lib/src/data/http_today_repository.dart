@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/today_models.dart';
 import '../domain/wealth_models.dart';
@@ -32,11 +35,22 @@ class HttpTodayRepository implements TodayRepository {
   HttpTodayRepository(this._client);
 
   final SproutApiClient _client;
+  static const _cacheKey = 'today.briefing.cache.v1';
 
   @override
   Future<TodayData> fetchToday() async {
-    final json = await _client.get('/v1/briefing');
-    final briefing = wealthBriefingFromApiJson(json);
-    return todayDataFromWealthBriefing(briefing);
+    try {
+      final json = await _client.get('/v1/briefing');
+      final briefing = wealthBriefingFromApiJson(json);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode(json));
+      return todayDataFromWealthBriefing(briefing);
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = prefs.getString(_cacheKey);
+      if (encoded == null) rethrow;
+      final cached = jsonDecode(encoded) as Map<String, dynamic>;
+      return todayDataFromWealthBriefing(wealthBriefingFromApiJson(cached));
+    }
   }
 }

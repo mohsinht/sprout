@@ -29,11 +29,21 @@ This folder is the working spec package for Sprout. It translates the high-level
 - [User Stories and Regression Invariants](user_stories_regression_invariants.md): permanent persona journeys (including P7 Multi-Currency Investor) and invariants for e2e/integration tests.
 - [Regulatory Constraints](regulatory_constraints.md): fund-movement boundary, privacy posture, hosting assumptions, and PECA/screen-scraping limits.
 - [Data Sources Registry](data_sources_registry.md): official, semi-official, commercial, and user-permissioned sources (Al Meezan prices, Xe FX, Wise balances, MUFAP) with cost/cadence/provenance notes.
+- [Agent and Test Traceability](agent_test_traceability.md): the executable-spec
+  contract for stable acceptance IDs, invariant CI checks, canonical fixtures,
+  vertical slices, taste lints, and low-end visual/performance runs.
 - [Capture Reliability](capture_reliability.md): parser drift, dedupe, confidence, and per-platform capture reality.
 - [Production Hardening](production_hardening.md): backend stack, auth baseline, idempotency, storage, webhooks, and observability.
+- [Post-v1 Product Opportunities](post_v1_roadmap.md): sequenced roadmap
+  candidates for memory, ritual, visible proof, goal depth, and privacy after
+  v1, with product-constitution guardrails and explicit rejected directions.
 
 ## Package Rule
 
 When a screen changes, update its product requirement, data contract impact, copy examples, and acceptance criteria together. A screen is not ready for implementation if its empty, offline, error, zero-connection, stale-price, and wealth-down states are unspecified.
 
 **Navigation tabs, Insights relevance, and goal CRUD are regression-protected** — see invariants I44–I50 in `user_stories_regression_invariants.md`. A build missing a primary tab, showing generic Insights feed items, obscuring content behind nav, or lacking full goal management fails.
+
+Post-v1 ideas are not current acceptance requirements. A roadmap candidate
+must receive its own focused specification, contracts, required states,
+acceptance IDs, and persona/invariant test mapping before implementation.

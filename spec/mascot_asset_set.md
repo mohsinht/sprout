@@ -1,13 +1,10 @@
 # Sprout Mascot Asset Set
 
-> **Layout-lock note (2026-07-09):** The animated mascot is elevated from
-> "future" to **required for Today.** On Today, the mascot must animate —
-> at minimum a subtle idle (breathing/bob + occasional blink), a
-> mood-matched expression driven by product state, plus a reaction on load
-> and on action completion. Static PNG is a fallback only (reduce-motion,
-> missing asset), never the default experience on Today. The existing
-> expression assets (videos / Rive states) must be wired to the four
-> product moods, not left unused.
+> **Performance realignment (2026-07-14):** Mood and presence remain required
+> on Today, but raster/static art is the shipping baseline. Animation is a
+> measured upgrade for device profiles that pass the low-end performance gate.
+> Reduce-motion, low-end, missing, or failed assets retain the same canonical
+> expression and information.
 
 ## Purpose
 
@@ -99,13 +96,16 @@ Use helper factories where possible:
 
 ## Required Animation States
 
-### Idle (required for Today)
+### Idle (conditional upgrade for Today)
 
-The mascot must **animate** on Today — at minimum a subtle idle (breathing/bob + occasional blink). It should feel alive but quiet. Blink and bob are acceptable when reduce-motion is off. **Static PNG is a fallback only** (reduce-motion, missing asset), never the default experience on Today.
+On profiles that pass the performance gate, the mascot may animate with a
+subtle idle (breathing/bob + occasional blink). It should feel alive but quiet.
+Raster/static is the baseline and is required on reduce-motion and low-end
+profiles; it is not a degraded error state.
 
 ### Mood-Matched Expressions (required for Today)
 
-The mascot's expression must be **driven by product state** (thriving / content / watchful / concerned) and react on load (settle-bounce) and on action completion (celebrate bounce). The existing expression videos / Rive states must be wired to the four product moods, not left unused.
+The mascot's expression must be **driven by product state** (thriving / content / watchful / concerned). Passing animated profiles react on load and completion; static profiles switch to the corresponding canonical still.
 
 ### Bounce / Celebrate (required for action completion)
 
@@ -140,9 +140,12 @@ Minimum canonical PNG set:
 
 Existing stills satisfy this through the deterministic mapping above. Future asset naming should use the product mood names for clarity.
 
-## Lottie / Rive Requirements (required for Today)
+## Lottie / Rive Requirements (performance-gated upgrade)
 
-Rive or Lottie is **required for Today** — the mascot must animate (idle + mood expressions + load reaction + completion reaction). Static PNGs remain the fallback layer. The existing expression assets (videos / Rive states) must be mapped to the four product moods and wired to the mascot state.
+Rive or Lottie is optional for launch and enabled only after measured frame-time
+and memory acceptance on the target device profile. Static PNGs are the first
+shipping layer. Existing expression assets remain mapped to the four moods so
+animation can be enabled without changing product state semantics.
 
 Required animation clips:
 
@@ -162,7 +165,9 @@ Performance requirements:
 
 ## Usage Rules
 
-- **Today: mascot is the living emotional narrator and must animate** — idle + mood-matched expression + load reaction + completion reaction. Static PNG is fallback only. It stays prominent without overpowering the wealth figure.
+- **Today: mascot is the living emotional narrator and must be mood-matched.**
+  Passing profiles add idle/load/completion motion; static profiles use the
+  same expression and stay prominent without overpowering wealth.
 - Money: mascot is a small calm signal only.
 - Settings: mascot appears sparingly; trust copy matters more.
 - Quick Add: mascot can confirm completion but should not slow entry.
@@ -174,7 +179,8 @@ Performance requirements:
 - Every animated state has a static fallback.
 - The four product moods map 1:1 to canonical states and assets.
 - **The existing expression assets (videos / Rive states) are wired to the four product moods** — not left unused.
-- **On Today, the mascot animates by default** (idle + mood-matched + load reaction + completion reaction). Static PNG is fallback only (reduce-motion, missing asset).
+- **On Today, raster/static is the safe baseline.** Animation is enabled only
+  for profiles that pass the performance gate.
 - Missing Rive/video assets never produce a blank box.
 - Reduce-motion displays still art.
 - Mascot mood is driven by product state, not decorative choice.

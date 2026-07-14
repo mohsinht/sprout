@@ -120,7 +120,10 @@ Content is readable instantly — non-essential motion finishes behind reading. 
 
 #### Mascot-alive requirement
 
-- On Today, the mascot must **animate** — at minimum a subtle idle (breathing/bob + occasional blink), and a **mood-matched expression** driven by product state (thriving / content / watchful / concerned), plus a reaction on load and on action completion.
+- On Today, the mascot must have a **mood-matched expression** driven by
+  product state (thriving / content / watchful / concerned). Profiles that
+  pass the motion performance gate add subtle idle, load, and completion
+  reactions; low-end and reduce-motion profiles use the raster/static baseline.
 - Static PNG is a **fallback only** (reduce-motion, missing asset), never the default experience on Today.
 - The mascot is the primary emotional signal; its motion is what turns the screen from "calm dashboard" into "calm companion." It should stay present, alive, and mood-driven without visually overpowering the wealth figure.
 
@@ -171,7 +174,8 @@ Acceptance criteria:
 - **Wealth figure animates count-up on first reveal** (unless reduce-motion).
 - **Tiles stagger in** on load (~50ms apart).
 - **Goal bars fill on reveal.**
-- **Mascot animates and is mood-matched** (not a static PNG by default).
+- **Mascot is mood-matched; animation is performance-gated.** Static/raster is
+  the safe baseline and never loses information or emotional state.
 - **Haptic feedback on every tile/chip/nav tap.**
 - **Action completion celebrates** (haptic + chime + confetti → calm "done").
 - **Entrance motion holds 60fps** on the target low-end Android device.

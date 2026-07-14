@@ -10,8 +10,29 @@ import {
   verifyRefreshToken,
   revokeRefreshToken,
 } from "./crypto.js";
+import { authRateLimit, emailRateLimitKey } from "./rate-limit.js";
 
 export const authRoute = new Hono<{ Variables: { userId: string } }>();
+
+const fifteenMinutes = 15 * 60 * 1000;
+
+authRoute.use(
+  "/register",
+  authRateLimit({ scope: "register", limit: 8, windowMs: fifteenMinutes }),
+);
+authRoute.use(
+  "/login",
+  authRateLimit({
+    scope: "login",
+    limit: 10,
+    windowMs: fifteenMinutes,
+    key: emailRateLimitKey,
+  }),
+);
+authRoute.use(
+  "/refresh",
+  authRateLimit({ scope: "refresh", limit: 30, windowMs: fifteenMinutes }),
+);
 
 const RegisterSchema = z.object({
   email: z.string().email(),

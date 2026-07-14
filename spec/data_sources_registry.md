@@ -33,7 +33,6 @@ Use official or semi-official free sources as the foundation. Treat commercial s
 | FBR tax cards / budget notes | Official public data | Salary tax lessons, tax estimates | Free public access | Annual/budget-cycle | Use for Learn/Sprout Explains. Keep dated and versioned. |
 | SBP regulated institutions list | Official public data | Institution verification | Free public access | As published | Use to verify referenced banks/EMIs/PSPs. |
 | Sarmaaya | Commercial platform | Market analytics, mutual funds, watchlists | Paid/commercial | Vendor-dependent | Enrichment only. Not a free foundation. |
-| Wise API / exports | Partner/API and user export | Foreign balances, statements, conversions | Partnership/API terms or user exports | Webhooks/exports | Partnership track; exports are safer for MVP. |
 | 1LINK APIs | Institutional/payment rails | Payment products, merchant/institution flows | Sandbox/certification/commercial | Partner-dependent | Not a retail PFM feed. Do not treat as account aggregation. |
 | Bank partnerships | Commercial partnership | Account data, statements, referrals | Negotiated | Partner-dependent | Phase 3+. Not MVP foundation. |
 
@@ -64,6 +63,34 @@ Every external data source should expose:
 - Confidence.
 - Delete/disconnect control where applicable.
 
+## Valuation Pipeline Reliability
+
+NAV/redemption-price and FX fetchers are financial parsers, even when their
+inputs come from an official website or PDF. They receive the same rigor as
+transaction parsers:
+
+- Every fetcher has a name, version, supported source shape, golden samples,
+  last-success timestamp, and drift/error metrics.
+- Al Meezan is the primary source for its redemption prices. MUFAP is an
+  independent checksum for matching fund/date observations, not merely a
+  manual fallback.
+- A disagreement between primary and validation sources is never resolved by
+  silently choosing one. The quote is held from fresh publication, the last
+  trusted dated quote remains available as labelled stale data, and the
+  discrepancy is observable for review. The numeric tolerance is an
+  implementation-owned configuration backed by source research and tests; it
+  is not invented in UI or AI code.
+- A failed or drifted fetch never skips the user's day and never fabricates a
+  replacement value. The daily snapshot is still produced from the last
+  trusted quote with explicit stale/unavailable provenance.
+- Source HTML/PDF samples and parser versions are retained for reproducible
+  incident analysis without retaining user financial documents.
+
+Before real valuations are exposed to users, this pipeline runs headlessly on
+its production cadence for at least 14 consecutive days. Launch review must
+inspect fetch success, stale rate, cross-source disagreement, and correction
+incidents. A calendar duration alone is not proof of reliability.
+
 ## Acceptance
 
 - Market, tax, and macro features name their source and freshness.
@@ -74,3 +101,8 @@ Every external data source should expose:
 - **Every holding valuation names its dated price/FX source** (Al Meezan prices with validity date; Xe FX with as-of date).
 - **Stale prices/FX are labelled** with the as-of date and freshness status, never silently trusted.
 - **Al Meezan fund codes** (AMMF/MIF/MSF/MDIP/MFPF-AAP) are used to identify specific funds in holdings and price fetches.
+- Price and FX fetchers are versioned and covered by golden samples.
+- MUFAP cross-validation failures prevent a disputed Al Meezan observation
+  from being silently published as fresh.
+- Fetch failure produces a labelled-stale or unavailable snapshot, never a
+  skipped day or invented value.

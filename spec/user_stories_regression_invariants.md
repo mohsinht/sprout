@@ -421,6 +421,57 @@ Must always:
 - Quick Add works for the cash use case.
 - The cash persona (Bilal) is not regressed.
 
+### S28 — Bilal's Thin-Wealth Today Is Complete, Not Lesser
+
+As Bilal, with only one manually tracked PKR cash holding and one goal, I see
+the same calm Today arc without empty fund/FX theatre, so that Sprout feels
+built for my real money rather than a downgraded investor screen.
+
+Given no funds, foreign currency, or connected source, when Today renders,
+then the PKR cash total remains the wealth hero, movement is attributed to
+manual income/expense changes, irrelevant holdings/market content is omitted,
+and one goal-relative action remains available.
+
+Must always:
+
+- Thin wealth is not labelled incomplete and never prompts a connection as
+  the primary action.
+- No empty fund, FX, market, or provenance placeholder is fabricated.
+- Manual provenance and the latest local save/sync state remain visible.
+
+### S29 — Snapshot History Survives Source And Calendar Boundaries
+
+As Mohsin, I expect yesterday, MTD, and the 6-day trend to remain coherent
+across restarts, weekends, PSX holidays, and a failed price fetch.
+
+Given persisted prior snapshots, when a market source fails or the next date
+is not a market day, then Sprout still writes the canonical PKT daily snapshot,
+uses only the last trusted dated observations, labels stale/unavailable values,
+and derives movement from durable history rather than current-state guesses.
+
+Must always:
+
+- Snapshot history is durable and idempotent per user/PKT date.
+- A failed valuation fetch never creates a silent missing day or fresh label.
+- Market-day expectations come from versioned calendar data, not AI inference.
+
+### S30 — Disputed Valuation Is Quarantined
+
+As Mohsin, I would rather see a dated stale value than a confidently wrong
+one, so that a source layout change cannot silently corrupt total wealth.
+
+Given an Al Meezan observation that fails parsing or disagrees with the MUFAP
+validation observation beyond the configured tested tolerance, when the daily
+job runs, then the new observation is quarantined, the last trusted value is
+labelled stale, and the discrepancy is recorded for operators.
+
+Must always:
+
+- AI never chooses which numeric source is true.
+- A disputed quote never enters the fresh valuation path.
+- Operators can identify the source, fetcher version, sample shape, and date
+  that caused the quarantine.
+
 ## Cross-Cutting Invariants
 
 ### Trust And Privacy
@@ -499,6 +550,17 @@ Must always:
 - `I48`: A user who set one goal at onboarding can later add a second and delete the first, and Today's "one step" updates accordingly.
 - `I49`: Every Insight ties a world/market fact to the user's holdings, goals, cash, or currencies; generic feed items, FOMO, guaranteed-return language, and unsupported claims are forbidden.
 - `I50`: Content is never obscured by the floating nav on Today, Money, Insights, or Settings, including at about 1.3x text scale.
+- `I51`: A manual-only, single-PKR-cash user receives a complete thin-wealth
+  Today without fabricated funds, FX, market content, or a connection gate.
+- `I52`: WealthSnapshot history is persisted idempotently per user and PKT
+  date; yesterday, MTD, trend, and continuity are never computed from only the
+  current holdings view.
+- `I53`: Price/NAV/FX fetchers are versioned, golden-tested parsers. Failed or
+  disputed observations degrade to dated stale/unavailable values and never
+  publish as fresh or skip the daily snapshot.
+- `I54`: The raster/static mascot path is the performance-safe baseline.
+  Animated Rive is enabled only on profiles where measured performance passes;
+  reduce-motion and failure always retain the same information and mood.
 
 ## Regression Discipline
 
@@ -507,18 +569,18 @@ Must always:
 - A pull request that fails an `S` or `I` test is blocked.
 - A new feature must add its own stories and keep the full existing suite green.
 - If product strategy genuinely requires changing an invariant, revise this doc first with rationale, then update tests.
-- Personas P1-P6 are the standing manual QA cast for every release.
+- Personas P1-P7 are the standing manual QA cast for every release.
 
 ## Coverage Matrix
 
 | Persona | Trust | Info Gathering | Data | Resilience | Dignity | A11y/Perf | Wealth |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P1 Ayesha | I1-I5 | I7-I12 | I12 | I18-I19 | | | I35-I37 |
-| P2 Bilal | | I7-I10 | I13-I14, I42 | I18-I19 | | I27-I29 | I42 |
+| P2 Bilal | | I7-I10 | I13-I14, I42, I51 | I18-I19 | | I27-I29, I54 | I42, I51 |
 | P3 Mahnoor | I3-I5 | I7-I10 | I15-I17 | I20-I22 | | | I35-I36 |
 | P4 Usman | | I10 | I13 | I18 | I26 | | I38 |
 | P5 Fatima | | I12 | I13 | | I25 | | |
 | P6 Sara | | | | I20 | I23-I26 | | I39 |
-| P7 Mohsin | | | I38, I43 | | I39 | | I35-I41 |
+| P7 Mohsin | | | I38, I43, I52-I53 | I53 | I39 | I54 | I35-I41, I52-I53 |
 
 Any invariant with no persona exercising it needs a synthetic test case.

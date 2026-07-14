@@ -10,9 +10,11 @@ import 'sprout_helpers.dart';
 /// and, when the source is uncertain, a calm "Needs review" tag instead of a
 /// scary warning. Dark-mode aware via [SproutColorScheme].
 class TransactionRow extends StatelessWidget {
-  const TransactionRow({required this.transaction, super.key});
+  const TransactionRow(
+      {required this.transaction, this.balanceVisible = true, super.key});
 
   final SproutTransaction transaction;
+  final bool balanceVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +81,9 @@ class TransactionRow extends StatelessWidget {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerRight,
                   child: Text(
-                    '$sign${SproutFormat.currency(transaction.amount)}',
+                    balanceVisible
+                        ? '$sign${SproutFormat.currency(transaction.amount)}'
+                        : '••••',
                     maxLines: 1,
                     style: Theme.of(context)
                         .textTheme

@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
+import { secureHeaders } from "hono/secure-headers";
 import { config } from "./config.js";
 import { authRoute } from "./auth/routes.js";
 import { profileRoute } from "./routes/profile.js";
@@ -16,6 +18,15 @@ import { runDailyJobForAllUsers } from "./services/job-runner.js";
 import { pool } from "./db/client.js";
 
 const app = new Hono();
+
+app.use("*", secureHeaders());
+app.use(
+  "*",
+  bodyLimit({
+    maxSize: 2 * 1024 * 1024,
+    onError: (c) => c.json({ error: "Request body is too large" }, 413),
+  }),
+);
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
 app.use(

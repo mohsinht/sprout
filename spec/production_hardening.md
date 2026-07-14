@@ -56,6 +56,23 @@ Use stable job keys for:
 
 Workers must safely retry without duplicating transactions or notifications.
 
+Daily WealthSnapshot writes use a stable user + `Asia/Karachi` date key.
+Retries update/confirm the same canonical snapshot rather than appending a
+second history point.
+
+## Valuation Pipeline Gate
+
+Treat NAV/redemption-price and FX fetchers as production parsers:
+
+- Version fetchers and keep sanitized golden source samples.
+- Cross-check Al Meezan fund/date observations with MUFAP.
+- Quarantine unresolved discrepancies; AI never arbitrates numeric truth.
+- Persist the daily snapshot even when an input is stale or unavailable.
+- Use a versioned Pakistan market calendar for market-day expectations.
+- Run the production cadence headlessly for at least 14 consecutive days
+  before exposing real valuations. Review success, stale, disagreement, and
+  correction evidence before enabling users.
+
 ## Object Storage
 
 Uploaded statement files:
@@ -99,6 +116,12 @@ Track:
 - Briefing job success/failure.
 - Source freshness.
 - User corrections on low-confidence items.
+- NAV/FX fetch success by source and fetcher version.
+- Stale/unavailable valuation rate by holding and user snapshot.
+- Primary-vs-validation disagreement and quarantine rate.
+- Snapshot gaps, duplicate PKT dates, and market-calendar version.
+- Open-to-close duration, D7/D30 return without notification prompting, and
+  user correction rate as beta trust/habit indicators.
 
 ## Acceptance
 
@@ -108,3 +131,7 @@ Track:
 - Webhooks are preferred for email capture.
 - Offline cache preserves the daily check-in.
 - No production path requires universal bank aggregation.
+- Daily snapshots are durable and idempotent per user/PKT date.
+- Real valuation sources pass the headless burn-in and review gate.
+- Disputed or failed valuations degrade visibly; no job silently publishes a
+  questionable value as fresh.

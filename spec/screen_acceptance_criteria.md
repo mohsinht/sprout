@@ -51,7 +51,9 @@
 - **Wealth figure animates count-up on first reveal** (unless reduce-motion is enabled).
 - **"What's happening" tiles stagger in** on load (~50ms apart, rising/fading).
 - **Goal progress bars/rings fill** left-to-right on first reveal.
-- **Mascot animates on load** (settle-bounce) and is mood-matched (not a static PNG by default).
+- **Mascot is mood-matched on load.** On device profiles that pass the motion
+  performance gate it settle-bounces; low-end, reduce-motion, or failed-asset
+  profiles use the raster/static baseline without losing mood or information.
 - **Haptic feedback on every tile tap, chip tap, and nav tap.**
 - **Action completion celebrates:** haptic + chime + confetti → calm "done" state.
 - **Entrance motion holds 60fps** on the target low-end Android device; any effect that janks is simplified or cut.
@@ -66,6 +68,13 @@
 - Market tile appears only when personally relevant; otherwise a more relevant context tile appears.
 - Completing the action triggers celebration, XP, streak feedback, and sign-off.
 - Every tile, score factor, event, and finding opens Sprout Explains.
+- **Thin-wealth Today passes:** with one manual PKR cash holding and a goal,
+  the cash total is the wealth hero, irrelevant fund/FX/market surfaces are
+  omitted, manual provenance/save state is honest, and the action is
+  goal-relative rather than a connection prompt.
+- **Valuation fetch failure passes:** Today still renders a persisted daily
+  snapshot, labels the affected value with its as-of date, and never presents
+  the carried observation as fresh.
 
 ### Craft (pass/fail)
 
@@ -202,6 +211,12 @@
 - **Every holding valuation exposes dated price/FX provenance.**
 - **Stale prices/FX are labelled, never silently trusted.**
 - **No "check-in" action is ever selected.**
+- **Daily WealthSnapshot is durable and idempotent per user/PKT date**, not
+  computed on read; yesterday, MTD, 6-day trend, and continuity use history.
+- **Market-day logic uses versioned Pakistan calendar data** so weekends and
+  configured PSX holidays do not become false missing-price incidents.
+- **Al Meezan observations are cross-validated with MUFAP**; unresolved
+  disagreement is quarantined and shown via last-trusted stale data.
 
 ## Design System
 
@@ -230,3 +245,10 @@
 - Android SMS capture is optional, Android-only, and policy-gated.
 - iOS works without SMS capture.
 - No screen scraping or stored bank passwords.
+- NAV/FX fetchers have versions, golden source samples, drift monitoring, and
+  last-success timestamps.
+- The valuation pipeline completes at least 14 consecutive headless daily runs
+  before real values are user-visible, with fetch success, stale rate, and
+  cross-source disagreements reviewed.
+- Every acceptance bullet has a stable test ID in the release traceability
+  matrix and maps to an automated or explicitly named manual test.

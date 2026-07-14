@@ -24,7 +24,7 @@ holdingsRoute.get("/", async (c) => {
 
 // ── POST /v1/holdings ────────────────────────────────────────────────────────
 
-const CreateHoldingSchema = z.object({
+const HoldingValuesSchema = z.object({
   kind: z.enum(["mutual_fund", "cash", "equity", "other"]),
   institution: z.string().min(1).max(200),
   label: z.string().min(1).max(200),
@@ -36,6 +36,28 @@ const CreateHoldingSchema = z.object({
   priceAsOf: z.string().optional(),
   priceSource: z.string().optional(),
   freshness: z.enum(["fresh", "stale", "manual", "unavailable"]).default("manual"),
+});
+
+function hasValidProvenance(value: {
+  kind?: string;
+  currency?: string;
+  freshness?: string;
+  priceAsOf?: string;
+  priceSource?: string;
+}): boolean {
+  if (value.freshness !== "fresh") return true;
+  if (value.kind === "cash" && value.currency === "PKR") return false;
+  return Boolean(value.priceAsOf?.trim() && value.priceSource?.trim());
+}
+
+const CreateHoldingSchema = HoldingValuesSchema.superRefine((value, ctx) => {
+  if (!hasValidProvenance(value)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["freshness"],
+      message: "Fresh valuations require a dated price/FX source; manual PKR cash must use manual freshness.",
+    });
+  }
 });
 
 holdingsRoute.post("/", async (c) => {
@@ -77,6 +99,23 @@ holdingsRoute.patch("/:id", async (c) => {
   const body = UpdateHoldingSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(schema.holdings)
+    .where(and(eq(schema.holdings.id, holdingId), eq(schema.holdings.userId, userId)))
+    .limit(1);
+  if (!existing) return c.json({ error: "Holding not found" }, 404);
+
+  if (!hasValidProvenance({
+    kind: existing.kind,
+    currency: existing.currency,
+    freshness: body.data.freshness ?? existing.freshness,
+    priceAsOf: body.data.priceAsOf ?? existing.priceAsOf ?? undefined,
+    priceSource: body.data.priceSource ?? existing.priceSource ?? undefined,
+  })) {
+    return c.json({ error: "Fresh valuations require a dated price/FX source" }, 400);
   }
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };

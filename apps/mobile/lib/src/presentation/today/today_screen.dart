@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../data/goal_store.dart';
+import '../../data/balance_privacy_store.dart';
 import '../../domain/today_models.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
@@ -70,11 +71,12 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       });
     }
 
-    if (action.completionKind == 'contributeToGoal' && action.targetId != null) {
+    if (action.completionKind == 'contributeToGoal' &&
+        action.targetId != null) {
       ref.read(goalStoreProvider.notifier).contribute(action.targetId!, 25000);
     }
 
-    ref.read(todayQuestCompletedProvider.notifier).state = true;
+    ref.read(todayQuestCompletedProvider.notifier).complete(action);
   }
 
   @override
@@ -83,6 +85,60 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
     final data = widget.data;
     final wealth = data.wealthSnapshot;
     final completed = ref.watch(todayQuestCompletedProvider);
+    final balancesVisible = ref.watch(balancesVisibleProvider);
+    ref
+        .read(todayQuestCompletedProvider.notifier)
+        .load(data.health.recommendedAction);
+
+    if (!balancesVisible) {
+      return CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              SproutSpacing.pageHorizontal,
+              SproutSpacing.lg,
+              SproutSpacing.pageHorizontal,
+              NavMetrics.bottomContentPadding(context),
+            ),
+            sliver: SliverList.list(children: [
+              _TodayHeader(data: data),
+              const SizedBox(height: SproutSpacing.lg),
+              _Greeting(data: data),
+              const SizedBox(height: SproutSpacing.xl),
+              const SproutMascot(state: SproutMascotState.idle, size: 112),
+              const SizedBox(height: SproutSpacing.lg),
+              Text(
+                'Your balances are hidden',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: SproutSpacing.sm),
+              Text(
+                'Sprout will keep exact balances, movements, goals, and transaction amounts private until you choose to show them.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(color: SproutColorScheme.of(context).muted),
+              ),
+              const SizedBox(height: SproutSpacing.xl),
+              FilledButton.icon(
+                onPressed: () =>
+                    ref.read(balancesVisibleProvider.notifier).setVisible(true),
+                icon: const Icon(Icons.visibility_rounded),
+                label: const Text('Show balances'),
+              ),
+              const SizedBox(height: SproutSpacing.lg),
+              Text(
+                data.provenanceSummary,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ]),
+          ),
+        ],
+      );
+    }
 
     // ── Above-fold: the calm 20-second glance ──
     // Mascot (compact, supporting), total wealth (hero number), movement chips,
@@ -128,7 +184,10 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
         actionLabel: 'See what I should do',
         onAction: () {
           HapticFeedback.lightImpact();
-          final goal = ref.read(goalStoreProvider).where((g) => g.status == 'active').firstOrNull;
+          final goal = ref
+              .read(goalStoreProvider)
+              .where((g) => g.status == 'active')
+              .firstOrNull;
           if (goal != null) {
             GoalEditorSheet.open(context, goal: goal);
           }
@@ -602,11 +661,21 @@ class _SproutRead extends StatelessWidget {
           context,
           title: 'What Sprout is seeing',
           rows: [
-            SheetInfoRow(icon: Icons.insights_rounded, label: 'Why today moved', value: detail),
-            SheetInfoRow(icon: Icons.flag_rounded, label: 'Closest next step', value: actionLabel),
+            SheetInfoRow(
+                icon: Icons.insights_rounded,
+                label: 'Why today moved',
+                value: detail),
+            SheetInfoRow(
+                icon: Icons.flag_rounded,
+                label: 'Closest next step',
+                value: actionLabel),
           ],
           actions: [
-            SheetAction(label: actionLabel, icon: Icons.play_arrow_rounded, onTap: onAction, isPrimary: true),
+            SheetAction(
+                label: actionLabel,
+                icon: Icons.play_arrow_rounded,
+                onTap: onAction,
+                isPrimary: true),
           ],
         );
       },
@@ -699,13 +768,34 @@ class _SalaryStrip extends StatelessWidget {
           context,
           title: 'Salary cashflow',
           rows: [
-            SheetInfoRow(icon: Icons.calendar_today_rounded, label: 'Expected salary', value: 'Arrives ${_formatDate(nextPayday)}'),
-            SheetInfoRow(icon: Icons.account_balance_wallet_rounded, label: 'Projected PKR', value: 'About ${SproutFormat.compactCurrency(availableCash)} available now'),
-            SheetInfoRow(icon: Icons.receipt_long_rounded, label: 'Bills this window', value: 'PKR ${SproutFormat.compactCurrency(upcomingBills)} due soon'),
+            SheetInfoRow(
+                icon: Icons.calendar_today_rounded,
+                label: 'Expected salary',
+                value: 'Arrives ${_formatDate(nextPayday)}'),
+            SheetInfoRow(
+                icon: Icons.account_balance_wallet_rounded,
+                label: 'Projected PKR',
+                value:
+                    'About ${SproutFormat.compactCurrency(availableCash)} available now'),
+            SheetInfoRow(
+                icon: Icons.receipt_long_rounded,
+                label: 'Bills this window',
+                value:
+                    'PKR ${SproutFormat.compactCurrency(upcomingBills)} due soon'),
           ],
           actions: [
-            SheetAction(label: 'Edit salary date or amount', icon: Icons.edit_rounded, onTap: () => context.go('/settings'), isPrimary: true),
-            SheetAction(label: 'Add a bill I’m expecting', icon: Icons.add_circle_outline_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bill reminder added to your mock plan.')))),
+            SheetAction(
+                label: 'Edit salary date or amount',
+                icon: Icons.edit_rounded,
+                onTap: () => context.go('/settings'),
+                isPrimary: true),
+            SheetAction(
+                label: 'Add a bill I’m expecting',
+                icon: Icons.add_circle_outline_rounded,
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content:
+                            Text('Bill reminder added to your mock plan.')))),
           ],
         );
       },
@@ -878,14 +968,38 @@ class _WhatsHappening extends ConsumerWidget {
             context,
             title: closest.name,
             rows: [
-              SheetInfoRow(icon: Icons.flag_rounded, label: 'Progress', value: '${SproutFormat.compactCurrency(closest.currentAmount)} saved · ${SproutFormat.compactCurrency(closest.remainingToTarget)} left'),
-              SheetInfoRow(icon: Icons.speed_rounded, label: 'Pace', value: closest.paceNote),
+              SheetInfoRow(
+                  icon: Icons.flag_rounded,
+                  label: 'Progress',
+                  value:
+                      '${SproutFormat.compactCurrency(closest.currentAmount)} saved · ${SproutFormat.compactCurrency(closest.remainingToTarget)} left'),
+              SheetInfoRow(
+                  icon: Icons.speed_rounded,
+                  label: 'Pace',
+                  value: closest.paceNote),
             ],
             actions: [
-              SheetAction(label: 'Add to this goal', icon: Icons.add_circle_outline_rounded, onTap: () => GoalEditorSheet.open(context, goal: closest), isPrimary: true),
-              SheetAction(label: 'Edit goal', icon: Icons.edit_rounded, onTap: () => GoalEditorSheet.open(context, goal: closest)),
-              SheetAction(label: 'Complete', icon: Icons.check_circle_outline_rounded, onTap: () => ref.read(goalStoreProvider.notifier).complete(closest.id), isDestructive: false),
-              SheetAction(label: 'Delete', icon: Icons.delete_outline_rounded, onTap: () => ref.read(goalStoreProvider.notifier).delete(closest.id), isDestructive: true),
+              SheetAction(
+                  label: 'Add to this goal',
+                  icon: Icons.add_circle_outline_rounded,
+                  onTap: () => GoalEditorSheet.open(context, goal: closest),
+                  isPrimary: true),
+              SheetAction(
+                  label: 'Edit goal',
+                  icon: Icons.edit_rounded,
+                  onTap: () => GoalEditorSheet.open(context, goal: closest)),
+              SheetAction(
+                  label: 'Complete',
+                  icon: Icons.check_circle_outline_rounded,
+                  onTap: () =>
+                      ref.read(goalStoreProvider.notifier).complete(closest.id),
+                  isDestructive: false),
+              SheetAction(
+                  label: 'Delete',
+                  icon: Icons.delete_outline_rounded,
+                  onTap: () =>
+                      ref.read(goalStoreProvider.notifier).delete(closest.id),
+                  isDestructive: true),
             ],
           );
         },
@@ -909,11 +1023,22 @@ class _WhatsHappening extends ConsumerWidget {
             context,
             title: thread.title,
             rows: [
-              SheetInfoRow(icon: Icons.lightbulb_rounded, label: 'Summary', value: thread.summary),
-              SheetInfoRow(icon: Icons.menu_book_rounded, label: 'Explanation', value: thread.body),
+              SheetInfoRow(
+                  icon: Icons.lightbulb_rounded,
+                  label: 'Summary',
+                  value: thread.summary),
+              SheetInfoRow(
+                  icon: Icons.menu_book_rounded,
+                  label: 'Explanation',
+                  value: thread.body),
             ],
             actions: [
-              SheetAction(label: 'Got it', icon: Icons.check_circle_outline_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as read.'))), isPrimary: true),
+              SheetAction(
+                  label: 'Got it',
+                  icon: Icons.check_circle_outline_rounded,
+                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Marked as read.'))),
+                  isPrimary: true),
             ],
           );
         },
@@ -1028,12 +1153,28 @@ class _WhatsHappening extends ConsumerWidget {
           context,
           title: title,
           rows: [
-            SheetInfoRow(icon: icon, label: 'What happened', value: event.plainWhy),
-            SheetInfoRow(icon: Icons.verified_rounded, label: 'Why this matters', value: event.kind == WealthEventKind.fxMove ? 'FX moved the value of your EUR balance.' : 'This is the driver behind today\'s net change.'),
+            SheetInfoRow(
+                icon: icon, label: 'What happened', value: event.plainWhy),
+            SheetInfoRow(
+                icon: Icons.verified_rounded,
+                label: 'Why this matters',
+                value: event.kind == WealthEventKind.fxMove
+                    ? 'FX moved the value of your EUR balance.'
+                    : 'This is the driver behind today\'s net change.'),
           ],
           actions: [
-            SheetAction(label: 'See full holding', icon: Icons.account_balance_rounded, onTap: () => context.go('/money'), isPrimary: true),
-            SheetAction(label: 'Learn why this moves', icon: Icons.menu_book_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Learn thread opened from the mock briefing.')))),
+            SheetAction(
+                label: 'See full holding',
+                icon: Icons.account_balance_rounded,
+                onTap: () => context.go('/money'),
+                isPrimary: true),
+            SheetAction(
+                label: 'Learn why this moves',
+                icon: Icons.menu_book_rounded,
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            'Learn thread opened from the mock briefing.')))),
           ],
         );
       },
@@ -1264,7 +1405,19 @@ class _HoldingsBreakdown extends StatelessWidget {
               context,
               title: '6-day wealth trend',
               rows: [
-                for (final point in holdings.isEmpty ? const <int>[] : [for (final value in [13667000, 13669000, 13670000, 13672000, 13674000, 13677000]) value])
+                for (final point in holdings.isEmpty
+                    ? const <int>[]
+                    : [
+                        for (final value in [
+                          13667000,
+                          13669000,
+                          13670000,
+                          13672000,
+                          13674000,
+                          13677000
+                        ])
+                          value
+                      ])
                   SheetInfoRow(
                     icon: Icons.show_chart_rounded,
                     label: 'Point',
@@ -1272,7 +1425,11 @@ class _HoldingsBreakdown extends StatelessWidget {
                   ),
               ],
               actions: [
-                SheetAction(label: 'See full chart', icon: Icons.show_chart_rounded, onTap: () => context.go('/insights'), isPrimary: true),
+                SheetAction(
+                    label: 'See full chart',
+                    icon: Icons.show_chart_rounded,
+                    onTap: () => context.go('/insights'),
+                    isPrimary: true),
               ],
             );
           },
@@ -1342,15 +1499,38 @@ class _HoldingRow extends StatelessWidget {
           context,
           title: holding.label,
           rows: [
-            SheetInfoRow(icon: Icons.account_balance_wallet_rounded, label: 'Value', value: _formatCompact(holding.valuePkr)),
-            SheetInfoRow(icon: Icons.verified_rounded, label: 'Source', value: '${holding.priceSource} · ${holding.priceAsOf}'),
+            SheetInfoRow(
+                icon: Icons.account_balance_wallet_rounded,
+                label: 'Value',
+                value: _formatCompact(holding.valuePkr)),
+            SheetInfoRow(
+                icon: Icons.verified_rounded,
+                label: 'Source',
+                value: '${holding.priceSource} · ${holding.priceAsOf}'),
             if (holding.fxRate != null)
-              SheetInfoRow(icon: Icons.currency_exchange_rounded, label: holding.fxRate!.pair, value: '${holding.fxRate!.value} · ${holding.fxRate!.source} · ${holding.fxRate!.asOf}'),
-            SheetInfoRow(icon: Icons.insights_rounded, label: 'Movement reason', value: event?.plainWhy ?? 'Flat today. No movement driver.'),
+              SheetInfoRow(
+                  icon: Icons.currency_exchange_rounded,
+                  label: holding.fxRate!.pair,
+                  value:
+                      '${holding.fxRate!.value} · ${holding.fxRate!.source} · ${holding.fxRate!.asOf}'),
+            SheetInfoRow(
+                icon: Icons.insights_rounded,
+                label: 'Movement reason',
+                value: event?.plainWhy ?? 'Flat today. No movement driver.'),
           ],
           actions: [
-            SheetAction(label: 'See full holding', icon: Icons.account_balance_rounded, onTap: () => context.go('/money'), isPrimary: true),
-            SheetAction(label: 'Learn why this moves', icon: Icons.menu_book_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Learn thread opened from the holding detail.')))),
+            SheetAction(
+                label: 'See full holding',
+                icon: Icons.account_balance_rounded,
+                onTap: () => context.go('/money'),
+                isPrimary: true),
+            SheetAction(
+                label: 'Learn why this moves',
+                icon: Icons.menu_book_rounded,
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text(
+                            'Learn thread opened from the holding detail.')))),
           ],
         );
       },
@@ -1493,10 +1673,17 @@ class _WhyItMoved extends StatelessWidget {
               title: 'Why it moved today',
               rows: [
                 for (final item in interpretation)
-                  SheetInfoRow(icon: Icons.insights_rounded, label: 'Driver', value: item),
+                  SheetInfoRow(
+                      icon: Icons.insights_rounded,
+                      label: 'Driver',
+                      value: item),
               ],
               actions: [
-                SheetAction(label: 'See 6-day trend', icon: Icons.show_chart_rounded, onTap: () => context.go('/insights'), isPrimary: true),
+                SheetAction(
+                    label: 'See 6-day trend',
+                    icon: Icons.show_chart_rounded,
+                    onTap: () => context.go('/insights'),
+                    isPrimary: true),
               ],
             );
           },
@@ -1684,11 +1871,22 @@ class _LearnLater extends StatelessWidget {
                 context,
                 title: thread.title,
                 rows: [
-                  SheetInfoRow(icon: Icons.lightbulb_rounded, label: 'Summary', value: thread.summary),
-                  SheetInfoRow(icon: Icons.menu_book_rounded, label: 'Explanation', value: thread.body),
+                  SheetInfoRow(
+                      icon: Icons.lightbulb_rounded,
+                      label: 'Summary',
+                      value: thread.summary),
+                  SheetInfoRow(
+                      icon: Icons.menu_book_rounded,
+                      label: 'Explanation',
+                      value: thread.body),
                 ],
                 actions: [
-                  SheetAction(label: 'Got it', icon: Icons.check_circle_outline_rounded, onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as read.'))), isPrimary: true),
+                  SheetAction(
+                      label: 'Got it',
+                      icon: Icons.check_circle_outline_rounded,
+                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Marked as read.'))),
+                      isPrimary: true),
                 ],
               );
             },

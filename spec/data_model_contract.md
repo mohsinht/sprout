@@ -328,6 +328,12 @@ type FxRate = {
 The daily snapshot of total wealth. This is the hero object of the Today
 screen. One per day, produced by the nightly job.
 
+`WealthSnapshot` is a durable historical record, not a computed-on-read view.
+The backend persists at most one canonical snapshot per user and PKT calendar
+date (with idempotent retries). Yesterday movement, MTD movement, the 6-day
+trend, and continuity language are derived from persisted snapshots. The UI
+must never reconstruct history from current holdings.
+
 ```ts
 type WealthSnapshot = {
   date: string;                    // ISO date of the snapshot
@@ -362,6 +368,22 @@ Rules:
   either `mainReason` or a `WealthEvent`.
 - `trend` holds the last N days (v0: 6 days) for the depth chart. It is a
   depth element, not a Today-hero element.
+- Snapshot dates and daily cutoffs use `Asia/Karachi`. Market-day comparisons
+  use a versioned Pakistan market calendar. Weekends and configured PSX
+  holidays do not count as missing NAV days; the calendar source/version is
+  operational metadata, not AI inference.
+- A source failure still creates the day's canonical snapshot using only the
+  last trusted observations, explicitly marked stale/unavailable. It never
+  creates a silent gap in history.
+
+### Canonical Contract Fixture
+
+The canonical multi-currency fixture lives in
+`packages/shared/src/mock-wealth.ts`: Al Meezan fund holdings, PKR cash, Wise
+USD/EUR cash, 7 Jul 2026 dated prices, and fixture FX values USD/PKR 277.992
+and EUR/PKR 317.536. These values are test fixtures, never live defaults.
+Contract validators, scoring/action golden tests, repository adapters, and UI
+fixtures should consume this same dataset or a mechanically derived form.
 
 ## WealthEvent
 

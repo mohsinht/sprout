@@ -77,9 +77,9 @@ The model may draft language, but the backend must validate and normalize the ou
 The nightly job follows this sequence (mirroring the canonical automation example):
 
 1. **Fetch holdings:** pull current fund units (from reconciled statement or connected source), Wise multi-currency balances, and PKR cash.
-2. **Pull prices/FX:** fetch dated NAVs/redemption prices per fund (e.g. Al Meezan prices valid for the date) and dated FX rates (e.g. USD/PKR, EUR/PKR from Xe). Each must carry `asOf` date and `source` label.
+2. **Pull and validate prices/FX:** versioned fetchers read dated NAVs/redemption prices per fund and dated FX rates. Al Meezan observations are cross-checked with MUFAP for matching fund/date. Every accepted observation carries `asOf`, source, fetcher version, and validation status. Failed or disputed observations are quarantined; the last trusted value may only continue as explicitly stale.
 3. **Reconcile units:** cross-check fund units against the user-uploaded Al Meezan statement. Flag discrepancies for review; never silently override.
-4. **Compute WealthSnapshot:** calculate `valuePkr` per holding, sum to `totalPkr`, compute `changeVsYesterday` and `changeMtd` from prior snapshots, determine `mainReason` (e.g. "NAV movement"), and generate `interpretation[]` lines in Sprout's voice.
+4. **Persist WealthSnapshot:** calculate `valuePkr` per holding, sum to `totalPkr`, compute `changeVsYesterday` and `changeMtd` from durable prior snapshots, determine `mainReason`, and generate interpretation. Upsert one canonical snapshot per user and `Asia/Karachi` date. Never compute history only on read.
 5. **Detect WealthEvents:** identify per-holding NAV moves, FX moves, contributions, withdrawals, bills, and goal milestones. Each event references prior-day context where available ("Al Meezan pulled back after yesterday's jump"). Mix good and not-good honestly.
 6. **Select recommended action:** choose one goal-relative, concrete next-step per the scoring model's priority order. Never a check-in. Never investment advice with implied certainty.
 7. **Attach learn-later threads:** for events worth learning (e.g. "why do fund NAVs move?"), attach a `learnMoreId` linking to a `LearnThread`.
@@ -118,6 +118,11 @@ Before saving a briefing:
 - **No valuation without a dated price/FX source.** Every `Holding.valuePkr` must trace to a `PriceQuote` (for funds) or `FxRate` (for non-PKR cash) with an `asOf` date and `source` label. If missing, the holding is marked `freshness: "unavailable"` and excluded from the total, with a finding.
 - **Stale price/FX handling:** if a NAV is older than the expected cadence (e.g. 2+ market days stale) or FX is older than 1 business day, mark the holding `freshness: "stale"`, label it in the UI, and include a finding. Never silently trust a stale price.
 - **Provenance summary:** `wealthSnapshot.provenanceSummary` must state the dated sources used (e.g. "Al Meezan prices valid 7 Jul 2026; FX from Xe: USD/PKR 277.992, EUR/PKR 317.536").
+- **Cross-validation:** a disputed Al Meezan/MUFAP observation is not published
+  as fresh. AI never chooses between numeric sources.
+- **Calendar continuity:** market-day freshness uses versioned Pakistan market
+  calendar data. A failed fetch still produces the canonical PKT-date snapshot
+  from last-trusted stale/unavailable observations.
 
 ## Severity Model
 
@@ -250,3 +255,6 @@ Before saving a briefing:
 - **Every holding valuation exposes dated price/FX provenance.**
 - **Stale prices/FX are labelled, never silently trusted.**
 - **No "check-in" action is ever selected.**
+- **Snapshot persistence is idempotent per user/PKT date and history-backed.**
+- **Price/FX fetchers are versioned, golden-tested, and drift-observed.**
+- **Disputed observations are quarantined, never silently fresh.**

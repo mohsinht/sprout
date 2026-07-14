@@ -218,6 +218,11 @@ Minimum:
 
 ## Phasing
 
+Phases describe build order, not permission to expose untrusted financial
+values. Mock/rules-based slices may ship to internal prototypes, but a public
+or closed beta showing real wealth is blocked by the production launch gates
+below.
+
 ### Phase 1
 
 4-tab shell plus center `+`, onboarding, manual-first capture, Today, Money, Insights, Settings, Sprout Explains, local persistence, mock/rules briefing, mascot states, and celebration. Insights uses mock data behind a repository in Phase 1.
@@ -229,6 +234,49 @@ Real nightly AI briefing behind the same contract, AI-generated personal Insight
 ### Phase 3
 
 Auto-capture sources, confidence pipeline, Urdu expansion, streak recovery, and richer income outlook that asks and remembers instead of predicting.
+
+## Delivery Triage And Launch Gates
+
+### Ship-blocking for a real-value beta
+
+- Four-tab shell + center Quick Add, locked Today arc, skippable offline-safe
+  onboarding, and manual holdings/cash/transaction entry.
+- Full goal CRUD with local persistence, deterministic scoring/action tests,
+  Sprout Explains, reduce-motion, and 1.3× text-scale acceptance.
+- Durable daily WealthSnapshot history with dated NAV/FX provenance,
+  Al Meezan statement unit reconciliation, MUFAP cross-validation, stale/error
+  degradation, and at least 14 days of reviewed headless pipeline runs.
+- Raster/static mascot baseline and measured low-end Android performance. Rive
+  is not a beta blocker.
+
+### Contract-preserving v1.x additions
+
+- Email OAuth capture, model-written phrasing, live personally relevant
+  Insights, notifications, dark mode, streak freeze/repair, Urdu, Rive motion,
+  and Wise partnership/API access. User exports/manual entry remain valid
+  earlier paths.
+
+### Post-v1 opportunities
+
+Future releases may deepen Sprout through memory, ritual, character, and
+visible proof without adding dashboard density. The sequenced candidate list
+and its constraints live in [Post-v1 Product Opportunities](post_v1_roadmap.md).
+These ideas are not v1 scope or current acceptance requirements. Each requires
+a focused feature spec and traceability update before implementation, and none
+may add another Today card, primary action, tab, generic feed, or unsupported
+prediction.
+
+### Explicit non-product
+
+- Moving/holding money, KYC/payment rails, universal bank aggregation claims,
+  bank-portal scraping, or stored credentials.
+- Generic news feeds, infinite scroll, social/leaderboards, a chat interface,
+  or a second Today action/card that breaks the locked structure.
+- Certain buy/sell/rebalance advice. Sprout may make a sourced observation and
+  suggest review/contribution consideration, never promise an outcome.
+
+The Flutter web target may remain an internal development/test harness. It is
+not a promised customer web product unless a separate deliberate spec adds it.
 
 ## App-Level Definition of Done
 

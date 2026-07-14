@@ -153,24 +153,8 @@ class ManualTransactionsNotifier
     state = [transaction, ...state];
     await _persist();
     if (_useMock || _ref.read(authSessionProvider) == null) return;
-    final accountId =
-        RegExp(r'^[0-9a-f-]{36}$').hasMatch(transaction.accountId ?? '')
-            ? transaction.accountId
-            : null;
     try {
-      final created =
-          await _ref.read(apiClientProvider).post('/v1/transactions', {
-        'amount': transaction.amount,
-        'currency': transaction.currency,
-        'type': transaction.type.name,
-        'category': transaction.category,
-        'merchant': transaction.merchant,
-        'note': transaction.note,
-        'occurredAt': transaction.date.toUtc().toIso8601String(),
-        'source': 'manual',
-        'confidence': 1,
-        if (accountId != null) 'accountId': accountId
-      });
+      final created = await _push(transaction);
       state = [
         for (final tx in state)
           if (tx.id == transaction.id) _transactionFromJson(created) else tx
@@ -187,16 +171,54 @@ class ManualTransactionsNotifier
   Future<void> syncFromServer() async {
     if (_useMock || _ref.read(authSessionProvider) == null) return;
     try {
+      // Local-first entries have non-UUID IDs. Retry them before replacing the
+      // local account picture with the server picture, so reconnecting cannot
+      // silently strand a transaction on one device.
+      final unresolved = <SproutTransaction>[];
+      var pushedAny = false;
+      for (final transaction in state.where((tx) => !_isRemoteId(tx.id))) {
+        try {
+          await _push(transaction);
+          pushedAny = true;
+        } catch (_) {
+          unresolved.add(transaction);
+        }
+      }
+
       final response =
           await _ref.read(apiClientProvider).get('/v1/transactions');
       final remote = (response['transactions'] as List? ?? const [])
           .map((e) => _transactionFromJson(e as Map<String, dynamic>))
           .toList();
-      final pending =
-          state.where((tx) => !RegExp(r'^[0-9a-f-]{36}$').hasMatch(tx.id));
-      state = [...pending, ...remote];
+      state = [...unresolved, ...remote];
       await _persist();
+      if (pushedAny) {
+        await _ref.read(accountsProvider.notifier).syncFromServer();
+        await _ref
+            .read(apiClientProvider)
+            .post('/v1/briefing/refresh', {'contextChanged': true});
+        _ref.read(briefingRevisionProvider.notifier).state++;
+      }
     } catch (_) {}
+  }
+
+  bool _isRemoteId(String id) => RegExp(r'^[0-9a-f-]{36}$').hasMatch(id);
+
+  Future<Map<String, dynamic>> _push(SproutTransaction transaction) {
+    final accountId =
+        _isRemoteId(transaction.accountId ?? '') ? transaction.accountId : null;
+    return _ref.read(apiClientProvider).post('/v1/transactions', {
+      'amount': transaction.amount,
+      'currency': transaction.currency,
+      'type': transaction.type.name,
+      'category': transaction.category,
+      'merchant': transaction.merchant,
+      'note': transaction.note,
+      'occurredAt': transaction.date.toUtc().toIso8601String(),
+      'source': 'manual',
+      'confidence': 1,
+      if (accountId != null) 'accountId': accountId,
+    });
   }
 
   Future<void> _persist() async {

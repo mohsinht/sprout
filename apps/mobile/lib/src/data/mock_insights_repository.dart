@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/insights_models.dart';
+import '../domain/today_models.dart';
+import 'http_today_repository.dart';
 import 'insights_validation.dart';
 
 abstract class InsightsRepository {
@@ -9,7 +11,9 @@ abstract class InsightsRepository {
 }
 
 final insightsRepositoryProvider = Provider<InsightsRepository>((ref) {
-  return const MockInsightsRepository();
+  const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
+  if (useMock) return const MockInsightsRepository();
+  return BriefingInsightsRepository(ref.read(todayRepositoryProvider));
 });
 
 final insightsProvider = FutureProvider<InsightsData>((ref) {
@@ -104,4 +108,71 @@ class MockInsightsRepository implements InsightsRepository {
     validateInsights(data.items);
     return data;
   }
+}
+
+/// Production insights are projections of dated, provenance-bearing events in
+/// the user's own briefing. If there is no relevant event, the honest result is
+/// a quiet week rather than generic market content.
+class BriefingInsightsRepository implements InsightsRepository {
+  BriefingInsightsRepository(this._todayRepository);
+
+  final TodayRepository _todayRepository;
+
+  @override
+  Future<InsightsData> fetchInsights() async {
+    final today = await _todayRepository.fetchToday();
+    final offline = today.provenanceSummary.contains('Waiting to sync');
+    final items = today.wealthEvents.map((event) {
+      final holding = today.wealthSnapshot.holdings
+          .where((item) => item.id == event.holdingId)
+          .firstOrNull;
+      final category = switch (event.kind) {
+        WealthEventKind.goalMilestone => InsightCategory.goals,
+        WealthEventKind.fxMove => InsightCategory.cash,
+        WealthEventKind.navMove => InsightCategory.funds,
+        _ => InsightCategory.wealth,
+      };
+      final icon = switch (category) {
+        InsightCategory.goals => Icons.flag_rounded,
+        InsightCategory.cash => Icons.currency_exchange_rounded,
+        InsightCategory.funds => Icons.account_balance_rounded,
+        InsightCategory.wealth => Icons.trending_up_rounded,
+      };
+      return MoneyInsight(
+        id: event.id,
+        category: category,
+        icon: icon,
+        headline: _headline(event),
+        personalMeaning: event.plainWhy,
+        detail:
+            '${event.plainWhy} This is based on your dated Sprout briefing, not a general market recommendation.',
+        relevanceTag: holding?.label ?? 'Your money',
+        provenance: InsightProvenance(
+          sourceLabel: holding?.priceSource ?? 'Sprout manual record',
+          asOf: event.date,
+          isMock: false,
+        ),
+        actionLabel: holding == null ? null : 'See Money',
+        actionKind:
+            holding == null ? InsightActionKind.none : InsightActionKind.money,
+      );
+    }).toList();
+    validateInsights(items);
+    return InsightsData(
+      items: items,
+      refreshedLabel: 'From your briefing · ${today.wealthSnapshot.date}',
+      offline: offline,
+      thinData: items.isEmpty,
+    );
+  }
+
+  String _headline(WealthEvent event) => switch (event.kind) {
+        WealthEventKind.navMove => 'A holding value moved',
+        WealthEventKind.fxMove => 'Currency movement affected your value',
+        WealthEventKind.contribution => 'A contribution changed your picture',
+        WealthEventKind.withdrawal => 'A withdrawal changed your picture',
+        WealthEventKind.bill => 'A bill affected your cash',
+        WealthEventKind.goalMilestone => 'A goal reached a milestone',
+        WealthEventKind.newsContext => 'New context for one of your holdings',
+      };
 }
