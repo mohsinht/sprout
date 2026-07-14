@@ -13,15 +13,18 @@ import '../presentation/shell/app_shell.dart';
 import '../presentation/today/today_screen.dart';
 import '../presentation/today/today_controller.dart';
 import '../data/auth_store.dart';
+import '../data/reminder_service.dart';
 import '../theme/sprout_theme.dart';
 import 'theme_mode_controller.dart';
+import 'app_lock_gate.dart';
 
 final _router = GoRouter(
   initialLocation: '/today',
   routes: [
     GoRoute(
       path: '/auth',
-      pageBuilder: (context, state) => const NoTransitionPage(child: AuthScreen()),
+      pageBuilder: (context, state) =>
+          const NoTransitionPage(child: AuthScreen()),
     ),
     // Dev-only mascot lab — not part of the product shell.
     GoRoute(
@@ -71,6 +74,10 @@ final _router = GoRouter(
   ],
 );
 
+final _reminderBootstrapProvider = FutureProvider<void>((ref) async {
+  await ReminderService.instance.initialize(onOpen: _router.go);
+});
+
 class SproutApp extends ConsumerWidget {
   const SproutApp({super.key});
 
@@ -79,6 +86,7 @@ class SproutApp extends ConsumerWidget {
     // Restore the persisted session at app startup. If Today started loading
     // before restoration completed, retry it once the access token is ready.
     ref.watch(authSessionProvider);
+    ref.watch(_reminderBootstrapProvider);
     ref.listen(authSessionProvider, (previous, next) {
       if (next != null && previous?.accessToken != next.accessToken) {
         ref.invalidate(todayControllerProvider);
@@ -92,6 +100,8 @@ class SproutApp extends ConsumerWidget {
       darkTheme: buildSproutTheme(brightness: Brightness.dark),
       themeMode: themeMode,
       routerConfig: _router,
+      builder: (context, child) =>
+          AppLockGate(child: child ?? const SizedBox.shrink()),
     );
   }
 }

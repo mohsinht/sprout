@@ -394,7 +394,8 @@ WealthTrendPoint wealthTrendPointFromApiJson(Map<String, dynamic> json) {
   );
 }
 
-WealthHoldingBreakdown wealthHoldingBreakdownFromApiJson(Map<String, dynamic> json) {
+WealthHoldingBreakdown wealthHoldingBreakdownFromApiJson(
+    Map<String, dynamic> json) {
   return WealthHoldingBreakdown(
     holdingId: json['holdingId'] as String,
     label: json['label'] as String,
@@ -409,7 +410,8 @@ WealthSnapshot wealthSnapshotFromApiJson(Map<String, dynamic> json) {
     date: json['date'] as String,
     totalPkr: json['totalPkr'] as int,
     perHoldingBreakdown: (json['perHoldingBreakdown'] as List<dynamic>)
-        .map((e) => wealthHoldingBreakdownFromApiJson(e as Map<String, dynamic>))
+        .map(
+            (e) => wealthHoldingBreakdownFromApiJson(e as Map<String, dynamic>))
         .toList(),
     changeVsYesterday: json['changeVsYesterday'] as int,
     changeMtd: json['changeMtd'] as int,
@@ -466,14 +468,16 @@ WealthGoal wealthGoalFromApiJson(Map<String, dynamic> json) {
   );
 }
 
-WealthBriefingAction wealthBriefingActionFromApiJson(Map<String, dynamic> json) {
+WealthBriefingAction wealthBriefingActionFromApiJson(
+    Map<String, dynamic> json) {
   return WealthBriefingAction(
     id: json['id'] as String,
     label: json['label'] as String,
     severity: _wealthEventSeverityFromString(json['severity'] as String),
     effect: json['effect'] as String,
     xp: json['xp'] as int,
-    completionKind: _wealthActionCompletionKindFromString(json['completionKind'] as String),
+    completionKind:
+        _wealthActionCompletionKindFromString(json['completionKind'] as String),
     targetId: json['targetId'] as String?,
     goalRelativeNote: json['goalRelativeNote'] as String?,
   );

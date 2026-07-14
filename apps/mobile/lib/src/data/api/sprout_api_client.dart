@@ -34,6 +34,8 @@ class SproutApiClient {
   final String _baseUrl;
   String? _authToken;
   String? _refreshToken;
+  String? _deviceId;
+  String? _deviceName;
   Future<void> Function(String accessToken, String refreshToken)?
       _onSessionRefreshed;
 
@@ -53,6 +55,11 @@ class SproutApiClient {
     _onSessionRefreshed = onRefreshed;
   }
 
+  void setDeviceIdentity(String deviceId, String deviceName) {
+    _deviceId = deviceId;
+    _deviceName = deviceName;
+  }
+
   void setAuthToken(String token) => _authToken = token;
   void clearAuthToken() {
     _authToken = null;
@@ -62,23 +69,42 @@ class SproutApiClient {
 
   Future<AuthSession> register(
       {required String email, required String password, String? name}) async {
+    final deviceId = _requireDeviceId();
     final json = await post('/v1/auth/register', {
       'email': email.trim(),
       'password': password,
       if (name != null && name.trim().isNotEmpty) 'name': name.trim(),
+      'deviceId': deviceId,
+      if (_deviceName != null) 'deviceName': _deviceName,
     });
     return _sessionFromJson(json);
   }
 
   Future<AuthSession> login(
       {required String email, required String password}) async {
-    final json = await post(
-        '/v1/auth/login', {'email': email.trim(), 'password': password});
+    final deviceId = _requireDeviceId();
+    final json = await post('/v1/auth/login', {
+      'email': email.trim(),
+      'password': password,
+      'deviceId': deviceId,
+      if (_deviceName != null) 'deviceName': _deviceName,
+    });
     return _sessionFromJson(json);
   }
 
   Future<void> logout(String refreshToken) async {
-    await post('/v1/auth/logout', {'refreshToken': refreshToken});
+    await post('/v1/auth/logout', {
+      'refreshToken': refreshToken,
+      'deviceId': _requireDeviceId(),
+    });
+  }
+
+  String _requireDeviceId() {
+    final id = _deviceId;
+    if (id == null) {
+      throw const SproutApiException('Device identity is unavailable');
+    }
+    return id;
   }
 
   AuthSession _sessionFromJson(Map<String, dynamic> json) {
@@ -217,7 +243,10 @@ class SproutApiClient {
           .post(
             Uri.parse('$_baseUrl/v1/auth/refresh'),
             headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({'refreshToken': refreshToken}),
+            body: jsonEncode({
+              'refreshToken': refreshToken,
+              'deviceId': _requireDeviceId(),
+            }),
           )
           .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return false;

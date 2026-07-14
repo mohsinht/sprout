@@ -50,7 +50,20 @@ class HttpTodayRepository implements TodayRepository {
       final encoded = prefs.getString(_cacheKey);
       if (encoded == null) rethrow;
       final cached = jsonDecode(encoded) as Map<String, dynamic>;
-      return todayDataFromWealthBriefing(wealthBriefingFromApiJson(cached));
+      final data =
+          todayDataFromWealthBriefing(wealthBriefingFromApiJson(cached));
+      return data.copyWith(
+        health: FinancialHealthScore(
+          score: data.health.score,
+          status: data.health.status,
+          summary: 'You are offline. This is your last saved Sprout briefing.',
+          positiveFactors: data.health.positiveFactors,
+          attentionFactors: data.health.attentionFactors,
+          recommendedAction: data.health.recommendedAction,
+        ),
+        provenanceSummary:
+            'Offline cached briefing · ${data.provenanceSummary}',
+      );
     }
   }
 }

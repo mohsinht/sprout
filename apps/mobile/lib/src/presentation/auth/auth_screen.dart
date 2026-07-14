@@ -50,9 +50,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } on SproutApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error =
             'Could not sign in right now. You can still use Sprout offline.');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

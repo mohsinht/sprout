@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'sprout_tokens.dart';
 
@@ -98,7 +97,8 @@ class SproutType {
     FontWeight weight = FontWeight.w700,
     double height = 1.2,
   }) {
-    return GoogleFonts.fredoka(
+    return TextStyle(
+      fontFamily: 'Fredoka',
       color: color,
       fontSize: size,
       fontWeight: weight,
@@ -113,7 +113,8 @@ class SproutType {
     FontWeight weight = FontWeight.w700,
     double height = 1.15,
   }) {
-    return GoogleFonts.fredoka(
+    return TextStyle(
+      fontFamily: 'Fredoka',
       color: color,
       fontSize: size,
       fontWeight: weight,
@@ -128,7 +129,8 @@ class SproutType {
     FontWeight weight = FontWeight.w700,
     double height = 1.05,
   }) {
-    return GoogleFonts.inter(
+    return TextStyle(
+      fontFamily: 'Inter',
       color: color,
       fontSize: size,
       fontWeight: weight,
@@ -143,7 +145,8 @@ class SproutType {
     FontWeight weight = FontWeight.w700,
     double height = 1.05,
   }) {
-    return GoogleFonts.inter(
+    return TextStyle(
+      fontFamily: 'Inter',
       color: color,
       fontSize: size,
       fontWeight: weight,
@@ -158,7 +161,8 @@ class SproutType {
     FontWeight weight = FontWeight.w800,
     double height = 1,
   }) {
-    return GoogleFonts.inter(
+    return TextStyle(
+      fontFamily: 'Inter',
       color: color,
       fontSize: size,
       fontWeight: weight,
@@ -173,7 +177,8 @@ class SproutType {
     FontWeight weight = FontWeight.w500,
     double height = 1.4,
   }) {
-    return GoogleFonts.nunitoSans(
+    return TextStyle(
+      fontFamily: 'Nunito Sans',
       color: color,
       fontSize: size,
       fontWeight: weight,
@@ -200,7 +205,7 @@ ThemeData buildSproutTheme({Brightness brightness = Brightness.light}) {
     onSurface: scheme.ink,
   );
 
-  final baseText = GoogleFonts.nunitoSansTextTheme();
+  const baseText = TextTheme();
   const displayWeight = FontWeight.w700; // Fredoka SemiBold/Bold
   const bodyWeight = FontWeight.w500; // Medium
   const labelWeight = FontWeight.w700; // Bold
@@ -209,7 +214,8 @@ ThemeData buildSproutTheme({Brightness brightness = Brightness.light}) {
 
   // Fredoka for playful headings / quest labels / display numbers.
   TextStyle fredoka(double size, FontWeight w, Color c, {double ls = 0}) =>
-      GoogleFonts.fredoka(
+      TextStyle(
+        fontFamily: 'Fredoka',
         fontSize: size,
         fontWeight: w,
         color: c,
@@ -219,7 +225,8 @@ ThemeData buildSproutTheme({Brightness brightness = Brightness.light}) {
 
   // Nunito Sans for body / explanations / clean UI.
   TextStyle nunito(double size, FontWeight w, Color c, {double h = 1.45}) =>
-      GoogleFonts.nunitoSans(
+      TextStyle(
+        fontFamily: 'Nunito Sans',
         fontSize: size,
         fontWeight: w,
         color: c,
@@ -275,7 +282,8 @@ ThemeData buildSproutTheme({Brightness brightness = Brightness.light}) {
           borderRadius: BorderRadius.circular(SproutRadius.pill),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        textStyle: GoogleFonts.nunitoSans(
+        textStyle: const TextStyle(
+          fontFamily: 'Nunito Sans',
           fontSize: 14,
           fontWeight: FontWeight.w700,
         ),
@@ -284,7 +292,8 @@ ThemeData buildSproutTheme({Brightness brightness = Brightness.light}) {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: SproutColors.seed,
-        textStyle: GoogleFonts.nunitoSans(
+        textStyle: const TextStyle(
+          fontFamily: 'Nunito Sans',
           fontSize: 14,
           fontWeight: FontWeight.w700,
         ),
@@ -306,8 +315,8 @@ ThemeData buildSproutTheme({Brightness brightness = Brightness.light}) {
         borderRadius: BorderRadius.circular(SproutRadius.card),
         borderSide: const BorderSide(color: SproutColors.seed, width: 1.5),
       ),
-      labelStyle: GoogleFonts.nunitoSans(color: muted),
-      hintStyle: GoogleFonts.nunitoSans(color: muted),
+      labelStyle: TextStyle(fontFamily: 'Nunito Sans', color: muted),
+      hintStyle: TextStyle(fontFamily: 'Nunito Sans', color: muted),
     ),
   );
 }

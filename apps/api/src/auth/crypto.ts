@@ -26,15 +26,21 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function issueRefreshToken(userId: string): Promise<string> {
+export async function issueRefreshToken(
+  userId: string,
+  device: { id: string; name?: string },
+): Promise<string> {
   const raw = randomBytes(48).toString("hex");
-  const tokenHash = hashToken(raw);
+  const tokenHash = hashToken(`${device.id}:${raw}`);
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + config.refreshTokenExpiresInDays);
 
   await db.insert(schema.refreshTokens).values({
     userId,
     tokenHash,
+    deviceId: device.id,
+    deviceName: device.name,
+    lastUsedAt: new Date(),
     expiresAt,
   });
 
@@ -42,9 +48,10 @@ export async function issueRefreshToken(userId: string): Promise<string> {
 }
 
 export async function verifyRefreshToken(
-  raw: string
+  raw: string,
+  deviceId: string,
 ): Promise<{ userId: string; tokenId: string } | null> {
-  const tokenHash = hashToken(raw);
+  const tokenHash = hashToken(`${deviceId}:${raw}`);
   const rows = await db
     .select()
     .from(schema.refreshTokens)
@@ -55,6 +62,12 @@ export async function verifyRefreshToken(
   if (!row) return null;
   if (row.revokedAt) return null;
   if (row.expiresAt < new Date()) return null;
+  if (row.deviceId && row.deviceId !== deviceId) return null;
+
+  await db
+    .update(schema.refreshTokens)
+    .set({ lastUsedAt: new Date() })
+    .where(eq(schema.refreshTokens.id, row.id));
 
   return { userId: row.userId, tokenId: row.id };
 }

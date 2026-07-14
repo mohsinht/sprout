@@ -3,6 +3,8 @@ import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { authMiddleware } from "../auth/middleware.js";
+import { config } from "../config.js";
+import { auditEvent } from "../lib/audit.js";
 
 /**
  * Statement/screenshot upload + re-anchor — the highest-trust event in the app.
@@ -25,6 +27,15 @@ import { authMiddleware } from "../auth/middleware.js";
 export const uploadRoute = new Hono<{ Variables: { userId: string } }>();
 
 uploadRoute.use("*", authMiddleware);
+uploadRoute.use("*", async (c, next) => {
+  if (!config.features.structuredImportsEnabled) {
+    return c.json({
+      error: "Structured imports are not enabled for this release",
+      code: "FEATURE_DISABLED",
+    }, 503);
+  }
+  await next();
+});
 
 // ── GET /v1/upload/baselines ──────────────────────────────────────────────────
 
@@ -45,22 +56,22 @@ uploadRoute.get("/baselines", async (c) => {
 // (units per fund, statement date). The backend creates a baseline, updates
 // holdings with confirmed units, and marks matching pending investments as unitized.
 
+const FundCodeSchema = z.enum(["AMMF", "MIF", "MSF", "MDIP", "MFPF-AAP"]);
 const StatementExtractSchema = z.object({
-  capturedAsOf: z.string(), // when the statement was captured
-  printedOn: z.string().optional(), // date printed on the document
+  capturedAsOf: z.string().date(), // when the statement was captured
+  printedOn: z.string().date().optional(), // date printed on the document
   confirmedValuePkr: z.number().int().nonnegative(),
   funds: z.array(
     z.object({
       holdingId: z.string().uuid().optional(), // existing holding to update
-      fundCode: z.string(),
-      fundName: z.string().optional(),
+      fundCode: FundCodeSchema,
+      fundName: z.string().min(1).max(200).optional(),
       units: z.number().nonnegative(),
       nav: z.number().positive().optional(),
       valuePkr: z.number().int().nonnegative().optional(),
-    })
-  ),
-  rawExtract: z.record(z.unknown()).optional(), // full structured extract
-});
+    }).strict()
+  ).min(1).max(25),
+}).strict();
 
 uploadRoute.post("/statement", async (c) => {
   const userId = c.get("userId") as string;
@@ -69,7 +80,7 @@ uploadRoute.post("/statement", async (c) => {
     return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
   }
 
-  const { capturedAsOf, printedOn, confirmedValuePkr, funds, rawExtract } = body.data;
+  const { capturedAsOf, printedOn, confirmedValuePkr, funds } = body.data;
 
   // 1. Create a new baseline
   const [baseline] = await db
@@ -80,7 +91,9 @@ uploadRoute.post("/statement", async (c) => {
       capturedAsOf,
       printedOn,
       confirmedValuePkr,
-      rawExtractJson: rawExtract ?? { funds },
+      // Store only the normalized minimum. Source documents and arbitrary OCR
+      // output are never accepted by this endpoint or retained by default.
+      rawExtractJson: { funds },
     })
     .returning();
 
@@ -92,6 +105,10 @@ uploadRoute.post("/statement", async (c) => {
         .set({
           units: fund.units.toString(),
           unitsConfirmedAsOf: capturedAsOf,
+          valuePkr: fund.valuePkr,
+          priceAsOf: fund.nav ? capturedAsOf : undefined,
+          priceSource: fund.nav ? "User-provided Al Meezan statement" : undefined,
+          freshness: fund.nav ? "manual" : "unavailable",
           valuationKind: "confirmed",
           baselineId: baseline.id,
           updatedAt: new Date(),
@@ -118,6 +135,10 @@ uploadRoute.post("/statement", async (c) => {
           .set({
             units: fund.units.toString(),
             unitsConfirmedAsOf: capturedAsOf,
+            valuePkr: fund.valuePkr,
+            priceAsOf: fund.nav ? capturedAsOf : undefined,
+            priceSource: fund.nav ? "User-provided Al Meezan statement" : undefined,
+            freshness: fund.nav ? "manual" : "unavailable",
             valuationKind: "confirmed",
             baselineId: baseline.id,
             updatedAt: new Date(),
@@ -137,7 +158,9 @@ uploadRoute.post("/statement", async (c) => {
           valuePkr: fund.valuePkr ?? 0,
           valuationKind: "confirmed",
           baselineId: baseline.id,
-          freshness: "fresh",
+          priceAsOf: fund.nav ? capturedAsOf : undefined,
+          priceSource: fund.nav ? "User-provided Al Meezan statement" : undefined,
+          freshness: fund.nav ? "manual" : "unavailable",
         });
       }
     }
@@ -164,12 +187,18 @@ uploadRoute.post("/statement", async (c) => {
     }
   }
 
+  auditEvent("statement_extract_reconciled", userId, {
+    baselineId: baseline.id,
+    fundsUpdated: funds.length,
+    sourceFileRetained: false,
+  });
   return c.json({
     ok: true,
     baselineId: baseline.id,
     message: "Reconciled to your new statement. Your holdings are now confirmed.",
     fundsUpdated: funds.length,
     pendingUnitized: pendingRows.filter((p) => p.initiatedOn <= capturedAsOf).length,
+    sourceFileRetained: false,
   }, 201);
 });
 
@@ -178,13 +207,12 @@ uploadRoute.post("/statement", async (c) => {
 // Creates a baseline, updates the cash holding with confirmed balance.
 
 const ScreenshotExtractSchema = z.object({
-  capturedAsOf: z.string(),
+  capturedAsOf: z.string().date(),
   holdingId: z.string().uuid().optional(),
-  institution: z.string().default("Wise"),
+  institution: z.literal("Wise").default("Wise"),
   currency: z.string().length(3),
   confirmedBalance: z.number().nonnegative(),
-  rawExtract: z.record(z.unknown()).optional(),
-});
+}).strict();
 
 uploadRoute.post("/screenshot", async (c) => {
   const userId = c.get("userId") as string;
@@ -193,7 +221,7 @@ uploadRoute.post("/screenshot", async (c) => {
     return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
   }
 
-  const { capturedAsOf, holdingId, institution, currency, confirmedBalance, rawExtract } = body.data;
+  const { capturedAsOf, holdingId, institution, currency, confirmedBalance } = body.data;
 
   // Convert to PKR for the baseline confirmed value (rough — FX will be applied properly in estimation)
   const confirmedValuePkr = currency === "PKR" ? Math.round(confirmedBalance) : 0;
@@ -205,7 +233,7 @@ uploadRoute.post("/screenshot", async (c) => {
       sourceKind: "wise_screenshot",
       capturedAsOf,
       confirmedValuePkr,
-      rawExtractJson: rawExtract ?? { institution, currency, confirmedBalance },
+      rawExtractJson: { institution, currency, confirmedBalance },
     })
     .returning();
 
@@ -216,6 +244,9 @@ uploadRoute.post("/screenshot", async (c) => {
       .set({
         valueNative: confirmedBalance.toString(),
         unitsConfirmedAsOf: capturedAsOf,
+        priceAsOf: capturedAsOf,
+        priceSource: "User-provided Wise screenshot",
+        freshness: currency === "PKR" ? "manual" : "unavailable",
         valuationKind: "confirmed",
         baselineId: baseline.id,
         updatedAt: new Date(),
@@ -243,6 +274,9 @@ uploadRoute.post("/screenshot", async (c) => {
         .set({
           valueNative: confirmedBalance.toString(),
           unitsConfirmedAsOf: capturedAsOf,
+          priceAsOf: capturedAsOf,
+          priceSource: "User-provided Wise screenshot",
+          freshness: currency === "PKR" ? "manual" : "unavailable",
           valuationKind: "confirmed",
           baselineId: baseline.id,
           updatedAt: new Date(),
@@ -259,14 +293,22 @@ uploadRoute.post("/screenshot", async (c) => {
         unitsConfirmedAsOf: capturedAsOf,
         valuationKind: "confirmed",
         baselineId: baseline.id,
-        freshness: "fresh",
+        priceAsOf: capturedAsOf,
+        priceSource: "User-provided Wise screenshot",
+        freshness: currency === "PKR" ? "manual" : "unavailable",
       });
     }
   }
 
+  auditEvent("wise_extract_reconciled", userId, {
+    baselineId: baseline.id,
+    currency,
+    sourceFileRetained: false,
+  });
   return c.json({
     ok: true,
     baselineId: baseline.id,
     message: "Reconciled to your new screenshot. Your cash balance is now confirmed.",
+    sourceFileRetained: false,
   }, 201);
 });

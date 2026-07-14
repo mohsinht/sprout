@@ -94,7 +94,8 @@ class _AddScreenState extends State<AddScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: SproutColors.seed,
                   borderRadius: BorderRadius.circular(SproutRadius.pill),
@@ -198,12 +199,14 @@ class _Header extends StatelessWidget {
             decoration: BoxDecoration(
               color: SproutColors.mint,
               borderRadius: BorderRadius.circular(SproutRadius.pill),
-              border: Border.all(color: SproutColors.seed.withValues(alpha: 0.2)),
+              border:
+                  Border.all(color: SproutColors.seed.withValues(alpha: 0.2)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.bolt_rounded, color: SproutColors.seed, size: 18),
+                const Icon(Icons.bolt_rounded,
+                    color: SproutColors.seed, size: 18),
                 const SizedBox(width: 6),
                 Text(
                   'Quick add',

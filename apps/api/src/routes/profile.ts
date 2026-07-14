@@ -3,6 +3,7 @@ import { z } from "zod";
 import { and, eq, ne } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { authMiddleware } from "../auth/middleware.js";
+import { auditEvent } from "../lib/audit.js";
 
 export const profileRoute = new Hono<{ Variables: { userId: string } }>();
 
@@ -86,6 +87,8 @@ profileRoute.delete("/imported-data", async (c) => {
   await db.delete(schema.transactions).where(
     and(eq(schema.transactions.userId, userId), ne(schema.transactions.source, "manual")),
   );
+
+  auditEvent("imported_data_deleted", userId);
 
   return c.json({ ok: true, message: "Imported data removed. Manual entries were preserved." });
 });

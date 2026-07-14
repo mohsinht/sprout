@@ -102,10 +102,10 @@ class CurrencyChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
     final bg = selected ? colors.mint : colors.surface;
-    final fg = selected ? SproutColors.leaf : (enabled ? colors.ink : colors.muted);
-    final borderColor = selected
-        ? SproutColors.seed.withValues(alpha: 0.45)
-        : colors.line;
+    final fg =
+        selected ? SproutColors.leaf : (enabled ? colors.ink : colors.muted);
+    final borderColor =
+        selected ? SproutColors.seed.withValues(alpha: 0.45) : colors.line;
     final content = AnimatedContainer(
       duration: const Duration(milliseconds: 160),
       padding: const EdgeInsets.symmetric(vertical: 12),

@@ -61,10 +61,20 @@ export class MufapNavSource implements NavSource {
   }
 }
 
+class UnavailableNavSource implements NavSource {
+  readonly name = "NAV unavailable";
+  async fetchNav(_fundCode: string): Promise<PriceQuote | null> {
+    return null;
+  }
+}
+
 /** Factory: returns real source if enabled, else mock. */
 export function createNavSource(): NavSource {
-  if (process.env.NAV_SOURCE === "mufap") {
+  if (process.env.NAV_SOURCE === "mufap_validation") {
     return new MufapNavSource();
   }
-  return new MockNavSource();
+  if (process.env.NAV_SOURCE === "mock" && process.env.NODE_ENV !== "production") {
+    return new MockNavSource();
+  }
+  return new UnavailableNavSource();
 }

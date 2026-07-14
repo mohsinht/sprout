@@ -161,6 +161,7 @@ class SproutRewardPill extends StatelessWidget {
   });
 
   final String text;
+
   /// When true, uses a light-on-dark style suitable for dark hero surfaces.
   final bool onLight;
 

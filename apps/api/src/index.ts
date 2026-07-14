@@ -14,10 +14,26 @@ import { briefingRoute } from "./routes/briefing.js";
 import { pendingRoute } from "./routes/pending.js";
 import { incomeRoute } from "./routes/income.js";
 import { uploadRoute } from "./routes/upload.js";
+import { opsRoute } from "./routes/ops.js";
 import { runDailyJobForAllUsers } from "./services/job-runner.js";
 import { pool } from "./db/client.js";
 
 const app = new Hono();
+
+app.use("*", async (c, next) => {
+  const requestId = c.req.header("X-Request-Id") ?? crypto.randomUUID();
+  const startedAt = Date.now();
+  c.header("X-Request-Id", requestId);
+  await next();
+  console.log(JSON.stringify({
+    event: "http_request",
+    requestId,
+    method: c.req.method,
+    path: new URL(c.req.url).pathname,
+    status: c.res.status,
+    durationMs: Date.now() - startedAt,
+  }));
+});
 
 app.use("*", secureHeaders());
 app.use(
@@ -56,6 +72,15 @@ app.get("/ready", async (c) => {
   }
 });
 
+app.onError((error, c) => {
+  console.error(JSON.stringify({
+    event: "unhandled_error",
+    requestId: c.res.headers.get("X-Request-Id"),
+    errorType: error.name,
+  }));
+  return c.json({ error: "Unexpected server error" }, 500);
+});
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 app.route("/v1/auth", authRoute);
 
@@ -72,6 +97,7 @@ app.route("/v1/transactions", transactionsRoute);
 app.route("/v1/pending", pendingRoute);
 app.route("/v1/income", incomeRoute);
 app.route("/v1/upload", uploadRoute);
+app.route("/v1/ops", opsRoute);
 
 // ── Briefing (daily + on-demand) ─────────────────────────────────────────────
 app.route("/v1/briefing", briefingRoute);
@@ -95,7 +121,7 @@ app.post("/v1/cron/daily", async (c) => {
 });
 
 // ── Serve ────────────────────────────────────────────────────────────────────
-serve(
+const server = serve(
   { fetch: app.fetch, port: config.port },
   (info) => {
     console.log(`Sprout API listening on http://localhost:${info.port}`);
@@ -107,3 +133,12 @@ serve(
     }
   }
 );
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    server.close(async () => {
+      await pool.end();
+      process.exit(0);
+    });
+  });
+}

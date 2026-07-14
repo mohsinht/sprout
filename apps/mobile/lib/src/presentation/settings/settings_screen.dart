@@ -7,10 +7,11 @@ import 'package:sprout_motion/sprout_motion.dart';
 import '../../app/theme_mode_controller.dart';
 import '../../data/goal_store.dart';
 import '../../data/balance_privacy_store.dart';
+import '../../data/app_lock_store.dart';
+import '../../data/reminder_service.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../data/api/sprout_api_client.dart';
 import '../../data/auth_store.dart';
-import '../../domain/today_models.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
@@ -45,32 +46,16 @@ class _SettingsStrings {
 
   // Profile
   static const profile = 'Profile';
-  static const monthlyIncome = 'Monthly income';
-  static const salaryDate = 'Salary date';
-  static const freelanceIncome = 'Freelance income';
-  static const freelanceHint = 'Show a separate freelance income line.';
-  static const viewProfile = 'View profile';
 
   // Data sources
   static const dataSources = 'Data sources';
-  static const notConnected = 'Not connected';
   static const on = 'On';
   static const connect = 'Connect';
-  static const disconnect = 'Disconnect';
-  static const disconnectConfirmTitle = 'Disconnect this source?';
-  static String disconnectConfirmBody(String label) =>
-      'Sprout will stop importing from $label. Manual entries stay.';
-  static const disconnectCancel = 'Keep connected';
-  static const disconnectConfirm = 'Disconnect';
-  static String disconnectedSnack(String label) =>
-      '$label disconnected. You can reconnect anytime.';
-  static const cannotDisconnectManual = 'Manual entries are always on.';
   static const emptySourcesTitle = 'Connect only what you trust.';
   static const emptySourcesSubtitle =
       'Sprout works fully with manual entries. Add a source only if you want to.';
   static const manageSources = 'Manage sources';
   static const sourceDetailDisconnect = 'Disconnect this source';
-  static const sourceDetailDelete = 'Delete imported data';
   static const sourceDetailAlwaysOn =
       'Manual entries are always on and cannot be disconnected.';
   static const sourceDetailSoon =
@@ -85,7 +70,9 @@ class _SettingsStrings {
   static const notifications = 'Notifications';
   static const dailyReminder = 'Daily check-in reminder';
   static const billReminder = 'Bill reminder';
+  static const salaryReminder = 'Salary or income reminder';
   static const weeklySummary = 'Weekly summary';
+  static const streakProtection = 'Streak protection reminder';
 
   // Currency
   static const currency = 'Display currency';
@@ -132,17 +119,20 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _dataSourcesKey = GlobalKey();
 
-  late bool _freelanceIncome = mockProfile.hasFreelanceIncome;
+  String _incomeType = 'other';
   String _profileName = mockProfile.name;
   int? _monthlyIncome = mockProfile.monthlyIncome;
   String _salaryDate = mockProfile.salaryDate;
+  List<Map<String, dynamic>> _projectedIncome = const [];
   bool _profileLoaded = false;
   late List<SproutDataSource> _sources = List.of(mockDataSources);
 
   late final Map<String, bool> _notifications = {
     _SettingsStrings.dailyReminder: true,
     _SettingsStrings.billReminder: true,
+    _SettingsStrings.salaryReminder: true,
     _SettingsStrings.weeklySummary: true,
+    _SettingsStrings.streakProtection: true,
   };
 
   String _currency = _SettingsStrings.pkr;
@@ -201,7 +191,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _profileName = profile['name'] as String? ?? 'friend';
         final salaryDay = profile['salaryDate'] as int?;
         _salaryDate = salaryDay == null ? 'Not set' : 'Day $salaryDay';
-        _freelanceIncome = profile['incomeType'] == 'freelance';
+        _incomeType = profile['incomeType'] as String? ?? 'other';
         _currency = profile['displayCurrency'] as String? ?? 'PKR';
         _prefs[_SettingsStrings.reducedMotion] =
             profile['reduceMotion'] as bool? ?? false;
@@ -215,9 +205,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             notifications['dailyCheckIn'] as bool? ?? true;
         _notifications[_SettingsStrings.billReminder] =
             notifications['billReminders'] as bool? ?? true;
+        _notifications[_SettingsStrings.salaryReminder] =
+            notifications['salaryIncomeReminders'] as bool? ?? true;
         _notifications[_SettingsStrings.weeklySummary] =
             notifications['weeklySummary'] as bool? ?? true;
+        _notifications[_SettingsStrings.streakProtection] =
+            notifications['streakProtection'] as bool? ?? true;
       });
+      await _loadProjectedIncome();
     } catch (_) {
       // Settings remains usable with local preferences while offline.
     }
@@ -318,52 +313,137 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _openProfileSheet() => _editProfileName();
 
-  Future<void> _confirmDisconnect(SproutDataSource source) async {
-    if (source.id == 'manual') {
-      _showSnack(_SettingsStrings.cannotDisconnectManual);
-      return;
-    }
-    final shouldDisconnect = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text(_SettingsStrings.disconnectConfirmTitle),
-            content: Text(_SettingsStrings.disconnectConfirmBody(source.label)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text(_SettingsStrings.disconnectCancel),
-              ),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: SproutColors.tomato,
-                  side: BorderSide(
-                    color: SproutColors.tomato.withValues(alpha: 0.4),
-                  ),
-                ),
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text(_SettingsStrings.disconnectConfirm),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+  Future<void> _loadProjectedIncome() async {
+    try {
+      final response =
+          await ref.read(apiClientProvider).get('/v1/income/projected');
+      final rows = (response['projectedIncome'] as List? ?? const [])
+          .cast<Map<String, dynamic>>();
+      if (!mounted) return;
+      setState(() {
+        _projectedIncome = rows;
+        _monthlyIncome = rows.fold<int>(
+            0,
+            (sum, row) =>
+                sum + ((row['convertedPkrEstimate'] as num?)?.round() ?? 0));
+      });
+    } catch (_) {}
+  }
 
-    if (!mounted || !shouldDisconnect) return;
-
+  Future<void> _editIncomeType() async {
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('How do you usually earn?'),
+        children: [
+          for (final option in const [
+            ('salaried', 'Salary'),
+            ('freelance', 'Freelance'),
+            ('business', 'Business'),
+            ('student', 'Student'),
+            ('other', 'Other or irregular'),
+          ])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, option.$1),
+              child: Text(option.$2),
+            ),
+        ],
+      ),
+    );
+    if (value == null || !mounted) return;
     setState(() {
-      _sources = _sources
-          .map((s) => s.id == source.id
-              ? SproutDataSource(
-                  id: s.id,
-                  label: s.label,
-                  detail: _SettingsStrings.notConnected,
-                  connected: false,
-                  comingSoon: s.comingSoon,
-                )
-              : s)
-          .toList();
+      _incomeType = value;
     });
-    _showSnack(_SettingsStrings.disconnectedSnack(source.label));
+    await _patchProfile({'incomeType': value});
+  }
+
+  Future<void> _editSalaryDate() async {
+    final controller = TextEditingController();
+    final value = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Which day does salary usually arrive?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Day of month (1–31)'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () {
+                final day = int.tryParse(controller.text);
+                Navigator.pop(
+                    context, day != null && day >= 1 && day <= 31 ? day : null);
+              },
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || !mounted) return;
+    setState(() => _salaryDate = 'Day $value');
+    await _patchProfile({'salaryDate': value});
+  }
+
+  Future<void> _addProjectedIncome() async {
+    final controller = TextEditingController();
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('How much income do you expect?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(prefixText: 'PKR '),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(
+                  context, int.tryParse(controller.text.replaceAll(',', ''))),
+              child: const Text('Next')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (amount == null || amount <= 0 || !mounted) return;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
+      helpText: 'When do you expect it?',
+    );
+    if (date == null || !mounted) return;
+    try {
+      await ref.read(apiClientProvider).post('/v1/income/projected', {
+        'amount': amount,
+        'currency': 'PKR',
+        'expectedOn': date.toIso8601String().substring(0, 10),
+      });
+      await _loadProjectedIncome();
+      _showSnack('Expected income added. It is not counted as current wealth.');
+    } catch (_) {
+      _showSnack('Could not save expected income while offline.');
+    }
+  }
+
+  Future<void> _deleteProjectedIncome(Map<String, dynamic> income) async {
+    try {
+      await ref
+          .read(apiClientProvider)
+          .delete('/v1/income/projected/${income['id']}');
+      await _loadProjectedIncome();
+    } catch (_) {
+      _showSnack('Could not remove this income right now.');
+    }
   }
 
   Future<void> _openSourceSheet(SproutDataSource source) async {
@@ -378,25 +458,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           value: source.detail,
         ),
         if (isManual)
-          SheetInfoRow(
+          const SheetInfoRow(
             icon: Icons.lock_rounded,
             label: 'Always on',
             value: _SettingsStrings.sourceDetailAlwaysOn,
           )
         else if (source.comingSoon)
-          SheetInfoRow(
+          const SheetInfoRow(
             icon: Icons.hourglass_top_rounded,
             label: 'Coming soon',
             value: _SettingsStrings.sourceDetailSoon,
           )
         else if (source.connected)
-          SheetInfoRow(
+          const SheetInfoRow(
             icon: Icons.link_off_rounded,
             label: _SettingsStrings.sourceDetailDisconnect,
             value: 'Tap below to disconnect. Manual entries stay.',
           )
         else
-          SheetInfoRow(
+          const SheetInfoRow(
             icon: Icons.link_rounded,
             label: 'Connect',
             value: 'Tap below to connect this source.',
@@ -464,6 +544,110 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  Future<void> _reviewSessions() async {
+    try {
+      final response =
+          await ref.read(apiClientProvider).get('/v1/auth/sessions');
+      final sessions = List<Map<String, dynamic>>.from(
+        (response['sessions'] as List? ?? const []).map(
+          (item) => Map<String, dynamic>.from(item as Map),
+        ),
+      );
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => StatefulBuilder(
+          builder: (context, setSheetState) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(SproutSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Signed-in devices',
+                      style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: SproutSpacing.sm),
+                  Text(
+                    'Remove a device you no longer recognize. This revokes its refresh session.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: SproutSpacing.md),
+                  if (sessions.isEmpty)
+                    const Text('No active device sessions.')
+                  else
+                    for (final session in sessions)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.devices_rounded),
+                        title: Text(session['deviceName'] as String? ??
+                            'Unnamed Sprout device'),
+                        subtitle: Text(
+                          'Active until ${(session['expiresAt'] as String? ?? '').split('T').first}',
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Revoke this device session',
+                          icon: const Icon(Icons.logout_rounded),
+                          onPressed: () async {
+                            await ref.read(apiClientProvider).delete(
+                                  '/v1/auth/sessions/${session['id']}',
+                                );
+                            setSheetState(() => sessions.remove(session));
+                          },
+                        ),
+                      ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) _showSnack('Device sessions are unavailable right now.');
+    }
+  }
+
+  Future<void> _setNotificationPreference(String label, bool enabled) async {
+    final key = switch (label) {
+      _SettingsStrings.dailyReminder => 'dailyCheckIn',
+      _SettingsStrings.billReminder => 'billReminders',
+      _SettingsStrings.salaryReminder => 'salaryIncomeReminders',
+      _SettingsStrings.weeklySummary => 'weeklySummary',
+      _SettingsStrings.streakProtection => 'streakProtection',
+      _ => null,
+    };
+    if (key == null) return;
+    final salaryDay = int.tryParse(
+      RegExp(r'\d+').firstMatch(_salaryDate)?.group(0) ?? '',
+    );
+    final accepted = await ReminderService.instance.setEnabled(
+      key,
+      enabled,
+      salaryDay: salaryDay,
+    );
+    if (!mounted) return;
+    if (!accepted) {
+      setState(() => _notifications[label] = false);
+      _showSnack(
+        'Notifications are disabled by this device. Sprout still works without them.',
+      );
+    } else {
+      setState(() => _notifications[label] = enabled);
+    }
+    await _patchProfile({
+      'notificationPreferences': {
+        'dailyCheckIn': _notifications[_SettingsStrings.dailyReminder] ?? true,
+        'billReminders': _notifications[_SettingsStrings.billReminder] ?? true,
+        'salaryIncomeReminders':
+            _notifications[_SettingsStrings.salaryReminder] ?? true,
+        'weeklySummary': _notifications[_SettingsStrings.weeklySummary] ?? true,
+        'streakProtection':
+            _notifications[_SettingsStrings.streakProtection] ?? true,
+        'hideSensitiveAmounts': true,
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     const useMock = bool.fromEnvironment('USE_MOCK', defaultValue: true);
@@ -498,6 +682,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         gap,
         _privacySection(colors),
         gap,
+        _securitySection(colors),
+        gap,
         _notificationsSection(colors),
         gap,
         _currencySection(colors),
@@ -529,47 +715,76 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _profileSection(SproutColorScheme colors) {
     return SettingsSection(
       header: _SettingsStrings.profile,
-      child: SproutButtonPress(
-        onTap: _openProfileSheet,
-        semanticLabel: _SettingsStrings.viewProfile,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
                 backgroundColor: colors.mint,
-                child: const Icon(Icons.person_rounded,
-                    color: SproutColors.leaf, size: 20),
+                child:
+                    const Icon(Icons.person_rounded, color: SproutColors.leaf),
               ),
-              const SizedBox(width: SproutSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _profileName,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(color: colors.ink),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _monthlyIncome == null
-                          ? 'Income not set'
-                          : '${SproutFormat.currency(_monthlyIncome!)} / month',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: colors.muted),
-                    ),
-                  ],
+              title: Text(_profileName),
+              subtitle: const Text('Name or nickname'),
+              trailing: const Icon(Icons.edit_rounded),
+              onTap: _openProfileSheet,
+            ),
+            _rowDivider,
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.work_outline_rounded),
+              title: const Text('Income type'),
+              subtitle: Text(
+                  _incomeType == 'other' ? 'Other or irregular' : _incomeType),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: _editIncomeType,
+            ),
+            _rowDivider,
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.calendar_today_rounded),
+              title: const Text('Usual salary date'),
+              subtitle: Text(_salaryDate),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: _editSalaryDate,
+            ),
+            _rowDivider,
+            for (final income in _projectedIncome) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.payments_outlined),
+                title: Text(SproutFormat.currency(
+                    num.tryParse('${income['amount']}')?.round() ?? 0)),
+                subtitle: Text(
+                    'Expected ${income['expectedOn']} · not in current wealth'),
+                trailing: IconButton(
+                  tooltip: 'Remove expected income',
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: () => _deleteProjectedIncome(income),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: colors.muted, size: 24),
+              _rowDivider,
             ],
-          ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _addProjectedIncome,
+                icon: const Icon(Icons.add_rounded),
+                label: Text(_monthlyIncome == null || _monthlyIncome == 0
+                    ? 'Add expected income'
+                    : 'Add another income'),
+              ),
+            ),
+            Text(
+              'Expected income is shown as a countdown only. Sprout never adds it to money you already have.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: colors.muted),
+            ),
+          ],
         ),
       ),
     );
@@ -613,7 +828,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ] else ...[
-            for (final goal in goals) ...[
+            for (final (index, goal) in goals.indexed) ...[
               SproutButtonPress(
                 onTap: () {
                   HapticFeedback.lightImpact();
@@ -678,8 +893,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ),
                           ),
                         ),
-                      const Icon(Icons.chevron_right_rounded,
-                          color: SproutColors.muted, size: 20),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            tooltip: 'Move ${goal.name} up',
+                            onPressed: index == 0
+                                ? null
+                                : () => ref
+                                    .read(goalStoreProvider.notifier)
+                                    .reorder(index, index - 1),
+                            icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            tooltip: 'Move ${goal.name} down',
+                            onPressed: index == goals.length - 1
+                                ? null
+                                : () => ref
+                                    .read(goalStoreProvider.notifier)
+                                    .reorder(index, index + 2),
+                            icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -697,7 +935,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
                 child: Row(
                   children: [
-                    Icon(Icons.add_rounded, color: SproutColors.seed, size: 20),
+                    const Icon(Icons.add_rounded,
+                        color: SproutColors.seed, size: 20),
                     const SizedBox(width: SproutSpacing.md),
                     Text(
                       'Add a new goal',
@@ -817,7 +1056,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final labels = [
       _SettingsStrings.dailyReminder,
       _SettingsStrings.billReminder,
+      _SettingsStrings.salaryReminder,
       _SettingsStrings.weeklySummary,
+      _SettingsStrings.streakProtection,
     ];
     return SettingsSection(
       header: _SettingsStrings.notifications,
@@ -830,22 +1071,59 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               icon: i == 0
                   ? Icons.notifications_active_rounded
                   : Icons.notifications_none_rounded,
-              onChanged: (v) {
-                setState(() => _notifications[labels[i]] = v);
-                _patchProfile({
-                  'notificationPreferences': {
-                    'dailyCheckIn':
-                        _notifications[_SettingsStrings.dailyReminder] ?? true,
-                    'billReminders':
-                        _notifications[_SettingsStrings.billReminder] ?? true,
-                    'weeklySummary':
-                        _notifications[_SettingsStrings.weeklySummary] ?? true,
-                  }
-                });
-              },
+              onChanged: (v) => _setNotificationPreference(labels[i], v),
             ),
             if (i != labels.length - 1) _rowDivider,
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _securitySection(SproutColorScheme colors) {
+    final lock = ref.watch(appLockProvider);
+    return SettingsSection(
+      header: 'App security',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PreferenceToggle(
+            label: lock.supported
+                ? 'Biometric or device unlock'
+                : 'Device unlock is unavailable here',
+            value: lock.enabled,
+            icon: Icons.fingerprint_rounded,
+            onChanged: lock.supported
+                ? (enabled) async {
+                    if (enabled) {
+                      final ok =
+                          await ref.read(appLockProvider.notifier).enable();
+                      if (!ok && mounted) {
+                        _showSnack(
+                            'Sprout lock was not enabled. Nothing changed.');
+                      }
+                    } else {
+                      await ref.read(appLockProvider.notifier).disable();
+                    }
+                  }
+                : null,
+          ),
+          Text(
+            'When enabled, Sprout locks after you leave the app. Your device handles authentication; Sprout never receives biometric data.',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: SproutSpacing.sm),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _reviewSessions,
+              icon: const Icon(Icons.devices_rounded),
+              label: const Text('Review signed-in devices'),
+            ),
+          ),
         ],
       ),
     );
@@ -953,7 +1231,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
             child: Row(
               children: [
-                Icon(Icons.delete_outline_rounded,
+                const Icon(Icons.delete_outline_rounded,
                     color: SproutColors.tomato, size: 20),
                 const SizedBox(width: SproutSpacing.md),
                 Expanded(
@@ -1098,7 +1376,7 @@ class _SourceControl extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_rounded,
+            const Icon(Icons.check_circle_rounded,
                 color: SproutColors.leaf, size: 13),
             const SizedBox(width: 5),
             Text(

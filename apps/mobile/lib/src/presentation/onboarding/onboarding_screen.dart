@@ -254,7 +254,7 @@ class _Welcome extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CenteredColumn(
       colors: colors,
-      mascot: SproutMascot(
+      mascot: const SproutMascot(
           state: SproutMascotState.happy, size: 128, playOnMount: true),
       title: "Hi, I'm Sprout.",
       body:
@@ -337,7 +337,7 @@ class _Celebration extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CenteredColumn(
       colors: colors,
-      mascot: SproutMascot(
+      mascot: const SproutMascot(
           state: SproutMascotState.happy, size: 140, playOnMount: true),
       title: 'Your garden is planted${name.isEmpty ? '' : ', $name'} 🌱',
       body:
@@ -398,7 +398,7 @@ class _QuestionColumn extends StatelessWidget {
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: SproutSpacing.xxl),
-        SproutMascot(state: SproutMascotState.thinking, size: 84),
+        const SproutMascot(state: SproutMascotState.thinking, size: 84),
         const SizedBox(height: SproutSpacing.xl),
         Text(title,
             style: SproutType.playfulTitle(

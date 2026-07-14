@@ -106,12 +106,12 @@ class UnavailableFxSource implements FxSource {
 
 /** Factory: returns real source if enabled, else mock. */
 export function createFxSource(): FxSource {
-  if (process.env.FX_SOURCE === "xe") {
+  if (config.fxSource === "xe") {
     return new XeFxSource();
   }
-  if (process.env.FX_SOURCE === "exchange_rate_host") {
+  if (config.fxSource === "exchange_rate_host") {
     return new ExchangeRateHostFxSource();
   }
-  if (process.env.FX_SOURCE === "mock") return new MockFxSource();
+  if (config.fxSource === "mock" && !config.isProduction) return new MockFxSource();
   return new UnavailableFxSource();
 }

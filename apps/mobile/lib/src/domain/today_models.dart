@@ -43,12 +43,14 @@ class TodayData {
   /// so goal edits (add/edit/complete/delete) are reflected on Today.
   TodayData copyWith({
     List<Goal>? goals,
+    FinancialHealthScore? health,
+    String? provenanceSummary,
   }) {
     return TodayData(
       user: user,
       currency: currency,
       salary: salary,
-      health: health,
+      health: health ?? this.health,
       autoCapture: autoCapture,
       snapshot: snapshot,
       quickActions: quickActions,
@@ -56,7 +58,7 @@ class TodayData {
       wealthEvents: wealthEvents,
       goals: goals ?? this.goals,
       learnThreads: learnThreads,
-      provenanceSummary: provenanceSummary,
+      provenanceSummary: provenanceSummary ?? this.provenanceSummary,
     );
   }
 }
@@ -76,7 +78,10 @@ class SproutUser {
 }
 
 class SalaryInfo {
-  const SalaryInfo({required this.nextPayday, required this.daysUntilSalary, this.isKnown = true});
+  const SalaryInfo(
+      {required this.nextPayday,
+      required this.daysUntilSalary,
+      this.isKnown = true});
 
   final DateTime nextPayday;
   final int daysUntilSalary;
@@ -403,8 +408,7 @@ TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
   // Map wealth holdings to today holdings (with changeVsYesterday/changeMtd
   // from the snapshot breakdown)
   final breakdownMap = {
-    for (final bd in b.wealthSnapshot.perHoldingBreakdown)
-      bd.holdingId: bd,
+    for (final bd in b.wealthSnapshot.perHoldingBreakdown) bd.holdingId: bd,
   };
 
   final holdings = b.holdings
@@ -487,7 +491,8 @@ TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
 
   return TodayData(
     user: SproutUser(
-      firstName: b.greeting.replaceAll(RegExp(r'^Good (morning|afternoon|evening),\s*'), ''),
+      firstName: b.greeting
+          .replaceAll(RegExp(r'^Good (morning|afternoon|evening),\s*'), ''),
       level: b.level,
       xp: b.xp,
       dayStreak: b.streak,

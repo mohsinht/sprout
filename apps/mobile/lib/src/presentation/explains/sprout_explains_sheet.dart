@@ -107,8 +107,7 @@ class SproutExplainsSheet extends StatelessWidget {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(SproutRadius.pill),
+                      borderRadius: BorderRadius.circular(SproutRadius.pill),
                     ),
                   ),
                   child: Text(nextActionLabel!),

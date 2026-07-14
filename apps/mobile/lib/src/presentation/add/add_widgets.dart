@@ -143,16 +143,22 @@ class AddExpenseChip extends StatelessWidget {
 /// The 13 canonical quick-add categories, with a tint + icon each.
 const kExpenseChips = <_ExpenseChipData>[
   _ExpenseChipData('Chai', Icons.coffee_rounded, SproutColors.tintMint),
-  _ExpenseChipData('Groceries', Icons.shopping_cart_rounded, SproutColors.tintSky),
-  _ExpenseChipData('Fuel', Icons.local_gas_station_rounded, SproutColors.tintWarm),
+  _ExpenseChipData(
+      'Groceries', Icons.shopping_cart_rounded, SproutColors.tintSky),
+  _ExpenseChipData(
+      'Fuel', Icons.local_gas_station_rounded, SproutColors.tintWarm),
   _ExpenseChipData('Ride', Icons.local_taxi_rounded, SproutColors.tintLilac),
-  _ExpenseChipData('Mobile Load', Icons.phone_android_rounded, SproutColors.tintGold),
-  _ExpenseChipData('Utility Bill', Icons.receipt_long_rounded, SproutColors.tintSky),
+  _ExpenseChipData(
+      'Mobile Load', Icons.phone_android_rounded, SproutColors.tintGold),
+  _ExpenseChipData(
+      'Utility Bill', Icons.receipt_long_rounded, SproutColors.tintSky),
   _ExpenseChipData('School Fee', Icons.school_rounded, SproutColors.tintMint),
   _ExpenseChipData('Medicine', Icons.medication_rounded, SproutColors.tintWarm),
-  _ExpenseChipData('Shopping', Icons.shopping_bag_rounded, SproutColors.tintLilac),
+  _ExpenseChipData(
+      'Shopping', Icons.shopping_bag_rounded, SproutColors.tintLilac),
   _ExpenseChipData('Food', Icons.restaurant_rounded, SproutColors.tintGold),
-  _ExpenseChipData('Zakat', Icons.volunteer_activism_rounded, SproutColors.tintMint),
+  _ExpenseChipData(
+      'Zakat', Icons.volunteer_activism_rounded, SproutColors.tintMint),
   _ExpenseChipData('Sadaqah', Icons.favorite_rounded, SproutColors.tintMint),
   _ExpenseChipData('Committee', Icons.groups_rounded, SproutColors.tintSky),
 ];
@@ -257,7 +263,8 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
                 prefixText: 'PKR ',
               ),
               validator: (v) {
-                final n = int.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
+                final n =
+                    int.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
                 if (n == null || n <= 0) return 'Enter an amount';
                 return null;
               },
@@ -275,7 +282,8 @@ class _ExpenseSheetState extends State<_ExpenseSheet> {
             const SizedBox(height: SproutSpacing.md),
             DropdownButtonFormField<SproutAccount>(
               initialValue: _account,
-              decoration: const InputDecoration(labelText: AddStrings.accountLabel),
+              decoration:
+                  const InputDecoration(labelText: AddStrings.accountLabel),
               items: [
                 for (final a in mockAccounts)
                   DropdownMenuItem(
@@ -367,7 +375,8 @@ class _IncomeFormState extends State<IncomeForm> {
         currency: 'PKR',
         type: TransactionType.income,
         category: _kind.label,
-        merchant: _source.text.trim().isEmpty ? _kind.label : _source.text.trim(),
+        merchant:
+            _source.text.trim().isEmpty ? _kind.label : _source.text.trim(),
         note: '',
         date: _date,
         source: TransactionSource.manual,
@@ -398,7 +407,8 @@ class _IncomeFormState extends State<IncomeForm> {
               prefixText: 'PKR ',
             ),
             validator: (v) {
-              final n = int.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
+              final n =
+                  int.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
               if (n == null || n <= 0) return 'Enter an amount';
               return null;
             },
@@ -417,7 +427,8 @@ class _IncomeFormState extends State<IncomeForm> {
             onTap: _pickDate,
             borderRadius: BorderRadius.circular(SproutRadius.card),
             child: InputDecorator(
-              decoration: const InputDecoration(labelText: AddStrings.dateLabel),
+              decoration:
+                  const InputDecoration(labelText: AddStrings.dateLabel),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -669,7 +680,8 @@ class ConnectEmailCard extends StatelessWidget {
       useSafeArea: true,
       backgroundColor: SproutColorScheme.of(context).surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(SproutRadius.hero)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(SproutRadius.hero)),
       ),
       builder: (context) => Padding(
         padding: EdgeInsets.fromLTRB(
@@ -777,9 +789,10 @@ class SmsComingSoonCard extends StatelessWidget {
                     children: [
                       Text(
                         AddStrings.sectionSms,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: colors.muted,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: colors.muted,
+                                ),
                       ),
                       const SizedBox(width: SproutSpacing.sm),
                       const _ComingSoonPill(),
@@ -826,4 +839,3 @@ class AddSectionHeader extends StatelessWidget {
     );
   }
 }
-

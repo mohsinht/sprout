@@ -63,12 +63,12 @@ void main() {
       (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(
+      const MediaQuery(
+        data: MediaQueryData(
           textScaler: TextScaler.linear(1.3),
           padding: EdgeInsets.only(bottom: 34),
         ),
-        child: const ProviderScope(child: SproutApp()),
+        child: ProviderScope(child: SproutApp()),
       ),
     );
     await tester.pumpAndSettle(const Duration(seconds: 2));

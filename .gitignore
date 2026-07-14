@@ -19,3 +19,5 @@ ios/Pods/
 .vscode/
 
 .pnpm-store/
+artifacts/backups/
+artifacts/valuation-burn-in-*.json
