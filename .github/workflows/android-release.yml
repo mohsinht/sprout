@@ -1,0 +1,114 @@
+name: Android release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PROD_API_URL: https://sprout-2bva.onrender.com
+
+jobs:
+  backend:
+    name: Verify backend before release
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sprout
+          POSTGRES_PASSWORD: sprout
+          POSTGRES_DB: sprout
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sprout -d sprout"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sprout/api db:migrate
+        env:
+          DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm --filter @sprout/api test
+
+  apk:
+    name: Build and publish signed APK
+    needs: backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "ANDROID_KEYSTORE_BASE64 is missing" >&2; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo "ANDROID_KEYSTORE_PASSWORD is missing" >&2; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "ANDROID_KEY_ALIAS is missing" >&2; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "ANDROID_KEY_PASSWORD is missing" >&2; exit 1; }
+
+      - name: Configure Android signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > apps/mobile/android/app/upload-keystore.jks
+          printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
+            > apps/mobile/android/key.properties
+
+      - run: flutter pub get
+        working-directory: apps/mobile
+      - run: flutter analyze
+        working-directory: apps/mobile
+      - run: flutter test --dart-define=SPROUT_ENV=dev
+        working-directory: apps/mobile
+      - name: Build production APK
+        run: >-
+          flutter build apk --release
+          --build-name="${GITHUB_REF_NAME#v}"
+          --build-number="${GITHUB_RUN_NUMBER}"
+          --dart-define=SPROUT_ENV=production
+          --dart-define=API_BASE_URL="${PROD_API_URL}"
+        working-directory: apps/mobile
+
+      - name: Rename APK
+        run: cp apps/mobile/build/app/outputs/flutter-apk/app-release.apk "sprout-${GITHUB_REF_NAME}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sprout-${{ github.ref_name }}-apk
+          path: sprout-${{ github.ref_name }}.apk
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          "sprout-${GITHUB_REF_NAME}.apk"
+          --verify-tag
+          --generate-notes
+          --title "Sprout ${GITHUB_REF_NAME}"
