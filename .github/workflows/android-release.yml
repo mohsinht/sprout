@@ -40,13 +40,27 @@ jobs:
       - run: pnpm --filter @sprout/api db:migrate
         env:
           DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
-      - run: pnpm lint
       - run: pnpm check
+      - run: pnpm lint
       - run: pnpm --filter @sprout/api test
+
+  goldens:
+    name: Verify visual regressions before release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: apps/mobile
+      - run: flutter test --tags=golden --dart-define=SPROUT_ENV=dev
+        working-directory: apps/mobile
 
   apk:
     name: Build and publish signed APK
-    needs: backend
+    needs: [backend, goldens]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +97,7 @@ jobs:
         working-directory: apps/mobile
       - run: flutter analyze
         working-directory: apps/mobile
-      - run: flutter test --dart-define=SPROUT_ENV=dev
+      - run: flutter test --exclude-tags=golden --dart-define=SPROUT_ENV=dev
         working-directory: apps/mobile
       - name: Build production APK
         run: >-

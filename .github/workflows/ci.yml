@@ -35,8 +35,8 @@ jobs:
       - run: pnpm --filter @sprout/api db:migrate
         env:
           DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
-      - run: pnpm lint
       - run: pnpm check
+      - run: pnpm lint
       - run: pnpm --filter @sprout/api test
 
   mobile:
@@ -52,10 +52,24 @@ jobs:
         working-directory: apps/mobile
       - run: flutter analyze
         working-directory: apps/mobile
-      - run: flutter test --dart-define=SPROUT_ENV=dev
+      - run: flutter test --exclude-tags=golden --dart-define=SPROUT_ENV=dev
         working-directory: apps/mobile
       - name: Verify Android debug build
         run: >-
           flutter build apk --debug
           --dart-define=SPROUT_ENV=dev
+        working-directory: apps/mobile
+
+  goldens:
+    name: Flutter visual regression tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: apps/mobile
+      - run: flutter test --tags=golden --dart-define=SPROUT_ENV=dev
         working-directory: apps/mobile

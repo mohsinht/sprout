@@ -75,7 +75,7 @@ void main() {
       find.byType(LearnContent),
       matchesGoldenFile('goldens/learn_path.png'),
     );
-  });
+  }, tags: 'golden');
 
   testWidgets('golden: in-lesson card', (tester) async {
     await tester.pumpWidget(_goldenHost(
@@ -86,7 +86,7 @@ void main() {
       find.byType(LessonStoryCard),
       matchesGoldenFile('goldens/learn_in_lesson.png'),
     );
-  });
+  }, tags: 'golden');
 
   testWidgets('golden: result state', (tester) async {
     await tester.pumpWidget(_goldenHost(
@@ -105,7 +105,7 @@ void main() {
       find.byType(LessonResultCard),
       matchesGoldenFile('goldens/learn_result.png'),
     );
-  });
+  }, tags: 'golden');
 
   testWidgets('golden: path complete', (tester) async {
     await tester.pumpWidget(_goldenHost(
@@ -116,7 +116,7 @@ void main() {
       find.byType(LearnContent),
       matchesGoldenFile('goldens/learn_path_complete.png'),
     );
-  });
+  }, tags: 'golden');
 }
 
 Widget _appWithRepo(LearnRepository repository) {
