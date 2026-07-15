@@ -18,7 +18,7 @@ const rules = [
     [
       "INS-01..04",
       "apps/api/src/harness/insights.integration.test.ts",
-      "FAILING_SPEC_CONFLICT",
+      "AUTOMATED",
     ],
   ],
   [
@@ -26,7 +26,7 @@ const rules = [
     [
       "AI-01..05",
       "apps/api/src/harness/ai-budget.integration.test.ts",
-      "FAILING_SPEC_CONFLICT",
+      "AUTOMATED",
     ],
   ],
   [
@@ -37,7 +37,7 @@ const rules = [
     /goal|contribut/i,
     [
       "LED-01..02 / P7",
-      "apps/api/src/harness/money-invariants.integration.test.ts; scripts/persona-local.mjs",
+      "apps/api/src/harness/money-invariants.integration.test.ts; apps/mobile/integration_test/persona_journeys_test.dart",
       "AUTOMATED_PARTIAL",
     ],
   ],
@@ -61,8 +61,8 @@ const rules = [
     /onboarding|Today|Money|Settings|Quick Add|nav|offline|dark|text scale|balance|privacy|source|Sprout Explains|notification/i,
     [
       "P1..P7",
-      "scripts/persona-local.mjs; artifacts/persona-evidence/",
-      "FAILING_DEVICE_EVIDENCE_MISSING",
+      "apps/mobile/integration_test/persona_journeys_test.dart; scripts/persona-local.mjs; artifacts/persona-evidence/",
+      "CI_DEVICE_AUTOMATED_PARTIAL",
     ],
   ],
 ];
@@ -91,8 +91,8 @@ for (let index = 0; index < lines.length; index += 1) {
     criterion,
     ...(match?.[1] ?? [
       `P1..P7-SAC-${line}`,
-      "scripts/persona-local.mjs",
-      "FAILING_DEVICE_EVIDENCE_MISSING",
+      "apps/mobile/integration_test/persona_journeys_test.dart; scripts/persona-local.mjs",
+      "CI_DEVICE_AUTOMATED_PARTIAL",
     ]),
   ]);
 }
