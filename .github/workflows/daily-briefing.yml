@@ -1,0 +1,41 @@
+name: Daily Sprout briefing
+
+on:
+  schedule:
+    # GitHub schedules use UTC. 21:00 UTC is 02:00 Asia/Karachi.
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-sprout-briefing
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Generate daily briefings for all users
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate cron secret
+        env:
+          CRON_SECRET: ${{ secrets.SPROUT_CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET" || {
+            echo "SPROUT_CRON_SECRET is not configured" >&2
+            exit 1
+          }
+
+      - name: Trigger daily briefing job
+        env:
+          CRON_SECRET: ${{ secrets.SPROUT_CRON_SECRET }}
+        run: |
+          curl --fail-with-body \
+            --show-error \
+            --silent \
+            --retry 3 \
+            --retry-delay 15 \
+            --retry-all-errors \
+            --max-time 300 \
+            --request POST \
+            --header "X-Cron-Secret: $CRON_SECRET" \
+            https://sprout-2bva.onrender.com/v1/cron/daily
