@@ -17,7 +17,7 @@
     "test:golden": "pnpm --filter @sprout/shared build && pnpm --filter @sprout/api exec tsx --test src/harness/golden.test.ts",
     "test:money-invariants": "pnpm --filter @sprout/api exec tsx --test src/harness/money-invariants.integration.test.ts",
     "test:insights": "pnpm --filter @sprout/api exec tsx --test src/harness/insights.integration.test.ts",
-    "test:ai-budget": "pnpm --filter @sprout/api exec tsx --test src/harness/ai-budget.integration.test.ts",
+    "test:ai-budget": "AI_DAILY_COST_CAP_CENTS=10 pnpm --filter @sprout/api exec tsx --test src/harness/ai-budget.integration.test.ts",
     "test:adversarial": "pnpm --filter @sprout/api exec tsx --test src/harness/adversarial.integration.test.ts && cd apps/mobile && flutter test test/transaction_row_test.dart --plain-name audit_d4_injection_description_renders_as_inert_text --dart-define=SPROUT_ENV=production",
     "test:ops": "pnpm --filter @sprout/api seed:valuation-mechanics && pnpm --filter @sprout/api exec tsx --test src/harness/ops.integration.test.ts",
     "test:score": "pnpm --filter @sprout/api test",

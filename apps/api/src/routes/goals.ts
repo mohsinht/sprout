@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { authMiddleware } from "../auth/middleware.js";
 
@@ -24,6 +24,12 @@ goalsRoute.get("/", async (c) => {
 goalsRoute.get("/:id/contributions", async (c) => {
   const userId = c.get("userId") as string;
   const goalId = c.req.param("id");
+  const [goal] = await db
+    .select({ id: schema.goals.id })
+    .from(schema.goals)
+    .where(and(eq(schema.goals.id, goalId), eq(schema.goals.userId, userId)))
+    .limit(1);
+  if (!goal) return c.json({ error: "Goal not found" }, 404);
   const rows = await db
     .select()
     .from(schema.goalContributions)
@@ -157,6 +163,9 @@ goalsRoute.post("/:id/contribute", async (c) => {
     );
 
   const updated = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select id from goals where id = ${goalId} and user_id = ${userId} for update`,
+    );
     const [existing] = await tx
       .select()
       .from(schema.goalContributions)

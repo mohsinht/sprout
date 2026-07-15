@@ -16,6 +16,7 @@ import { incomeRoute } from "./routes/income.js";
 import { uploadRoute } from "./routes/upload.js";
 import { opsRoute } from "./routes/ops.js";
 import { recurringRoute } from "./routes/recurring.js";
+import { insightsRoute } from "./routes/insights.js";
 import { runDailyJobForAllUsers } from "./services/job-runner.js";
 import { pool } from "./db/client.js";
 
@@ -26,14 +27,16 @@ app.use("*", async (c, next) => {
   const startedAt = Date.now();
   c.header("X-Request-Id", requestId);
   await next();
-  console.log(JSON.stringify({
-    event: "http_request",
-    requestId,
-    method: c.req.method,
-    path: new URL(c.req.url).pathname,
-    status: c.res.status,
-    durationMs: Date.now() - startedAt,
-  }));
+  console.log(
+    JSON.stringify({
+      event: "http_request",
+      requestId,
+      method: c.req.method,
+      path: new URL(c.req.url).pathname,
+      status: c.res.status,
+      durationMs: Date.now() - startedAt,
+    }),
+  );
 });
 
 app.use("*", secureHeaders());
@@ -52,7 +55,7 @@ app.use(
     origin: config.corsOrigins,
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 
 // ── Health ───────────────────────────────────────────────────────────────────
@@ -61,7 +64,7 @@ app.get("/health", (c) =>
     ok: true,
     service: "sprout-api",
     version: "0.2.0",
-  })
+  }),
 );
 
 app.get("/ready", async (c) => {
@@ -77,11 +80,13 @@ app.onError((error, c) => {
   if (error instanceof SyntaxError) {
     return c.json({ error: "Malformed JSON", code: "INVALID_JSON" }, 400);
   }
-  console.error(JSON.stringify({
-    event: "unhandled_error",
-    requestId: c.res.headers.get("X-Request-Id"),
-    errorType: error.name,
-  }));
+  console.error(
+    JSON.stringify({
+      event: "unhandled_error",
+      requestId: c.res.headers.get("X-Request-Id"),
+      errorType: error.name,
+    }),
+  );
   return c.json({ error: "Unexpected server error" }, 500);
 });
 
@@ -103,6 +108,7 @@ app.route("/v1/income", incomeRoute);
 app.route("/v1/upload", uploadRoute);
 app.route("/v1/ops", opsRoute);
 app.route("/v1/recurring", recurringRoute);
+app.route("/v1/insights", insightsRoute);
 
 // ── Briefing (daily + on-demand) ─────────────────────────────────────────────
 app.route("/v1/briefing", briefingRoute);
@@ -126,18 +132,22 @@ app.post("/v1/cron/daily", async (c) => {
 });
 
 // ── Serve ────────────────────────────────────────────────────────────────────
-const server = serve(
-  { fetch: app.fetch, port: config.port },
-  (info) => {
-    console.log(`Sprout API listening on http://localhost:${info.port}`);
-    if (!config.openaiApiKey) {
-      console.log("  ⚠ OPENAI_API_KEY not set — using mock AI (deterministic fallback copy)");
-    }
-    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("sprout:sprout@localhost")) {
-      console.log("  ⚠ Using default DATABASE_URL — set DATABASE_URL for production");
-    }
+const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
+  console.log(`Sprout API listening on http://localhost:${info.port}`);
+  if (!config.openaiApiKey) {
+    console.log(
+      "  ⚠ OPENAI_API_KEY not set — using deterministic fallback copy",
+    );
   }
-);
+  if (
+    !process.env.DATABASE_URL ||
+    process.env.DATABASE_URL.includes("sprout:sprout@localhost")
+  ) {
+    console.log(
+      "  ⚠ Using default DATABASE_URL — set DATABASE_URL for production",
+    );
+  }
+});
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {

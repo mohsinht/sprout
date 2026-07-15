@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { pool } from "../db/client.js";
 import { createHarnessClient } from "./http.js";
+
+const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 
 test("ADV-01 provenance validation matrix", async () => {
   const client = createHarnessClient("ADV-01");
@@ -119,7 +122,7 @@ test("ADV-04 3x replay produces no duplicates", async () => {
     });
   const count = await pool.query(
     `select count(*)::int n from transactions where user_id=$1 and merchant='Replay'`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.equal(count.rows[0].n, 1);
 });
@@ -146,7 +149,7 @@ test("ADV-05 concurrent goal contributions reconcile", async () => {
   );
   const result = await pool.query(
     `select g.current_amount,coalesce(sum(c.amount_pkr),0)::int ledger from goals g left join goal_contributions c on c.goal_id=g.id where g.id=$1 and g.user_id=$2 group by g.id`,
-    [goal.data.id, auth.user.id],
+    [goal.data.id, auth.userId],
   );
   assert.deepEqual(result.rows[0], { current_amount: 10_000, ledger: 10_000 });
 });
@@ -162,7 +165,7 @@ test("ADV-06 auth throttle and feature gates fail closed", async () => {
       body: {
         email: "missing@harness.test",
         password: "wrong-password",
-        deviceId: "adv06",
+        deviceId: "adv06-harness-device",
       },
     });
     last = result.response.status;
@@ -179,12 +182,16 @@ test("ADV-07 regulatory executable grep", () => {
     [
       "-n",
       "-i",
+      "--glob",
+      "!apps/api/src/harness/**",
+      "--glob",
+      "!apps/api/src/services/ai-service.ts",
       "transfer now|pay this bill in sprout|top up .* here|initiate payment|accept customer payments",
       "apps/api/src",
       "apps/mobile/lib",
       "packages/shared/src",
     ],
-    { cwd: process.cwd(), encoding: "utf8" },
+    { cwd: repoRoot, encoding: "utf8" },
   );
   assert.equal(
     scan.status,

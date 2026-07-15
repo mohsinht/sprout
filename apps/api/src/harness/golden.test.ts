@@ -57,7 +57,8 @@ test("FIX-01 eid_spike_month", () => {
       },
     ],
   });
-  if (baseline.status !== "available") assert.fail("FIX-01 expected an available expense baseline");
+  if (baseline.status !== "available")
+    assert.fail("FIX-01 expected an available expense baseline");
   const scoreAfterSpike = scoreWithCash(baseline.monthlyExpenses);
   assert.deepEqual(baseline, {
     status: "available",

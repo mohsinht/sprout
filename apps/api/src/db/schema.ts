@@ -594,6 +594,25 @@ export const personalInsights = pgTable(
   ],
 );
 
+export const aiRewriteCache = pgTable("ai_rewrite_cache", {
+  inputHash: varchar("input_hash", { length: 64 }).primaryKey(),
+  outputJson: jsonb("output_json").notNull(),
+  model: text("model").notNull(),
+  originalCostCents: integer("original_cost_cents").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const aiDailyUsage = pgTable("ai_daily_usage", {
+  usageDate: date("usage_date").primaryKey(),
+  costCents: integer("cost_cents").notNull().default(0),
+  callCount: integer("call_count").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export const dailyBriefings = pgTable("daily_briefings", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")

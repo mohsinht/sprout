@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { before } from "node:test";
 import { readFile } from "node:fs/promises";
 import { pool } from "../db/client.js";
 import { createHarnessClient } from "./http.js";
+
+before(async () => {
+  await pool.query(
+    `delete from personal_insights where world_fact_id in (select id from world_facts where source_id='harness');
+     delete from world_facts where source_id='harness'`,
+  );
+});
 
 async function seedFact(kind: string, currency: string | null = null) {
   const stableKey = `harness:${kind}:${currency ?? "none"}:${Date.now()}:${Math.random()}`;
@@ -82,7 +89,7 @@ test("INS-03 stored insight provenance, cap, and personal tie", async () => {
   }
   const invalid = await pool.query(
     `select count(*)::int n from personal_insights where user_id=$1 and num_nonnulls(world_fact_id,wealth_event_id)<>1`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.equal(invalid.rows[0].n, 0);
 });

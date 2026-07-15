@@ -27,7 +27,7 @@ test("LED-01 ledger reconciles every goal", async () => {
   });
   const result = await pool.query(
     `select g.id,g.current_amount,coalesce(sum(c.amount_pkr),0)::int ledger_total from goals g left join goal_contributions c on c.goal_id=g.id where g.user_id=$1 group by g.id`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.ok(result.rows.length > 0);
   for (const row of result.rows)
@@ -102,7 +102,7 @@ test("REC-02 on_salary_day only materializes after confirmed salary", async () =
   });
   let count = await pool.query(
     `select count(*)::int n from recurring_occurrences where user_id=$1`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.equal(count.rows[0].n, 0);
   await client.request("/v1/transactions", {
@@ -119,7 +119,7 @@ test("REC-02 on_salary_day only materializes after confirmed salary", async () =
   });
   count = await pool.query(
     `select count(*)::int n from recurring_occurrences where user_id=$1`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.equal(count.rows[0].n, 1);
 });
@@ -153,7 +153,7 @@ test("REC-03 REC-04 REC-05 ask outcomes, stored skip, and 3x replay", async () =
   );
   const rows = await pool.query(
     `select status,count(*)::int n from recurring_occurrences where user_id=$1 group by status`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.deepEqual(rows.rows, [{ status: "skipped", n: 1 }]);
 });
@@ -218,7 +218,7 @@ test("REC-07 non-Yes lifecycle leaves wealth untouched", async () => {
   );
   const tx = await pool.query(
     `select count(*)::int n from transactions where user_id=$1`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.equal(tx.rows[0].n, 0);
 });

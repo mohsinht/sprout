@@ -31,6 +31,7 @@ export const WorldFactSchema = z.object({
 export const PersonalInsightSchema = z
   .object({
     id: z.string(),
+    stableKey: z.string(),
     userId: z.string(),
     worldFactId: z.string().optional(),
     wealthEventId: z.string().optional(),

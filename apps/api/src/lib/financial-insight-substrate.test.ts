@@ -116,6 +116,7 @@ test("goal contribution rounds down to a practical denomination", () => {
 test("personal insight contract requires exactly one auditable origin", () => {
   const base = {
     id: "insight-1",
+    stableKey: "world-fact:fact-1:user-1",
     userId: "user-1",
     headline: "Rate changed",
     personalMeaning: "Your PKR cash is directly relevant.",

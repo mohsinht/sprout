@@ -43,6 +43,7 @@ import {
   checkGuardrails,
 } from "../lib/briefing-validation.js";
 import { createAiService, type AiService } from "../services/ai-service.js";
+import { rewriteBriefingWithinBudget } from "./ai-rewrite-policy.js";
 
 export interface BriefingResult {
   briefing: WealthBriefing;
@@ -683,47 +684,45 @@ export async function generateBriefing(params: {
   let interpretation = fallbackInterpretation;
   let mascotMood = scoreResult.mascotMood;
 
-  try {
-    const aiResult = await aiService.generateBriefingCopy({
-      greeting: fallbackGreeting,
-      summary: fallbackSummary,
-      wealthSnapshot: {
-        totalPkr: wealthSnapshot.totalPkr,
-        changeVsYesterday: wealthSnapshot.changeVsYesterday,
-        changeMtd: wealthSnapshot.changeMtd,
-        mainReason: wealthSnapshot.mainReason,
-        interpretation: fallbackInterpretation,
-        provenanceSummary: wealthSnapshot.provenanceSummary,
-      },
-      wealthEvents: wealthEvents.map((e) => ({
-        id: e.id,
-        plainWhy: e.plainWhy,
-        magnitudePkr: e.magnitudePkr,
-        direction: e.direction,
-        severity: e.severity,
-      })),
-      recommendedAction: {
-        id: recommendedAction.id,
-        label: recommendedAction.label,
-        severity: recommendedAction.severity,
-        effect: recommendedAction.effect,
-        goalRelativeNote: recommendedAction.goalRelativeNote,
-      },
-      mascotMood: scoreResult.mascotMood,
-      score: scoreResult.score,
-      band: scoreResult.band,
-    });
-
-    greeting = aiResult.output.greeting || fallbackGreeting;
-    summary = aiResult.output.summary || fallbackSummary;
-    interpretation = aiResult.output.interpretation?.length
-      ? aiResult.output.interpretation
-      : fallbackInterpretation;
-    aiCostCents = aiResult.costCents;
-    aiModel = aiService.name;
-  } catch {
-    aiModel = "fallback";
-  }
+  const aiInput = {
+    greeting: fallbackGreeting,
+    summary: fallbackSummary,
+    wealthSnapshot: {
+      totalPkr: wealthSnapshot.totalPkr,
+      changeVsYesterday: wealthSnapshot.changeVsYesterday,
+      changeMtd: wealthSnapshot.changeMtd,
+      mainReason: wealthSnapshot.mainReason,
+      interpretation: fallbackInterpretation,
+      provenanceSummary: wealthSnapshot.provenanceSummary,
+    },
+    wealthEvents: wealthEvents.map((e) => ({
+      id: e.id,
+      plainWhy: e.plainWhy,
+      magnitudePkr: e.magnitudePkr,
+      direction: e.direction,
+      severity: e.severity,
+    })),
+    recommendedAction: {
+      id: recommendedAction.id,
+      label: recommendedAction.label,
+      severity: recommendedAction.severity,
+      effect: recommendedAction.effect,
+      goalRelativeNote: recommendedAction.goalRelativeNote,
+    },
+    mascotMood: scoreResult.mascotMood,
+    score: scoreResult.score,
+    band: scoreResult.band,
+  } satisfies import("./ai-service.js").AiBriefingInput;
+  const aiResult = await rewriteBriefingWithinBudget({
+    date,
+    input: aiInput,
+    aiService,
+  });
+  greeting = aiResult.output.greeting;
+  summary = aiResult.output.summary;
+  interpretation = aiResult.output.interpretation;
+  aiCostCents = aiResult.costCents;
+  aiModel = aiResult.model;
 
   // ── 12. Build the briefing object ───────────────────────────────────────────
   const briefingFreshness = enrichedHoldings.some(

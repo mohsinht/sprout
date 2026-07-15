@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { pool } from "../db/client.js";
 import { apiBaseUrl, createHarnessClient } from "./http.js";
+
+const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 
 test("OPS-01 three-day valuation mechanics and real gate numbers", async () => {
   const metrics = await pool.query(`select
@@ -37,7 +40,7 @@ test("OPS-02 cron double-fire is idempotent", async () => {
   }
   const result = await pool.query(
     `select idempotency_key,count(*)::int n from job_runs where user_id=$1 and idempotency_key like 'daily:%' group by idempotency_key`,
-    [auth.user.id],
+    [auth.userId],
   );
   assert.ok(result.rows.every((row) => row.n === 1));
 });
@@ -45,12 +48,12 @@ test("OPS-02 cron double-fire is idempotent", async () => {
 test("OPS-02 backup and isolated restore smoke", () => {
   const output = `/tmp/sprout-harness-${Date.now()}.dump`;
   execFileSync("bash", ["scripts/backup-postgres.sh", output], {
-    cwd: process.cwd(),
+    cwd: repoRoot,
     stdio: "inherit",
     env: process.env,
   });
   execFileSync("bash", ["scripts/restore-smoke.sh", output], {
-    cwd: process.cwd(),
+    cwd: repoRoot,
     stdio: "inherit",
     env: process.env,
   });
@@ -63,7 +66,7 @@ test("OPS-03 headers, request IDs, sanitized errors, and boot refusal", async ()
     assert.ok(response.headers.get("x-request-id"));
   }
   const boot = spawnSync(process.execPath, ["apps/api/dist/config.js"], {
-    cwd: process.cwd(),
+    cwd: repoRoot,
     env: {
       ...process.env,
       NODE_ENV: "production",

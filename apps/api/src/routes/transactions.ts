@@ -29,14 +29,16 @@ transactionsRoute.get("/", async (c) => {
 // ── POST /v1/transactions ────────────────────────────────────────────────────
 
 const CreateTransactionSchema = z.object({
-  amount: z.number().int().positive(),
+  amount: z.number().int().positive().max(2_147_483_647),
   currency: z.string().length(3).default("PKR"),
   type: z.enum(["expense", "income", "transfer"]),
   category: z.string().min(1).max(100),
   merchant: z.string().max(200).optional(),
   note: z.string().max(500).optional(),
   occurredAt: z.string().datetime({ offset: true }).optional(), // ISO; defaults to now
-  source: z.enum(["manual", "sms", "email", "statement", "wise", "al_meezan"]).default("manual"),
+  source: z
+    .enum(["manual", "sms", "email", "statement", "wise", "al_meezan"])
+    .default("manual"),
   provider: z.string().max(200).optional(),
   confidence: z.number().min(0).max(1).default(1),
   needsReview: z.boolean().default(false),
@@ -47,9 +49,18 @@ const CreateTransactionSchema = z.object({
 
 transactionsRoute.post("/", async (c) => {
   const userId = c.get("userId") as string;
-  const body = CreateTransactionSchema.safeParse(await c.req.json());
+  let payload: unknown;
+  try {
+    payload = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  const body = CreateTransactionSchema.safeParse(payload);
   if (!body.success) {
-    return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
+    return c.json(
+      { error: "Invalid input", details: body.error.flatten() },
+      400,
+    );
   }
 
   const occurredAt = body.data.occurredAt
@@ -70,8 +81,8 @@ transactionsRoute.post("/", async (c) => {
     .where(
       and(
         eq(schema.transactions.userId, userId),
-        eq(schema.transactions.dedupeFingerprint, fingerprint)
-      )
+        eq(schema.transactions.dedupeFingerprint, fingerprint),
+      ),
     )
     .limit(1);
 
@@ -85,7 +96,12 @@ transactionsRoute.post("/", async (c) => {
     const [account] = await db
       .select({ id: schema.accounts.id })
       .from(schema.accounts)
-      .where(and(eq(schema.accounts.id, accountId), eq(schema.accounts.userId, userId)))
+      .where(
+        and(
+          eq(schema.accounts.id, accountId),
+          eq(schema.accounts.userId, userId),
+        ),
+      )
       .limit(1);
     if (!account) return c.json({ error: "Account not found" }, 404);
   }
@@ -119,7 +135,10 @@ transactionsRoute.patch("/:id/confirm", async (c) => {
     .update(schema.transactions)
     .set({ needsReview: false, confidence: "1.00" })
     .where(
-      and(eq(schema.transactions.id, txId), eq(schema.transactions.userId, userId))
+      and(
+        eq(schema.transactions.id, txId),
+        eq(schema.transactions.userId, userId),
+      ),
     )
     .returning();
 
@@ -139,7 +158,10 @@ transactionsRoute.delete("/:id", async (c) => {
   const [deleted] = await db
     .delete(schema.transactions)
     .where(
-      and(eq(schema.transactions.id, txId), eq(schema.transactions.userId, userId))
+      and(
+        eq(schema.transactions.id, txId),
+        eq(schema.transactions.userId, userId),
+      ),
     )
     .returning();
 

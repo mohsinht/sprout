@@ -1,9 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/insights_models.dart';
-import '../domain/today_models.dart';
-import 'http_today_repository.dart';
+import 'api/sprout_api_client.dart';
 import 'insights_validation.dart';
 
 abstract class InsightsRepository {
@@ -14,7 +16,7 @@ final insightsRepositoryProvider = Provider<InsightsRepository>((ref) {
   const useMock =
       String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') == 'dev';
   if (useMock) return const MockInsightsRepository();
-  return BriefingInsightsRepository(ref.read(todayRepositoryProvider));
+  return ApiInsightsRepository(ref.read(apiClientProvider));
 });
 
 final insightsProvider = FutureProvider<InsightsData>((ref) {
@@ -111,28 +113,40 @@ class MockInsightsRepository implements InsightsRepository {
   }
 }
 
-/// Production insights are projections of dated, provenance-bearing events in
-/// the user's own briefing. If there is no relevant event, the honest result is
-/// a quiet week rather than generic market content.
-class BriefingInsightsRepository implements InsightsRepository {
-  BriefingInsightsRepository(this._todayRepository);
+class ApiInsightsRepository implements InsightsRepository {
+  ApiInsightsRepository(this._client);
 
-  final TodayRepository _todayRepository;
+  final SproutApiClient _client;
+  static const _cacheKey = 'insights.cache.v1';
 
   @override
   Future<InsightsData> fetchInsights() async {
-    final today = await _todayRepository.fetchToday();
-    final offline = today.provenanceSummary.contains('Waiting to sync');
-    final items = today.wealthEvents.map((event) {
-      final holding = today.wealthSnapshot.holdings
-          .where((item) => item.id == event.holdingId)
-          .firstOrNull;
-      final category = switch (event.kind) {
-        WealthEventKind.goalMilestone => InsightCategory.goals,
-        WealthEventKind.fxMove => InsightCategory.cash,
-        WealthEventKind.navMove => InsightCategory.funds,
-        _ => InsightCategory.wealth,
-      };
+    try {
+      final response = await _client.get('/v1/insights');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonEncode(response));
+      return _fromJson(response, offline: false);
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString(_cacheKey);
+      if (cached == null) rethrow;
+      return _fromJson(jsonDecode(cached) as Map<String, dynamic>,
+          offline: true);
+    }
+  }
+
+  InsightsData _fromJson(Map<String, dynamic> json, {required bool offline}) {
+    final rows =
+        (json['insights'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final items = rows.map((row) {
+      final template = row['templateId'] as String? ?? '';
+      final category = row['matchedGoalId'] != null
+          ? InsightCategory.goals
+          : row['matchedCurrency'] != null
+              ? InsightCategory.cash
+              : template.startsWith('nav_move')
+                  ? InsightCategory.funds
+                  : InsightCategory.wealth;
       final icon = switch (category) {
         InsightCategory.goals => Icons.flag_rounded,
         InsightCategory.cash => Icons.currency_exchange_rounded,
@@ -140,40 +154,33 @@ class BriefingInsightsRepository implements InsightsRepository {
         InsightCategory.wealth => Icons.trending_up_rounded,
       };
       return MoneyInsight(
-        id: event.id,
+        id: row['id'] as String,
         category: category,
         icon: icon,
-        headline: _headline(event),
-        personalMeaning: event.plainWhy,
-        detail:
-            '${event.plainWhy} This is based on your dated Sprout briefing, not a general market recommendation.',
-        relevanceTag: holding?.label ?? 'Your money',
+        headline: row['headline'] as String,
+        personalMeaning: row['personalMeaning'] as String,
+        detail: row['detail'] as String,
+        relevanceTag: row['matchedCurrency'] as String? ??
+            (row['matchedGoalId'] != null ? 'Your goal' : 'Your holding'),
         provenance: InsightProvenance(
-          sourceLabel: holding?.priceSource ?? 'Sprout manual record',
-          asOf: event.date,
+          sourceLabel: row['sourceLabel'] as String,
+          asOf: row['asOf'] as String,
           isMock: false,
         ),
-        actionLabel: holding == null ? null : 'See Money',
-        actionKind:
-            holding == null ? InsightActionKind.none : InsightActionKind.money,
+        actionLabel: row['matchedGoalId'] != null ? 'Review goal' : 'See Money',
+        actionKind: row['matchedGoalId'] != null
+            ? InsightActionKind.goal
+            : InsightActionKind.money,
+        targetId: row['matchedGoalId'] as String? ??
+            row['matchedHoldingId'] as String?,
       );
     }).toList();
     validateInsights(items);
+    final asOf = items.isEmpty ? 'Quiet state' : items.first.provenance.asOf;
     return InsightsData(
-      items: items,
-      refreshedLabel: 'From your briefing · ${today.wealthSnapshot.date}',
-      offline: offline,
-      thinData: items.isEmpty,
-    );
+        items: items,
+        refreshedLabel: asOf,
+        offline: offline,
+        thinData: items.isEmpty);
   }
-
-  String _headline(WealthEvent event) => switch (event.kind) {
-        WealthEventKind.navMove => 'A holding value moved',
-        WealthEventKind.fxMove => 'Currency movement affected your value',
-        WealthEventKind.contribution => 'A contribution changed your picture',
-        WealthEventKind.withdrawal => 'A withdrawal changed your picture',
-        WealthEventKind.bill => 'A bill affected your cash',
-        WealthEventKind.goalMilestone => 'A goal reached a milestone',
-        WealthEventKind.newsContext => 'New context for one of your holdings',
-      };
 }

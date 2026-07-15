@@ -107,6 +107,7 @@ jobs:
       CRON_SECRET: ci-only-cron-secret-at-least-thirty-two-characters
       API_BASE_URL: http://127.0.0.1:8787
       SPROUT_ENV: production
+      AI_DAILY_COST_CAP_CENTS: 10
     services:
       postgres:
         image: postgres:16-alpine
@@ -157,9 +158,24 @@ jobs:
       - name: AI-01..05 budget and degradation
         if: always()
         run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:ai-budget
-      - name: P1..P7 persona journeys
+      - name: P1..P7 real Flutter persona journeys
         if: always()
-        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:personas
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            test -f /tmp/sprout-harness-precondition-ok
+            cd apps/mobile
+            flutter drive \
+              --driver=test_driver/integration_test.dart \
+              --target=integration_test/persona_journeys_test.dart \
+              -d emulator-5554 \
+              --dart-define=SPROUT_ENV=production \
+              --dart-define=API_BASE_URL=http://10.0.2.2:8787
+            cd ../..
+            pnpm test:personas
       - name: ADV-01..07 adversarial API
         if: always()
         run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:adversarial

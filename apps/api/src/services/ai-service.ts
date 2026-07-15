@@ -8,6 +8,21 @@ const AiBriefingOutputSchema = z.object({
   interpretation: z.array(z.string().min(1).max(240)).min(2).max(3),
 });
 
+const bannedAiCopy =
+  /you failed|bad spending|you should have|guaranteed|buy now|you will earn|connect your bank to continue|transfer now|pay this bill in sprout|top up .* here/i;
+
+export function validateAiBriefingOutput(value: unknown): AiBriefingOutput {
+  const output = AiBriefingOutputSchema.parse(value);
+  if (
+    bannedAiCopy.test(
+      [output.greeting, output.summary, ...output.interpretation].join(" "),
+    )
+  ) {
+    throw new Error("AI copy failed Sprout guardrails");
+  }
+  return output;
+}
+
 export interface AiBriefingInput {
   greeting: string;
   summary: string;
@@ -46,14 +61,18 @@ export interface AiBriefingOutput {
 
 export interface AiService {
   readonly name: string;
-  generateBriefingCopy(input: AiBriefingInput): Promise<{ output: AiBriefingOutput; costCents: number }>;
+  generateBriefingCopy(
+    input: AiBriefingInput,
+  ): Promise<{ output: AiBriefingOutput; costCents: number }>;
 }
 
 /** Mock AI — returns the deterministic copy. Zero cost. */
 export class MockAiService implements AiService {
   readonly name = "mock-ai";
 
-  async generateBriefingCopy(input: AiBriefingInput): Promise<{ output: AiBriefingOutput; costCents: number }> {
+  async generateBriefingCopy(
+    input: AiBriefingInput,
+  ): Promise<{ output: AiBriefingOutput; costCents: number }> {
     return {
       output: {
         greeting: input.greeting,
@@ -78,7 +97,9 @@ export class OpenAiService implements AiService {
     return this.client;
   }
 
-  async generateBriefingCopy(input: AiBriefingInput): Promise<{ output: AiBriefingOutput; costCents: number }> {
+  async generateBriefingCopy(
+    input: AiBriefingInput,
+  ): Promise<{ output: AiBriefingOutput; costCents: number }> {
     try {
       const client = this.getClient();
 
@@ -112,7 +133,9 @@ Return JSON with exactly these fields:
 
       const response = await client.responses.create({
         model: config.openaiModel,
-        reasoning: { effort: config.openaiReasoningEffort as "low" | "medium" | "high" },
+        reasoning: {
+          effort: config.openaiReasoningEffort as "low" | "medium" | "high",
+        },
         store: false,
         input: [
           { role: "system", content: systemPrompt },
@@ -129,7 +152,12 @@ Return JSON with exactly these fields:
               properties: {
                 greeting: { type: "string" },
                 summary: { type: "string" },
-                interpretation: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 3 },
+                interpretation: {
+                  type: "array",
+                  items: { type: "string" },
+                  minItems: 2,
+                  maxItems: 3,
+                },
               },
               required: ["greeting", "summary", "interpretation"],
             },
@@ -144,7 +172,7 @@ Return JSON with exactly these fields:
       const inputTokens = response.usage?.input_tokens ?? 0;
       const outputTokens = response.usage?.output_tokens ?? 0;
       const costCents = Math.ceil(
-        (inputTokens * 0.00000015 + outputTokens * 0.0000006) * 100
+        (inputTokens * 0.00000015 + outputTokens * 0.0000006) * 100,
       );
 
       return { output: parsed, costCents };
