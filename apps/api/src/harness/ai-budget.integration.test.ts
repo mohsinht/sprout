@@ -120,6 +120,7 @@ test("AI-03 malformed output is rejected with valid fallback", async () => {
   assert.ok(result.briefing.greeting);
   assert.equal(result.aiCostCents, 0);
   assert.equal(result.aiModel, "fallback");
+  assert.equal(result.aiMode, "fallback");
 });
 
 test("AI-04 canonical input hash cache shares identical state", async () => {

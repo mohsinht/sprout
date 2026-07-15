@@ -48,6 +48,7 @@ briefingRoute.post("/refresh", async (c) => {
     return c.json({
       ...briefing,
       message: "Already refreshed recently — using the latest briefing.",
+      refresh: { status: "current", copyMode: "existing", aiUsed: false },
     });
   }
 
@@ -58,11 +59,20 @@ briefingRoute.post("/refresh", async (c) => {
       ...briefing,
       freshness: "local_fallback",
       message: "I could not refresh the scan, so I am using what I already know.",
+      refresh: { status: "failed", copyMode: "existing", aiUsed: false },
     });
   }
 
   const { briefing } = await getBriefingWithFallback(userId);
-  return c.json(briefing);
+  return c.json({
+    ...briefing,
+    message: "Today refreshed from your latest saved money data.",
+    refresh: {
+      status: "refreshed",
+      copyMode: result.aiMode ?? "deterministic",
+      aiUsed: result.aiMode === "ai",
+    },
+  });
 });
 
 // ── GET /v1/briefing/sources ─────────────────────────────────────────────────

@@ -177,15 +177,10 @@ Return JSON with exactly these fields:
 
       return { output: parsed, costCents };
     } catch (error) {
-      // On any AI failure, fall back to deterministic copy
-      return {
-        output: {
-          greeting: input.greeting,
-          summary: input.summary,
-          interpretation: input.wealthSnapshot.interpretation,
-        },
-        costCents: 0,
-      };
+      // The budget/rewrite policy owns deterministic fallback and telemetry.
+      // Re-throw so a provider or schema failure cannot be reported as an
+      // actual AI rewrite to the UI.
+      throw error;
     }
   }
 }

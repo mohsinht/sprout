@@ -16,6 +16,7 @@ import '../../data/reduce_motion_store.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../data/api/sprout_api_client.dart';
 import '../../data/auth_store.dart';
+import '../../data/mock_insights_repository.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../theme/sprout_theme.dart';
@@ -25,6 +26,7 @@ import '../../widgets/trust_badge.dart';
 import '../goals/goal_editor_sheet.dart';
 import '../add/quick_add_sheet.dart';
 import '../today/today_widgets.dart';
+import '../today/today_controller.dart';
 import 'settings_widgets.dart';
 
 /// One consistent divider between rows inside any Settings card.
@@ -143,6 +145,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   String _currency = _SettingsStrings.pkr;
   String _language = 'en';
+  bool _refreshingToday = false;
+  bool _refreshingInsights = false;
+  String? _todayRefreshStatus;
+  String? _insightsRefreshStatus;
 
   late final Map<String, bool> _prefs = {
     _SettingsStrings.reducedMotion: false,
@@ -726,6 +732,106 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
   }
 
+  Future<void> _refreshToday() async {
+    if (_refreshingToday) return;
+    setState(() {
+      _refreshingToday = true;
+      _todayRefreshStatus = null;
+    });
+    final session = ref.read(authSessionProvider);
+    if (session == null || session.isGuest) {
+      ref.invalidate(todayControllerProvider);
+      if (mounted) {
+        setState(() {
+          _refreshingToday = false;
+          _todayRefreshStatus =
+              'Today re-read your saved entries. Online AI was not used.';
+        });
+      }
+      return;
+    }
+    try {
+      final response = await ref
+          .read(apiClientProvider)
+          .post('/v1/briefing/refresh', {'contextChanged': false});
+      ref.invalidate(todayControllerProvider);
+      final refresh = response['refresh'] as Map<String, dynamic>?;
+      final status = refresh?['status'] as String?;
+      final aiUsed = refresh?['aiUsed'] as bool? ?? false;
+      final copyMode = refresh?['copyMode'] as String?;
+      if (!mounted) return;
+      setState(() {
+        _todayRefreshStatus = switch (status) {
+          'current' => 'Today is already current. No extra AI call was made.',
+          'failed' =>
+            'Today could not refresh. Your latest saved briefing is still here.',
+          _ when aiUsed =>
+            'Today refreshed. AI polished the wording; amounts stayed rule-based.',
+          _ when copyMode == 'cache' =>
+            'Today refreshed with approved wording. No extra AI call was made.',
+          _ => 'Today refreshed with calm rule-based wording.',
+        };
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _todayRefreshStatus = error is SproutApiException
+            ? error.userMessage
+            : 'Today could not refresh. Your saved briefing is still available.';
+      });
+    } finally {
+      if (mounted) setState(() => _refreshingToday = false);
+    }
+  }
+
+  Future<void> _refreshInsights() async {
+    if (_refreshingInsights) return;
+    setState(() {
+      _refreshingInsights = true;
+      _insightsRefreshStatus = null;
+    });
+    final session = ref.read(authSessionProvider);
+    if (session == null || session.isGuest) {
+      ref.invalidate(insightsProvider);
+      if (mounted) {
+        setState(() {
+          _refreshingInsights = false;
+          _insightsRefreshStatus =
+              'Insights rechecked saved data. Online AI was not used.';
+        });
+      }
+      return;
+    }
+    try {
+      final response =
+          await ref.read(apiClientProvider).post('/v1/insights/refresh', {});
+      ref.invalidate(insightsProvider);
+      final refresh = response['refresh'] as Map<String, dynamic>?;
+      final aiUsed = refresh?['aiUsed'] as bool? ?? false;
+      final copyMode = refresh?['copyMode'] as String?;
+      final quiet = response['state'] == 'quiet';
+      if (!mounted) return;
+      setState(() {
+        _insightsRefreshStatus = aiUsed
+            ? 'Insights refreshed. AI polished wording from dated sources.'
+            : copyMode == 'ai_rewrite'
+                ? 'Insights refreshed with approved wording. No new AI call was made.'
+                : quiet
+                    ? 'Insights checked. Nothing new needs your attention.'
+                    : 'Insights refreshed from dated sources. Wording stayed rule-based.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _insightsRefreshStatus = error is SproutApiException
+            ? error.userMessage
+            : 'Insights could not refresh. Saved insights remain available.';
+      });
+    } finally {
+      if (mounted) setState(() => _refreshingInsights = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const useMock =
@@ -755,6 +861,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           gap,
         ],
         _profileSection(colors),
+        gap,
+        _contentRefreshSection(colors),
         gap,
         _goalsSection(colors),
         gap,
@@ -870,6 +978,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _contentRefreshSection(SproutColorScheme colors) {
+    return SettingsSection(
+      header: 'Content refresh',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Sprout updates overnight. Refresh after you change something and want a new read now.',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: SproutSpacing.lg),
+          _RefreshSettingsRow(
+            icon: Icons.today_rounded,
+            title: 'Today',
+            description: 'Rebuild the daily briefing from saved money data.',
+            status: _todayRefreshStatus,
+            loading: _refreshingToday,
+            buttonKey: const ValueKey('refresh-today-button'),
+            onRefresh: _refreshToday,
+          ),
+          _rowDivider,
+          _RefreshSettingsRow(
+            icon: Icons.auto_awesome_rounded,
+            title: 'Insights',
+            description: 'Recheck dated facts against your money.',
+            status: _insightsRefreshStatus,
+            loading: _refreshingInsights,
+            buttonKey: const ValueKey('refresh-insights-button'),
+            onRefresh: _refreshInsights,
+          ),
+          const SizedBox(height: SproutSpacing.md),
+          Text(
+            'Today may use AI for notable wording within the daily limit. Insights currently refreshes dated facts with rule-based wording. Facts, amounts, and actions never come from AI.',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: colors.muted),
+          ),
+        ],
       ),
     );
   }
@@ -1582,6 +1736,89 @@ class _EmptySourcesCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RefreshSettingsRow extends StatelessWidget {
+  const _RefreshSettingsRow({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.status,
+    required this.loading,
+    required this.buttonKey,
+    required this.onRefresh,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final String? status;
+  final bool loading;
+  final Key buttonKey;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Icon(icon, color: colors.muted, size: 22),
+        ),
+        const SizedBox(width: SproutSpacing.md),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: colors.muted),
+                ),
+                if (status != null) ...[
+                  const SizedBox(height: SproutSpacing.sm),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      status!,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: colors.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: SproutSpacing.sm),
+        SizedBox(
+          width: 88,
+          height: 44,
+          child: OutlinedButton(
+            key: buttonKey,
+            onPressed: loading ? null : onRefresh,
+            child: loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Refresh'),
+          ),
+        ),
+      ],
     );
   }
 }

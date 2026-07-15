@@ -13,6 +13,7 @@ export interface JobResult {
   briefingId: string;
   status: "succeeded" | "failed" | "skipped";
   error?: string;
+  aiMode?: "deterministic" | "cache" | "ai" | "fallback";
 }
 
 /** Run the daily briefing job for a user. Idempotent. */
@@ -53,7 +54,11 @@ export async function runDailyBriefingJob(userId: string, date?: string): Promis
       .set({ status: "succeeded", finishedAt: new Date() })
       .where(eq(schema.jobRuns.id, jobRun.id));
 
-    return { briefingId: result.briefing.id, status: "succeeded" };
+    return {
+      briefingId: result.briefing.id,
+      status: "succeeded",
+      aiMode: result.aiMode,
+    };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     await db
@@ -125,7 +130,11 @@ export async function runOnDemandBriefing(userId: string, contextChanged = false
       .set({ status: "succeeded", finishedAt: new Date() })
       .where(eq(schema.jobRuns.id, jobRun.id));
 
-    return { briefingId: result.briefing.id, status: "succeeded" };
+    return {
+      briefingId: result.briefing.id,
+      status: "succeeded",
+      aiMode: result.aiMode,
+    };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
     await db

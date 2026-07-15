@@ -49,6 +49,7 @@ export interface BriefingResult {
   briefing: WealthBriefing;
   aiCostCents: number;
   aiModel: string;
+  aiMode: "deterministic" | "cache" | "ai" | "fallback";
   guardrailViolations: string[];
 }
 
@@ -679,6 +680,7 @@ export async function generateBriefing(params: {
   // ── 11. Call AI for copy ─────────────────────────────────────────────────────
   let aiCostCents = 0;
   let aiModel = "none";
+  let aiMode: BriefingResult["aiMode"] = "deterministic";
   let greeting = fallbackGreeting;
   let summary = fallbackSummary;
   let interpretation = fallbackInterpretation;
@@ -723,6 +725,7 @@ export async function generateBriefing(params: {
   interpretation = aiResult.output.interpretation;
   aiCostCents = aiResult.costCents;
   aiModel = aiResult.model;
+  aiMode = aiResult.mode;
 
   // ── 12. Build the briefing object ───────────────────────────────────────────
   const briefingFreshness = enrichedHoldings.some(
@@ -830,6 +833,7 @@ export async function generateBriefing(params: {
     briefing: validated,
     aiCostCents,
     aiModel,
+    aiMode,
     guardrailViolations: violations,
   };
 }

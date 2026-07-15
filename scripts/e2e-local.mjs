@@ -261,7 +261,23 @@ const refresh = await request("/v1/briefing/refresh", {
 });
 check(refresh.data.wealthSnapshot?.totalPkr === 163800, "briefing refresh uses confirmed account and holding values");
 check(typeof refresh.data.summary === "string" && refresh.data.summary.length > 0, "AI/fallback analysis returns the agreed briefing contract");
+check(
+  refresh.data.refresh?.status === "refreshed" &&
+    typeof refresh.data.refresh.aiUsed === "boolean",
+  "manual Today refresh reports whether an AI call was actually used",
+);
 check(refresh.data.projectedIncome?.every((row) => row.inCurrentWealth === false) ?? true, "briefing does not count projected income as wealth");
+
+const refreshedInsights = await request("/v1/insights/refresh", {
+  method: "POST",
+  body: {},
+});
+check(
+  ["quiet", "populated"].includes(refreshedInsights.data.state) &&
+    refreshedInsights.data.refresh?.status === "refreshed" &&
+    typeof refreshedInsights.data.refresh.aiUsed === "boolean",
+  "manual Insights refresh returns an honest content and AI-use status",
+);
 
 const current = await request("/v1/briefing");
 check(current.data.goals.length === 2 && current.data.wealthSnapshot, "Today briefing is fetchable end to end");

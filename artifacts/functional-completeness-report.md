@@ -60,6 +60,7 @@ Proof: `/ready` returns 200 with `database: ready`, origin `http://127.0.0.1:809
 | App lock | Platform capability-gated | Device biometric/local auth plugin | PASS on supported device |
 | Reduce motion | Changes runtime animation policy | Local preference plus profile API | PASS |
 | Dark mode | Changes live app theme | Runtime theme controller | PASS |
+| Manual content refresh | Separate sober Today and Insights controls in Settings with loading and inline outcome states | Today refresh runs the rate-limited briefing pipeline and reports actual AI use; Insights reruns the deterministic dated-fact join | PASS |
 | Daily/weekly/salary/streak reminders | Real permission request, scheduling, cancellation and deep links | Platform notification service plus profile preference | PASS on supported device |
 | Bill reminders | Disabled with “Nothing is scheduled yet” | Bill tracking is not a launched model/UI | HONESTLY UNAVAILABLE |
 | Data export | Copies plain user-owned JSON | Authenticated export API | PASS |
