@@ -14,6 +14,11 @@ jobs:
   backend:
     name: Backend lint, build, and test
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
+      JWT_SECRET: ci-only-jwt-secret-at-least-thirty-two-characters
+      CRON_SECRET: ci-only-cron-secret-at-least-thirty-two-characters
+      API_BASE_URL: http://127.0.0.1:8787
     services:
       postgres:
         image: postgres:16-alpine
@@ -33,10 +38,28 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @sprout/api db:migrate
-        env:
-          DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
       - run: pnpm check
       - run: pnpm lint
+      - name: Start API and wait for readiness
+        shell: bash
+        run: |
+          pnpm --filter @sprout/api start > /tmp/sprout-api.log 2>&1 &
+          api_pid=$!
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error "$API_BASE_URL/health" > /dev/null; then
+              echo "API is ready (pid $api_pid)"
+              exit 0
+            fi
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              echo "API exited before becoming ready"
+              cat /tmp/sprout-api.log
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "API did not become ready within 30 seconds"
+          cat /tmp/sprout-api.log
+          exit 1
       - run: pnpm --filter @sprout/api test
 
   mobile:
