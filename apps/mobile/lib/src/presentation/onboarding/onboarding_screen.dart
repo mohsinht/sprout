@@ -99,7 +99,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         goalType: amount == null ? null : _goalType,
         targetAmount: amount,
       );
-      await ref.read(authSessionProvider.notifier).markOnboardingComplete();
     } on SproutApiException catch (error) {
       if (error.statusCode != 401 && error.statusCode != 403) {
         // Sync is intentionally non-blocking; the local draft is safe.
@@ -114,6 +113,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       _saving = false;
       _step = 4;
     });
+  }
+
+  Future<void> _enterToday() async {
+    await ref.read(authSessionProvider.notifier).markOnboardingComplete();
+    if (mounted) context.go('/today');
   }
 
   @override
@@ -172,6 +176,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return _Celebration(
             name: _nameController.text.trim(),
             colors: colors,
+            onContinue: _enterToday,
             key: const ValueKey('done'));
     }
   }
@@ -346,9 +351,14 @@ class _TargetStep extends StatelessWidget {
 }
 
 class _Celebration extends StatelessWidget {
-  const _Celebration({required this.name, required this.colors, super.key});
+  const _Celebration(
+      {required this.name,
+      required this.colors,
+      required this.onContinue,
+      super.key});
   final String name;
   final SproutColorScheme colors;
+  final Future<void> Function() onContinue;
   @override
   Widget build(BuildContext context) => _CenteredColumn(
       colors: colors,
@@ -358,7 +368,8 @@ class _Celebration extends StatelessWidget {
       body:
           'You can add money manually, connect something later, or simply look around. Sprout is ready.',
       button: FilledButton(
-          onPressed: () => context.go('/today'),
+          key: const ValueKey('onboarding-see-today'),
+          onPressed: () => onContinue(),
           child: const Text('See my Today')));
 }
 

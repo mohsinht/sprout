@@ -17,6 +17,10 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     _restore();
   }
 
+  @visibleForTesting
+  AuthSessionStore.forTesting(this._client, AuthSession session)
+      : super(session);
+
   static const _accessKey = 'auth.accessToken';
   static const _refreshKey = 'auth.refreshToken';
   static const _userIdKey = 'auth.userId';

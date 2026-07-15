@@ -16,6 +16,26 @@ const apiBase = String.fromEnvironment('API_BASE_URL',
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  Future<void> waitFor(
+    WidgetTester tester,
+    Finder finder, {
+    Duration timeout = const Duration(seconds: 20),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    while (finder.evaluate().isEmpty && DateTime.now().isBefore(deadline)) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    if (finder.evaluate().isNotEmpty) return;
+    final visibleText = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((widget) => widget.data)
+        .whereType<String>()
+        .where((text) => text.trim().isNotEmpty)
+        .take(20)
+        .join(' | ');
+    fail('Timed out waiting for $finder. Visible text: $visibleText');
+  }
+
   setUpAll(() async {
     await binding.convertFlutterSurfaceToImage();
   });
@@ -29,7 +49,7 @@ void main() {
     final container = ProviderContainer();
     await tester.pumpWidget(UncontrolledProviderScope(
         container: container, child: const SproutApp()));
-    await tester.pump(const Duration(seconds: 2));
+    await waitFor(tester, find.text('Create an account'));
     await tester.tap(find.text('Create an account'));
     await tester.pumpAndSettle();
     final fields = find.byType(TextField);
@@ -38,12 +58,14 @@ void main() {
         '${id.toLowerCase()}-${DateTime.now().microsecondsSinceEpoch}@device.sprout.test');
     await tester.enterText(fields.at(2), 'Persona!246810');
     await tester.tap(find.text('Create account'));
-    await tester.pump(const Duration(seconds: 3));
+    await waitFor(tester, find.text("Hi, I'm Sprout."));
     expect(find.text("Hi, I'm Sprout."), findsOneWidget);
     await tester.tap(find.text('Skip for now'));
-    await tester.pump(const Duration(seconds: 2));
-    await tester.tap(find.text('See my Today'));
-    await tester.pump(const Duration(seconds: 4));
+    final seeToday = find.byKey(const ValueKey('onboarding-see-today'));
+    await waitFor(tester, seeToday);
+    expect(find.text('See my Today'), findsOneWidget);
+    await tester.tap(seeToday);
+    await waitFor(tester, find.text('Today'));
     return container;
   }
 
