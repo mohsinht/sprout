@@ -6,6 +6,8 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "build": "pnpm -r build",
+    "build:android:s25u": "bash scripts/build-android-s25u.sh",
+    "setup:android:signing": "bash scripts/setup-android-signing.sh",
     "check": "pnpm -r build && pnpm -r typecheck",
     "dev:api": "pnpm --filter @sprout/api dev",
     "dev:api:local": "DATABASE_URL=postgresql://sprout:sprout@localhost:5432/sprout DATABASE_SSL=false pnpm --filter @sprout/api dev",
