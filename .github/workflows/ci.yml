@@ -158,6 +158,12 @@ jobs:
       - name: AI-01..05 budget and degradation
         if: always()
         run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:ai-budget
+      - name: Enable KVM for Android emulator
+        if: always()
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: P1..P7 real Flutter persona journeys
         if: always()
         uses: reactivecircus/android-emulator-runner@v2
@@ -165,10 +171,11 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_6
+          working-directory: apps/mobile
           script: |
             test -f /tmp/sprout-harness-precondition-ok
-            cd apps/mobile && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/persona_journeys_test.dart -d emulator-5554 --dart-define=SPROUT_ENV=production --dart-define=API_BASE_URL=http://10.0.2.2:8787
-            pnpm test:personas
+            flutter drive --driver=test_driver/integration_test.dart --target=integration_test/persona_journeys_test.dart -d emulator-5554 --dart-define=SPROUT_ENV=production --dart-define=API_BASE_URL=http://10.0.2.2:8787
+            pnpm --dir ../.. test:personas
       - name: ADV-01..07 adversarial API
         if: always()
         run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:adversarial
