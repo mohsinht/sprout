@@ -126,7 +126,6 @@ class GoalStore extends StateNotifier<List<Goal>> {
     await _remotePatch(id, {
       'name': updated.name,
       'targetAmount': updated.targetAmount,
-      'currentAmount': updated.currentAmount,
       'status': updated.status,
       'isPrimary': updated.isPrimary
     });
@@ -140,9 +139,12 @@ class GoalStore extends StateNotifier<List<Goal>> {
     await _persist();
     if (!_isRemoteId(id)) return;
     try {
-      final updated = await _ref
-          .read(apiClientProvider)
-          .post('/v1/goals/$id/contribute', {'amount': amount});
+      final updated =
+          await _ref.read(apiClientProvider).post('/v1/goals/$id/contribute', {
+        'amount': amount,
+        'source': 'manual',
+        'idempotencyKey': '$id-${DateTime.now().microsecondsSinceEpoch}',
+      });
       state = [
         for (final g in state)
           if (g.id == id) _fromJson(updated) else g

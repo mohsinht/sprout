@@ -1,5 +1,10 @@
 import { eq, and, desc } from "drizzle-orm";
-import { calculatePresenceScore, type FactorPresenceInputs, type WealthBriefing, type WealthTrendPoint } from "@sprout/shared";
+import {
+  calculatePresenceScore,
+  type FactorPresenceInputs,
+  type WealthBriefing,
+  type WealthTrendPoint,
+} from "@sprout/shared";
 import { db, schema } from "../db/client.js";
 import { config } from "../config.js";
 import { createFxSource } from "../sources/fx-source.js";
@@ -23,6 +28,12 @@ import {
   computeTrendStability,
   computeDiversification,
 } from "../lib/scoring.js";
+import {
+  computeContributionConsistency,
+  computeExpenseBaseline,
+  computeGoalPace,
+  deriveGoalContributionSuggestion,
+} from "../lib/financial-insight-substrate.js";
 import {
   selectRecommendedAction,
   deterministicInterpretation,
@@ -82,13 +93,25 @@ export async function generateBriefing(params: {
     .from(schema.goals)
     .where(eq(schema.goals.userId, userId));
 
+  const goalContributionRows = await db
+    .select()
+    .from(schema.goalContributions)
+    .where(eq(schema.goalContributions.userId, userId));
+
   const holdingRows = await db
     .select()
     .from(schema.holdings)
     .where(eq(schema.holdings.userId, userId));
-  const recurringRows = await db.select({ occurrence: schema.recurringOccurrences, series: schema.recurringSeries })
+  const recurringRows = await db
+    .select({
+      occurrence: schema.recurringOccurrences,
+      series: schema.recurringSeries,
+    })
     .from(schema.recurringOccurrences)
-    .innerJoin(schema.recurringSeries, eq(schema.recurringSeries.id, schema.recurringOccurrences.seriesId))
+    .innerJoin(
+      schema.recurringSeries,
+      eq(schema.recurringSeries.id, schema.recurringOccurrences.seriesId),
+    )
     .where(eq(schema.recurringOccurrences.userId, userId));
 
   const accountRows = await db
@@ -125,7 +148,11 @@ export async function generateBriefing(params: {
   // ── 2. Fetch prices/FX ──────────────────────────────────────────────────────
   const fxSource = params.fxSource ?? createFxSource();
   const navSource = params.navSource ?? createNavSource();
-  const validationNavSource = params.validationNavSource ?? (config.features.valuationExposureEnabled ? new MufapNavSource() : undefined);
+  const validationNavSource =
+    params.validationNavSource ??
+    (config.features.valuationExposureEnabled
+      ? new MufapNavSource()
+      : undefined);
 
   const fxCache = new Map<string, import("@sprout/shared").FxRate>();
   for (const h of holdingRows) {
@@ -142,13 +169,16 @@ export async function generateBriefing(params: {
   }
 
   for (const rate of fxCache.values()) {
-    await db.insert(schema.fxRates).values({
-      pair: rate.pair,
-      rate: rate.value.toString(),
-      asOf: rate.asOf,
-      source: rate.source,
-      sourceUrl: rate.sourceUrl,
-    }).onConflictDoNothing();
+    await db
+      .insert(schema.fxRates)
+      .values({
+        pair: rate.pair,
+        rate: rate.value.toString(),
+        asOf: rate.asOf,
+        source: rate.source,
+        sourceUrl: rate.sourceUrl,
+      })
+      .onConflictDoNothing();
   }
 
   const navCache = new Map<string, import("@sprout/shared").PriceQuote>();
@@ -159,11 +189,19 @@ export async function generateBriefing(params: {
         const validation = await validationNavSource.fetchNav(h.fundCode);
         if (validation && validation.asOf === nav.asOf) {
           const compared = compareNavs(nav.value, validation.value);
-          await db.insert(schema.navCrossValidations).values({
-            instrument: h.fundCode, asOf: nav.asOf, primarySource: nav.source,
-            validationSource: validation.source, primaryValue: String(nav.value), validationValue: String(validation.value),
-            differenceRatio: String(compared.differenceRatio), matched: compared.matched,
-          }).onConflictDoNothing();
+          await db
+            .insert(schema.navCrossValidations)
+            .values({
+              instrument: h.fundCode,
+              asOf: nav.asOf,
+              primarySource: nav.source,
+              validationSource: validation.source,
+              primaryValue: String(nav.value),
+              validationValue: String(validation.value),
+              differenceRatio: String(compared.differenceRatio),
+              matched: compared.matched,
+            })
+            .onConflictDoNothing();
           if (compared.matched) navCache.set(h.fundCode, nav);
         }
       } else if (nav && !config.features.valuationExposureEnabled) {
@@ -173,20 +211,24 @@ export async function generateBriefing(params: {
   }
 
   for (const [instrument, quote] of navCache.entries()) {
-    await db.insert(schema.priceQuotes).values({
-      instrument,
-      value: quote.value.toString(),
-      asOf: quote.asOf,
-      source: quote.source,
-      sourceUrl: quote.sourceUrl,
-      currency: quote.currency,
-    }).onConflictDoNothing();
+    await db
+      .insert(schema.priceQuotes)
+      .values({
+        instrument,
+        value: quote.value.toString(),
+        asOf: quote.asOf,
+        source: quote.source,
+        sourceUrl: quote.sourceUrl,
+        currency: quote.currency,
+      })
+      .onConflictDoNothing();
   }
 
   // ── 3. Build manual adjustments from transactions since last baseline ───────
   const manualAdjustments: ManualAdjustment[] = txRows.map((t) => ({
     id: t.id,
-    amount: t.type === "income" ? t.amount : t.type === "expense" ? -t.amount : 0,
+    amount:
+      t.type === "income" ? t.amount : t.type === "expense" ? -t.amount : 0,
     currency: t.currency,
     occurredAt: t.occurredAt.toISOString(),
     note: t.note ?? undefined,
@@ -198,15 +240,16 @@ export async function generateBriefing(params: {
     const fxRate = h.currency !== "PKR" ? fxCache.get(h.currency) : undefined;
 
     const priceAsOf = price?.asOf ?? fxRate?.asOf ?? h.priceAsOf ?? null;
-    const freshness = h.kind === "cash" && h.currency === "PKR"
-      ? "manual" as const
-      : determineFreshness(priceAsOf, h.kind, date);
+    const freshness =
+      h.kind === "cash" && h.currency === "PKR"
+        ? ("manual" as const)
+        : determineFreshness(priceAsOf, h.kind, date);
 
     // Determine if there are adjustments since the baseline
     const hasAdjustmentsSinceBaseline =
       h.unitsConfirmedAsOf != null &&
       manualAdjustments.some(
-        (a) => new Date(a.occurredAt) > new Date(h.unitsConfirmedAsOf!)
+        (a) => new Date(a.occurredAt) > new Date(h.unitsConfirmedAsOf!),
       );
 
     const valuationKind = determineValuationKind({
@@ -251,7 +294,9 @@ export async function generateBriefing(params: {
       valueNative,
       // A missing dated quote/FX rate is unavailable, not a reason to reuse an
       // old or mock number. PKR cash is the only manual valuation here.
-      valuePkr: valuePkr || (h.kind === "cash" && h.currency === "PKR" ? h.valuePkr : 0),
+      valuePkr:
+        valuePkr ||
+        (h.kind === "cash" && h.currency === "PKR" ? h.valuePkr : 0),
       price,
       fxRate,
       priceAsOf: priceAsOf ?? "unknown",
@@ -271,10 +316,12 @@ export async function generateBriefing(params: {
         return sum;
       }, 0);
     const valueNative = account.openingBalance + ledgerChange;
-    const fxRate = account.currency === "PKR" ? undefined : fxCache.get(account.currency);
-    const freshness = account.currency === "PKR"
-      ? "manual" as const
-      : determineFreshness(fxRate?.asOf, "cash", date);
+    const fxRate =
+      account.currency === "PKR" ? undefined : fxCache.get(account.currency);
+    const freshness =
+      account.currency === "PKR"
+        ? ("manual" as const)
+        : determineFreshness(fxRate?.asOf, "cash", date);
 
     enrichedHoldings.push({
       id: account.id,
@@ -283,7 +330,10 @@ export async function generateBriefing(params: {
       label: account.label,
       currency: account.currency,
       valueNative,
-      valuePkr: account.currency === "PKR" ? valueNative : Math.round(valueNative * (fxRate?.value ?? 0)),
+      valuePkr:
+        account.currency === "PKR"
+          ? valueNative
+          : Math.round(valueNative * (fxRate?.value ?? 0)),
       fxRate,
       priceAsOf: fxRate?.asOf ?? "unknown",
       priceSource: fxRate?.source ?? "Manual entry",
@@ -302,22 +352,26 @@ export async function generateBriefing(params: {
   }));
 
   // ── 6. Compute WealthSnapshot ───────────────────────────────────────────────
-  const trend: WealthTrendPoint[] = priorSnapshots
-    .reverse()
-    .map((s) => ({
-      date: s.date,
-      totalPkr: s.totalPkr,
-      perHolding: (s.perHoldingJson as { holdingId: string; valuePkr: number }[]) ?? [],
-    }));
+  const trend: WealthTrendPoint[] = priorSnapshots.reverse().map((s) => ({
+    date: s.date,
+    totalPkr: s.totalPkr,
+    perHolding:
+      (s.perHoldingJson as { holdingId: string; valuePkr: number }[]) ?? [],
+  }));
 
   const todayTotal =
     enrichedHoldings.reduce((sum, h) => sum + h.valuePkr, 0) +
-    pendingInvestments.filter((p) => p.status === "pending").reduce((sum, p) => sum + p.amountPkr, 0);
+    pendingInvestments
+      .filter((p) => p.status === "pending")
+      .reduce((sum, p) => sum + p.amountPkr, 0);
 
   trend.push({
     date,
     totalPkr: todayTotal,
-    perHolding: enrichedHoldings.map((h) => ({ holdingId: h.id, valuePkr: h.valuePkr })),
+    perHolding: enrichedHoldings.map((h) => ({
+      holdingId: h.id,
+      valuePkr: h.valuePkr,
+    })),
   });
 
   const recentTrend = trend.slice(-config.trendDays);
@@ -329,13 +383,19 @@ export async function generateBriefing(params: {
     priorSnapshot: priorSnapshot
       ? {
           totalPkr: priorSnapshot.totalPkr,
-          perHoldingBreakdown: priorSnapshot.perHoldingJson as { holdingId: string; valuePkr: number }[],
+          perHoldingBreakdown: priorSnapshot.perHoldingJson as {
+            holdingId: string;
+            valuePkr: number;
+          }[],
         }
       : undefined,
     monthStartSnapshot: monthStartSnapshot
       ? {
           totalPkr: monthStartSnapshot.totalPkr,
-          perHoldingBreakdown: monthStartSnapshot.perHoldingJson as { holdingId: string; valuePkr: number }[],
+          perHoldingBreakdown: monthStartSnapshot.perHoldingJson as {
+            holdingId: string;
+            valuePkr: number;
+          }[],
         }
       : undefined,
     trend: recentTrend,
@@ -344,7 +404,10 @@ export async function generateBriefing(params: {
   // ── 7. Detect WealthEvents ──────────────────────────────────────────────────
   const priorHoldingsMap = new Map<string, EnrichedHolding>();
   if (priorSnapshot) {
-    const priorBreakdown = priorSnapshot.perHoldingJson as { holdingId: string; valuePkr: number }[];
+    const priorBreakdown = priorSnapshot.perHoldingJson as {
+      holdingId: string;
+      valuePkr: number;
+    }[];
     for (const p of priorBreakdown) {
       const current = enrichedHoldings.find((h) => h.id === p.holdingId);
       if (current) {
@@ -359,7 +422,12 @@ export async function generateBriefing(params: {
     priorHoldings: priorHoldingsMap,
     pendingInvestments,
   });
-  for (const holding of enrichedHoldings.filter((item) => item.kind === "cash" && item.currency !== "PKR" && item.freshness === "unavailable")) {
+  for (const holding of enrichedHoldings.filter(
+    (item) =>
+      item.kind === "cash" &&
+      item.currency !== "PKR" &&
+      item.freshness === "unavailable",
+  )) {
     wealthEvents.push({
       id: `event-unavailable-fx-${holding.id}-${date}`,
       date,
@@ -371,12 +439,22 @@ export async function generateBriefing(params: {
       severity: "heads_up",
     });
   }
-  const upcomingLiabilities = recurringRows.filter(({ occurrence, series }) =>
-    series.kind === "liability" && (occurrence.status === "upcoming" || occurrence.status === "ask_pending"));
+  const upcomingLiabilities = recurringRows.filter(
+    ({ occurrence, series }) =>
+      series.kind === "liability" &&
+      (occurrence.status === "upcoming" || occurrence.status === "ask_pending"),
+  );
   if (upcomingLiabilities.length > 0) {
-    const total = upcomingLiabilities.reduce((sum, row) => sum + row.series.amount, 0);
+    const total = upcomingLiabilities.reduce(
+      (sum, row) => sum + row.series.amount,
+      0,
+    );
     wealthEvents.push({
-      id: `event-upcoming-liability-${date}`, date, kind: "bill", magnitudePkr: 0, direction: "flat",
+      id: `event-upcoming-liability-${date}`,
+      date,
+      kind: "bill",
+      magnitudePkr: 0,
+      direction: "flat",
       plainWhy: `PKR ${total.toLocaleString()} in recurring liabilities is upcoming. Nothing is deducted until you confirm it.`,
       severity: "heads_up",
     });
@@ -388,36 +466,167 @@ export async function generateBriefing(params: {
     .sort((a, b) => {
       if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
       if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-      const aProgress = a.targetAmount > 0 ? a.currentAmount / a.targetAmount : 0;
-      const bProgress = b.targetAmount > 0 ? b.currentAmount / b.targetAmount : 0;
+      const aProgress =
+        a.targetAmount > 0 ? a.currentAmount / a.targetAmount : 0;
+      const bProgress =
+        b.targetAmount > 0 ? b.currentAmount / b.targetAmount : 0;
       return bProgress - aProgress;
     });
-  const goalPaceRatio = activeGoals.length > 0
-    ? activeGoals.reduce((sum, g) => sum + g.currentAmount / g.targetAmount, 0) / activeGoals.length
-    : null;
+  const goalPaces = new Map(
+    activeGoals.map((goal) => [
+      goal.id,
+      computeGoalPace({
+        createdAt: goal.createdAt.toISOString().slice(0, 10),
+        deadline: goal.deadline,
+        targetAmount: goal.targetAmount,
+        currentAmount: goal.currentAmount,
+        asOf: date,
+      }),
+    ]),
+  );
+  const goalPaceRatio =
+    activeGoals.length > 0
+      ? activeGoals.reduce((sum, goal) => {
+          const pace = goalPaces.get(goal.id)!;
+          return (
+            sum +
+            (pace.expectedRatio == null || pace.expectedRatio === 0
+              ? pace.fundedRatio
+              : Math.min(1, pace.fundedRatio / pace.expectedRatio))
+          );
+        }, 0) / activeGoals.length
+      : null;
 
   const holdingValues = enrichedHoldings.map((h) => h.valuePkr);
-  const diversificationRatio = holdingValues.length > 0 && !enrichedHoldings.some((h) => h.freshness === "unavailable")
-    ? computeDiversification(holdingValues) : null;
+  const diversificationRatio =
+    holdingValues.length > 0 &&
+    !enrichedHoldings.some((h) => h.freshness === "unavailable")
+      ? computeDiversification(holdingValues)
+      : null;
   const dailyTotals = recentTrend.map((t) => t.totalPkr);
-  const trendStabilityRatio = dailyTotals.length >= 2 ? computeTrendStability(dailyTotals) : null;
+  const trendStabilityRatio =
+    dailyTotals.length >= 2 ? computeTrendStability(dailyTotals) : null;
 
   const unconfirmedCount = txRows.filter((t) => t.needsReview).length;
-  const stalePriceCount = enrichedHoldings.filter((h) => h.freshness === "stale" || h.freshness === "unavailable").length;
+  const stalePriceCount = enrichedHoldings.filter(
+    (h) => h.freshness === "stale" || h.freshness === "unavailable",
+  ).length;
   const missing = (reason: string) => ({ available: false as const, reason });
-  const confirmedPkrCash = enrichedHoldings.filter((h) => h.kind === "cash" && h.currency === "PKR").reduce((sum, h) => sum + h.valuePkr, 0);
-  const upcomingLiabilityTotal = upcomingLiabilities.reduce((sum, row) => sum + row.series.amount, 0);
+  const confirmedPkrCash = enrichedHoldings
+    .filter((h) => h.kind === "cash" && h.currency === "PKR")
+    .reduce((sum, h) => sum + h.valuePkr, 0);
+  const upcomingLiabilityTotal = upcomingLiabilities.reduce(
+    (sum, row) => sum + row.series.amount,
+    0,
+  );
+  const localDate = (value: Date) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: profile?.timezone ?? "Asia/Karachi",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(value);
+    const get = (type: string) =>
+      parts.find((part) => part.type === type)?.value ?? "";
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  };
+  const completedMonths = [1, 2, 3].map((monthsAgo) => {
+    const current = new Date(`${date.slice(0, 7)}-01T00:00:00.000Z`);
+    return new Date(
+      Date.UTC(current.getUTCFullYear(), current.getUTCMonth() - monthsAgo, 1),
+    )
+      .toISOString()
+      .slice(0, 7);
+  });
+  const incomeByMonth = new Map<string, number>();
+  for (const transaction of txRows.filter(
+    (row) =>
+      row.type === "income" && !row.needsReview && row.currency === "PKR",
+  )) {
+    const month = localDate(transaction.occurredAt).slice(0, 7);
+    if (completedMonths.includes(month))
+      incomeByMonth.set(
+        month,
+        (incomeByMonth.get(month) ?? 0) + transaction.amount,
+      );
+  }
+  const confirmedMonthlyIncome =
+    incomeByMonth.size > 0
+      ? Math.round(
+          [...incomeByMonth.values()].reduce((sum, value) => sum + value, 0) /
+            incomeByMonth.size,
+        )
+      : undefined;
+  const expenseBaseline = computeExpenseBaseline({
+    asOf: date,
+    confirmedMonthlyIncome,
+    expenses: txRows
+      .filter((row) => row.currency === "PKR")
+      .map((row) => ({
+        amount: row.amount,
+        type: row.type,
+        occurredOn: localDate(row.occurredAt),
+        confirmed: !row.needsReview,
+        category: row.category,
+      })),
+  });
+  const contributionConsistency = computeContributionConsistency({
+    asOf: date,
+    salaryDay:
+      profile?.incomeType === "salaried"
+        ? (profile.salaryDate ?? undefined)
+        : undefined,
+    contributions: goalContributionRows.map((row) => ({
+      contributionDate: row.contributionDate,
+      source: row.source,
+    })),
+  });
+  const confidencePenalty =
+    unconfirmedCount +
+    stalePriceCount +
+    (expenseBaseline.status === "partial_capture" ? 1 : 0);
   const scoreResult = calculatePresenceScore({
-    goalPace: goalPaceRatio == null ? missing("no active goal") : { available: true, value: goalPaceRatio },
-    cashBuffer: missing("monthly confirmed expenses are unavailable"),
-    contributionConsistency: missing("contribution history is unavailable"),
-    diversification: diversificationRatio == null ? missing("holding values are unavailable") : { available: true, value: diversificationRatio },
-    trendStability: trendStabilityRatio == null ? missing("fewer than two daily snapshots") : { available: true, value: trendStabilityRatio },
-    billCoverage: upcomingLiabilityTotal === 0 ? missing("no upcoming recurring liabilities") : { available: true, value: confirmedPkrCash / upcomingLiabilityTotal },
+    goalPace:
+      goalPaceRatio == null
+        ? missing("no active goal")
+        : { available: true, value: goalPaceRatio },
+    cashBuffer:
+      expenseBaseline.status === "available" &&
+      expenseBaseline.monthlyExpenses > 0
+        ? {
+            available: true,
+            value: confirmedPkrCash / expenseBaseline.monthlyExpenses / 3,
+          }
+        : missing(
+            expenseBaseline.status === "partial_capture"
+              ? "expense capture appears partial"
+              : "monthly confirmed expenses are unavailable",
+          ),
+    contributionConsistency: goalContributionRows.some(
+      (row) => row.source !== "opening_balance",
+    )
+      ? { available: true, value: contributionConsistency.ratio }
+      : missing("contribution history is unavailable"),
+    diversification:
+      diversificationRatio == null
+        ? missing("holding values are unavailable")
+        : { available: true, value: diversificationRatio },
+    trendStability:
+      trendStabilityRatio == null
+        ? missing("fewer than two daily snapshots")
+        : { available: true, value: trendStabilityRatio },
+    billCoverage:
+      upcomingLiabilityTotal === 0
+        ? missing("no upcoming recurring liabilities")
+        : { available: true, value: confirmedPkrCash / upcomingLiabilityTotal },
     debtCommitments: missing("no confirmed debt commitment input"),
-    dataConfidence: { available: true, value: 1 - (unconfirmedCount + stalePriceCount) / 8 },
+    dataConfidence: { available: true, value: 1 - confidencePenalty / 8 },
   } satisfies FactorPresenceInputs);
-  const actionScore = { attentionFactors: [] as { id: string; contribution: number }[] };
+  const actionScore = {
+    attentionFactors: scoreResult.factors
+      .filter((factor) => factor.available && (factor.normalized ?? 1) < 0.25)
+      .map((factor) => ({ id: factor.id, contribution: factor.points ?? 0 })),
+  };
 
   // ── 9. Select recommended action ────────────────────────────────────────────
   const goalsForAction = activeGoals.map((g) => ({
@@ -426,14 +635,29 @@ export async function generateBriefing(params: {
     targetAmount: g.targetAmount,
     currentAmount: g.currentAmount,
     remainingToTarget: Math.max(0, g.targetAmount - g.currentAmount),
+    pace: goalPaces.get(g.id)!,
+    suggestion: deriveGoalContributionSuggestion({
+      targetAmount: g.targetAmount,
+      currentAmount: g.currentAmount,
+      deadline: g.deadline,
+      asOf: date,
+      confirmedMonthlyIncome,
+    }),
   }));
 
   const recommendedAction = selectRecommendedAction({
     score: actionScore,
     goals: goalsForAction,
-    holdings: enrichedHoldings.map((h) => ({ id: h.id, label: h.label, valuePkr: h.valuePkr })),
+    holdings: enrichedHoldings.map((h) => ({
+      id: h.id,
+      label: h.label,
+      valuePkr: h.valuePkr,
+    })),
     unconfirmedCount,
     stalePriceCount,
+    paydayPriority:
+      profile?.incomeType === "salaried" &&
+      profile.salaryDate === Number(date.slice(8, 10)),
   });
 
   // ── 10. Deterministic fallback copy ─────────────────────────────────────────
@@ -502,11 +726,13 @@ export async function generateBriefing(params: {
   }
 
   // ── 12. Build the briefing object ───────────────────────────────────────────
-  const briefingFreshness = enrichedHoldings.some((h) => h.freshness === "unavailable")
-    ? "unavailable" as const
+  const briefingFreshness = enrichedHoldings.some(
+    (h) => h.freshness === "unavailable",
+  )
+    ? ("unavailable" as const)
     : enrichedHoldings.some((h) => h.freshness === "stale")
-      ? "stale" as const
-      : "fresh" as const;
+      ? ("stale" as const)
+      : ("fresh" as const);
 
   const briefing: WealthBriefing = {
     id: `briefing-${date}`,
@@ -529,20 +755,45 @@ export async function generateBriefing(params: {
     wealthEvents,
     learnThreads: [],
     recommendedAction,
-    goals: activeGoals.map((g) => ({
-      id: g.id,
-      name: g.name,
-      type: g.type,
-      targetAmount: g.targetAmount,
-      currentAmount: g.currentAmount,
-      currency: "PKR" as const,
-      deadline: g.deadline ?? undefined,
-      status: g.status,
-      pace: "on_track" as const,
-      nextStep: `Add PKR 25,000 this month`,
-      remainingToTarget: Math.max(0, g.targetAmount - g.currentAmount),
-      paceNote: `PKR ${Math.max(0, g.targetAmount - g.currentAmount).toLocaleString()} to go`,
-    })),
+    goals: activeGoals.map((g) => {
+      const pace = goalPaces.get(g.id)!;
+      const suggestion = deriveGoalContributionSuggestion({
+        targetAmount: g.targetAmount,
+        currentAmount: g.currentAmount,
+        deadline: g.deadline,
+        asOf: date,
+        confirmedMonthlyIncome,
+      });
+      const nextStep =
+        suggestion.kind === "amount"
+          ? `Add PKR ${suggestion.amount.toLocaleString()} this month`
+          : suggestion.kind === "review_deadline"
+            ? "This goal's deadline may need a review"
+            : `Add to your ${g.name}`;
+      const paceNote =
+        pace.status === "no_deadline"
+          ? `${Math.round(pace.fundedRatio * 100)}% funded — no deadline set.`
+          : `${pace.status.replaceAll("_", " ")} as of ${pace.evaluatedAt}; PKR ${Math.max(0, g.targetAmount - g.currentAmount).toLocaleString()} to go.`;
+      return {
+        id: g.id,
+        name: g.name,
+        type: g.type,
+        targetAmount: g.targetAmount,
+        currentAmount: g.currentAmount,
+        currency: "PKR" as const,
+        deadline: g.deadline ?? undefined,
+        status: g.status,
+        pace:
+          pace.status === "slightly_behind"
+            ? ("watch" as const)
+            : pace.status === "needs_review"
+              ? ("behind" as const)
+              : ("on_track" as const),
+        nextStep,
+        remainingToTarget: Math.max(0, g.targetAmount - g.currentAmount),
+        paceNote,
+      };
+    }),
     holdings: enrichedHoldings.map((h) => ({
       id: h.id,
       kind: h.kind,
@@ -557,7 +808,8 @@ export async function generateBriefing(params: {
       valueNative: h.valueNative,
       priceAsOf: h.priceAsOf,
       priceSource: h.priceSource,
-      freshness: h.freshness as "fresh" | "stale" | "manual" | "unavailable" | "estimated",
+      freshness: h.freshness as
+        "fresh" | "stale" | "manual" | "unavailable" | "estimated",
     })),
     streak: 0,
     xp: 0,
@@ -587,35 +839,49 @@ export async function generateBriefing(params: {
 export async function storeBriefing(
   briefing: WealthBriefing,
   aiCostCents: number,
-  aiModel: string
+  aiModel: string,
 ): Promise<void> {
   const date = briefing.briefingDate;
   await db.transaction(async (tx) => {
-    await tx.delete(schema.wealthEvents).where(
-      and(eq(schema.wealthEvents.userId, briefing.userId), eq(schema.wealthEvents.date, date)),
-    );
-    await tx.insert(schema.wealthSnapshots).values({
-      userId: briefing.userId,
-      date,
-      totalPkr: briefing.wealthSnapshot.totalPkr,
-      perHoldingJson: briefing.wealthSnapshot.perHoldingBreakdown,
-      changeVsYesterday: briefing.wealthSnapshot.changeVsYesterday,
-      changeMtd: briefing.wealthSnapshot.changeMtd,
-      mainReason: briefing.wealthSnapshot.mainReason,
-      interpretationJson: briefing.wealthSnapshot.interpretation,
-      freshness: briefing.freshness === "local_fallback" ? "stale" : briefing.freshness,
-    }).onConflictDoUpdate({
-      target: [schema.wealthSnapshots.userId, schema.wealthSnapshots.date],
-      set: {
+    await tx
+      .delete(schema.wealthEvents)
+      .where(
+        and(
+          eq(schema.wealthEvents.userId, briefing.userId),
+          eq(schema.wealthEvents.date, date),
+        ),
+      );
+    await tx
+      .insert(schema.wealthSnapshots)
+      .values({
+        userId: briefing.userId,
+        date,
         totalPkr: briefing.wealthSnapshot.totalPkr,
         perHoldingJson: briefing.wealthSnapshot.perHoldingBreakdown,
         changeVsYesterday: briefing.wealthSnapshot.changeVsYesterday,
         changeMtd: briefing.wealthSnapshot.changeMtd,
         mainReason: briefing.wealthSnapshot.mainReason,
         interpretationJson: briefing.wealthSnapshot.interpretation,
-        freshness: briefing.freshness === "local_fallback" ? "stale" : briefing.freshness,
-      },
-    });
+        freshness:
+          briefing.freshness === "local_fallback"
+            ? "stale"
+            : briefing.freshness,
+      })
+      .onConflictDoUpdate({
+        target: [schema.wealthSnapshots.userId, schema.wealthSnapshots.date],
+        set: {
+          totalPkr: briefing.wealthSnapshot.totalPkr,
+          perHoldingJson: briefing.wealthSnapshot.perHoldingBreakdown,
+          changeVsYesterday: briefing.wealthSnapshot.changeVsYesterday,
+          changeMtd: briefing.wealthSnapshot.changeMtd,
+          mainReason: briefing.wealthSnapshot.mainReason,
+          interpretationJson: briefing.wealthSnapshot.interpretation,
+          freshness:
+            briefing.freshness === "local_fallback"
+              ? "stale"
+              : briefing.freshness,
+        },
+      });
 
     for (const event of briefing.wealthEvents) {
       await tx.insert(schema.wealthEvents).values({
@@ -631,9 +897,14 @@ export async function storeBriefing(
       });
     }
 
-    await tx.delete(schema.dailyBriefings).where(
-      and(eq(schema.dailyBriefings.userId, briefing.userId), eq(schema.dailyBriefings.briefingDate, date)),
-    );
+    await tx
+      .delete(schema.dailyBriefings)
+      .where(
+        and(
+          eq(schema.dailyBriefings.userId, briefing.userId),
+          eq(schema.dailyBriefings.briefingDate, date),
+        ),
+      );
     await tx.insert(schema.dailyBriefings).values({
       userId: briefing.userId,
       briefingDate: date,
@@ -663,7 +934,9 @@ export async function storeBriefing(
 }
 
 /** Retrieve the latest stored briefing for a user. Returns null if none. */
-export async function getLatestBriefing(userId: string): Promise<WealthBriefing | null> {
+export async function getLatestBriefing(
+  userId: string,
+): Promise<WealthBriefing | null> {
   const rows = await db
     .select()
     .from(schema.dailyBriefings)
@@ -690,8 +963,10 @@ export async function getLatestBriefing(userId: string): Promise<WealthBriefing 
     scoreFactors: row.scoreFactorsJson as WealthBriefing["scoreFactors"],
     wealthSnapshot: row.wealthSnapshotJson as WealthBriefing["wealthSnapshot"],
     wealthEvents: row.wealthEventsJson as WealthBriefing["wealthEvents"],
-    learnThreads: (row.learnThreadsJson ?? []) as WealthBriefing["learnThreads"],
-    recommendedAction: row.recommendedActionJson as WealthBriefing["recommendedAction"],
+    learnThreads: (row.learnThreadsJson ??
+      []) as WealthBriefing["learnThreads"],
+    recommendedAction:
+      row.recommendedActionJson as WealthBriefing["recommendedAction"],
     goals: row.goalsJson as WealthBriefing["goals"],
     holdings: row.holdingsJson as WealthBriefing["holdings"],
     streak: row.streak,

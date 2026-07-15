@@ -20,7 +20,7 @@
    must fail visibly and label the data stale/missing, never silently
    substitute mock.
 2. **The done-check is the gate, not the agent saying "done."** Compilation is
-   not correctness. For each ticket, *you* confirm the done-check with real
+   not correctness. For each ticket, _you_ confirm the done-check with real
    eyes: for FX, is the rate today's actual rate? For MUFAP, does it match
    your known NAVs? For the pipeline, does it produce your real number?
 3. **One ticket, verified, before the next.** Small commits, review each.
@@ -36,6 +36,7 @@ The `wealth_models.dart` versions match the backend's `WealthBriefing`
 contract. You can't wire the API until the app speaks the same shape.
 
 **Build:**
+
 - Make `wealth_models.dart` the single source of truth for wealth models.
 - Add `fromApiJson` factory constructors (or a mapper) to each model in
   `wealth_models.dart` that parses the backend's JSON response.
@@ -47,6 +48,7 @@ contract. You can't wire the API until the app speaks the same shape.
   return the same data, just through the consolidated types).
 
 **Done-check:**
+
 - [ ] `flutter analyze` passes with zero errors.
 - [ ] Today screen renders identically (same data, same layout).
 - [ ] `wealth_models.dart` has `fromApiJson` factories for `WealthBriefing`,
@@ -64,6 +66,7 @@ it needs an HTTP client, base URL config, and real repository implementations
 that sit alongside the mocks behind the same interfaces.
 
 **Build:**
+
 - Add `dio` (or `http`) to `apps/mobile/pubspec.yaml`.
 - Create `apps/mobile/lib/src/data/api/sprout_api_client.dart`:
   - Base URL from environment (`--dart-define=API_BASE_URL=...`).
@@ -82,6 +85,7 @@ that sit alongside the mocks behind the same interfaces.
   providers return HTTP repositories; default stays mock.
 
 **Done-check:**
+
 - [ ] `flutter analyze` passes.
 - [ ] With `USE_MOCK=true` (default), the app behaves exactly as before.
 - [ ] With `USE_MOCK=false`, the app attempts to call `GET /v1/briefing`
@@ -99,6 +103,7 @@ compute your real wealth, it needs your actual holdings: 5 Al Meezan funds
 EUR cash balances.
 
 **Build:**
+
 - Start a local Postgres (or use Supabase/Neon free tier).
 - Run `pnpm drizzle-kit push` in `apps/api` to create tables.
 - Create a seed script (`apps/api/src/scripts/seed-holdings.ts`) that
@@ -116,6 +121,7 @@ EUR cash balances.
 - Run the seed script.
 
 **Done-check:**
+
 - [ ] `SELECT * FROM holdings` returns your real holdings with correct
       unit counts and currencies.
 - [ ] `SELECT * FROM goals` returns your real goals.
@@ -136,6 +142,7 @@ Real automated statement parsing is a later ticket. The goal here is to get
 the confirmed baseline into the database, not to build a parser.
 
 **Build:**
+
 - Use the `POST /v1/upload/statement` endpoint (already built).
 - Send a JSON payload with your real statement data:
   - `capturedAsOf`: the date you captured the statement
@@ -147,9 +154,10 @@ the confirmed baseline into the database, not to build a parser.
   `valuation_kind: "confirmed"`.
 
 **Done-check:**
+
 - [ ] `SELECT * FROM baselines` shows one row with your statement data.
 - [ ] `SELECT fund_code, units, units_confirmed_as_of, valuation_kind
-      FROM holdings` shows all funds as `confirmed` with the correct date.
+    FROM holdings` shows all funds as `confirmed` with the correct date.
 - [ ] Any pending investments (if seeded) are marked `unitized`.
 
 ---
@@ -161,6 +169,7 @@ valuePkr. The mock FX source returns the canonical example values; the real
 source fetches live rates.
 
 **Build:**
+
 - Set `FX_SOURCE=real` in `.env`.
 - Verify the `ExchangeRateHostFxSource` fetches real USD/PKR and EUR/PKR.
 - Check `SELECT * FROM fx_rates` for the fetched rates with provenance.
@@ -168,6 +177,7 @@ source fetches live rates.
   stale (does not crash or show wrong data).
 
 **Done-check:**
+
 - [ ] `SELECT pair, rate, as_of, source FROM fx_rates` shows real rates
       from `exchangerate.host` with today's date.
 - [ ] The rates are plausible (not the mock 277.992 / 317.536 — actual
@@ -184,6 +194,7 @@ MUFAP publishes daily NAVs for all Pakistani mutual funds. This is the
 closest thing to an official source.
 
 **Build:**
+
 - Inspect the MUFAP daily NAV page structure (mufap.com.pk).
 - Implement the real parser in `MufapNavSource.fetchNav()`:
   - Fetch the daily NAV table.
@@ -197,6 +208,7 @@ closest thing to an official source.
 - Verify `SELECT * FROM price_quotes` shows real NAVs with provenance.
 
 **Done-check:**
+
 - [ ] `SELECT instrument, value, as_of, source FROM price_quotes` shows
       real NAVs from MUFAP for all 5 fund codes.
 - [ ] The NAVs are plausible (not the mock values — actual current NAVs).
@@ -213,6 +225,7 @@ your holdings, fetches real prices/FX, computes the WealthSnapshot, detects
 events, computes the score, selects the action, and stores the briefing.
 
 **Build:**
+
 - Start the API: `pnpm --filter @sprout/api dev`.
 - Call `POST /v1/cron/daily` with the cron secret (or trigger on-demand
   via `POST /v1/briefing/refresh`).
@@ -230,6 +243,7 @@ events, computes the score, selects the action, and stores the briefing.
   - No guardrail violations.
 
 **Done-check:**
+
 - [ ] `GET /v1/briefing` returns a valid `WealthBriefing` with your real
       total wealth.
 - [ ] **Reconciliation golden test:** the computed total matches the
@@ -258,6 +272,7 @@ harder to diagnose. It's a five-minute check that saves an hour of "is it the
 backend or the wiring?"
 
 **Build:**
+
 - Start the API: `pnpm --filter @sprout/api dev`.
 - Call `GET /v1/briefing` with your auth token.
 - Inspect the full JSON response:
@@ -271,6 +286,7 @@ backend or the wiring?"
 - If anything is wrong, fix it here — not in the Flutter wiring.
 
 **Done-check:**
+
 - [ ] The JSON response from `GET /v1/briefing` is correct and complete.
 - [ ] Every field that the Flutter app will consume is present and valid.
 - [ ] No mock data appears in the response (all sources are real or
@@ -284,9 +300,10 @@ backend or the wiring?"
 on the Today screen.
 
 **Build:**
+
 - Start the API on your machine.
 - Run the Flutter app with `--dart-define=USE_MOCK=false
-  --dart-define=API_BASE_URL=http://localhost:8787`.
+--dart-define=API_BASE_URL=http://localhost:8787`.
 - The Today screen should call `GET /v1/briefing` and render your real:
   - Total wealth figure (the hero number).
   - Today's change and MTD change.
@@ -297,6 +314,7 @@ on the Today screen.
   `freshness: "local_fallback"`.
 
 **Done-check:**
+
 - [ ] The Today screen shows your real total wealth (~13.67M PKR).
 - [ ] The wealth figure matches `GET /v1/briefing` from the API.
 - [ ] Today's change and MTD change are both shown.
@@ -316,6 +334,7 @@ you how many days until your next payday and the approximate PKR value.
 It's never in the total wealth number.
 
 **Build:**
+
 - Use `POST /v1/income/projected` to add your real salary:
   - Amount: your real salary (e.g. USD 6,500).
   - Currency: USD.
@@ -329,6 +348,7 @@ It's never in the total wealth number.
 - Emphasize: this is NOT in the current wealth total.
 
 **Done-check:**
+
 - [ ] `GET /v1/income/projected` returns your salary with days remaining
       and converted PKR estimate.
 - [ ] The Today screen shows the salary strip.
@@ -344,6 +364,7 @@ hasn't confirmed units yet, that money is "in transit." It stays in total
 wealth but is flagged, and is reconciled out when the next statement arrives.
 
 **Build:**
+
 - Use `POST /v1/pending` to add any real pending investments:
   - Amount in PKR.
   - Destination (e.g. "MFPF Aggressive Allocation").
@@ -355,6 +376,7 @@ wealth but is flagged, and is reconciled out when the next statement arrives.
   - In the wealth events as a `contribution` event with a plainWhy.
 
 **Done-check:**
+
 - [ ] `GET /v1/pending` returns your pending investments.
 - [ ] The briefing's `totalPkr` includes pending amounts.
 - [ ] The per-holding breakdown shows "In transit (pending)."
@@ -366,6 +388,12 @@ wealth but is flagged, and is reconciled out when the next statement arrives.
 ---
 
 ## What comes after Phase 1
+
+> **Insight Engine continuation (July 2026):** the deterministic financial
+> substrate, shared WorldFact layer, personal join, and budgeted rewrite work
+> now continue in [Insight Engine Execution Plan](insight_engine_execution_plan.md).
+> Its Pakistan-specific expense, cadence, goal-pace, and affordability rules
+> are canonical and must be implemented before enabling AI rewrites.
 
 Phase 2 (harden): versioned parser health checks, dedupe verification,
 stale-price labelling in the UI, every failure/fallback path tested,

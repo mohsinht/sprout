@@ -86,8 +86,15 @@ type BriefingAction = {
   severity: "all_good" | "heads_up" | "worth_doing" | "needs_attention";
   effect: string;
   xp: number;
-  completionKind: "confirm_transaction" | "log_cash" | "move_money" | "review" | "set_goal" | "contribute_to_goal" | "rebalance";
-  targetId?: string;        // goalId or holdingId the action relates to
+  completionKind:
+    | "confirm_transaction"
+    | "log_cash"
+    | "move_money"
+    | "review"
+    | "set_goal"
+    | "contribute_to_goal"
+    | "rebalance";
+  targetId?: string; // goalId or holdingId the action relates to
   goalRelativeNote?: string; // e.g. "PKR 2 lakh to your car goal"
 };
 ```
@@ -107,7 +114,15 @@ Current equivalent:
 ```ts
 type GlanceTile = {
   id: string;
-  kind: "wealth" | "holding" | "goal" | "market" | "scan_summary" | "bill" | "salary" | "trend";
+  kind:
+    | "wealth"
+    | "holding"
+    | "goal"
+    | "market"
+    | "scan_summary"
+    | "bill"
+    | "salary"
+    | "trend";
   title: string;
   value: string;
   detail: string;
@@ -205,7 +220,14 @@ type Account = {
   provider: string;
   label: string;
   maskedRef?: string;
-  type: "cash" | "bank" | "wallet" | "wise" | "investment" | "foreign_balance" | "other";
+  type:
+    | "cash"
+    | "bank"
+    | "wallet"
+    | "wise"
+    | "investment"
+    | "foreign_balance"
+    | "other";
   balance: number;
   currency: "PKR";
   freshness: "updated_today" | "recent" | "stale" | "manual";
@@ -225,7 +247,15 @@ Current equivalents:
 type Goal = {
   id: string;
   name: string;
-  type: "emergency" | "car" | "home" | "education" | "eidi" | "zakat" | "travel" | "custom";
+  type:
+    | "emergency"
+    | "car"
+    | "home"
+    | "education"
+    | "eidi"
+    | "zakat"
+    | "travel"
+    | "custom";
   targetAmount: number;
   currentAmount: number;
   currency: "PKR";
@@ -233,9 +263,9 @@ type Goal = {
   status: "active" | "complete" | "paused";
   pace: "ahead" | "on_track" | "watch" | "behind";
   nextStep: string;
-  remainingToTarget: number;   // targetAmount - currentAmount, always >= 0
-  paceNote: string;             // plain-language, e.g. "PKR 2 lakh to go"
-  isPrimary?: boolean;          // user-chosen hero goal that Today references
+  remainingToTarget: number; // targetAmount - currentAmount, always >= 0
+  paceNote: string; // plain-language, e.g. "PKR 2 lakh to go"
+  isPrimary?: boolean; // user-chosen hero goal that Today references
 };
 ```
 
@@ -265,17 +295,17 @@ provenance.
 type Holding = {
   id: string;
   kind: "mutual_fund" | "cash" | "equity" | "other";
-  institution: string;          // e.g. "Al Meezan", "Wise"
-  label: string;                // user-facing, e.g. "Al Meezan Mutual Fund"
-  fundCode?: string;            // e.g. "AMMF", "MIF", "MSF", "MDIP", "MFPF-AAP"
-  currency: "PKR" | "USD" | "EUR" | string;  // native currency of the holding
-  units?: number;               // for funds/equity; omitted for cash
-  price?: PriceQuote;           // NAV or unit price (funds/equity); omitted for cash
-  fxRate?: FxRate;              // FX to PKR if currency != PKR; omitted if PKR
-  valuePkr: number;              // current value in PKR (whole rupees)
-  valueNative?: number;         // current value in native currency (for display)
-  priceAsOf: string;            // ISO date of the price/FX used (required)
-  priceSource: string;          // human-readable source label, e.g. "Al Meezan redemption prices"
+  institution: string; // e.g. "Al Meezan", "Wise"
+  label: string; // user-facing, e.g. "Al Meezan Mutual Fund"
+  fundCode?: string; // e.g. "AMMF", "MIF", "MSF", "MDIP", "MFPF-AAP"
+  currency: "PKR" | "USD" | "EUR" | string; // native currency of the holding
+  units?: number; // for funds/equity; omitted for cash
+  price?: PriceQuote; // NAV or unit price (funds/equity); omitted for cash
+  fxRate?: FxRate; // FX to PKR if currency != PKR; omitted if PKR
+  valuePkr: number; // current value in PKR (whole rupees)
+  valueNative?: number; // current value in native currency (for display)
+  priceAsOf: string; // ISO date of the price/FX used (required)
+  priceSource: string; // human-readable source label, e.g. "Al Meezan redemption prices"
   freshness: "fresh" | "stale" | "manual" | "unavailable";
 };
 ```
@@ -301,11 +331,11 @@ valuation without a dated price is invalid.
 
 ```ts
 type PriceQuote = {
-  value: number;          // NAV or unit price in the holding's native currency
-  asOf: string;           // ISO date the price is valid for
-  source: string;         // e.g. "Al Meezan redemption prices"
-  sourceUrl?: string;     // optional URL for transparency
-  currency: string;       // currency of the price (matches holding.currency)
+  value: number; // NAV or unit price in the holding's native currency
+  asOf: string; // ISO date the price is valid for
+  source: string; // e.g. "Al Meezan redemption prices"
+  sourceUrl?: string; // optional URL for transparency
+  currency: string; // currency of the price (matches holding.currency)
 };
 ```
 
@@ -315,10 +345,10 @@ A dated FX rate from a named source. Required for any non-PKR holding.
 
 ```ts
 type FxRate = {
-  pair: string;           // e.g. "USD/PKR", "EUR/PKR"
-  value: number;          // the rate (e.g. 277.992)
-  asOf: string;            // ISO date the rate is valid for
-  source: string;          // e.g. "Xe"
+  pair: string; // e.g. "USD/PKR", "EUR/PKR"
+  value: number; // the rate (e.g. 277.992)
+  asOf: string; // ISO date the rate is valid for
+  source: string; // e.g. "Xe"
   sourceUrl?: string;
 };
 ```
@@ -336,21 +366,21 @@ must never reconstruct history from current holdings.
 
 ```ts
 type WealthSnapshot = {
-  date: string;                    // ISO date of the snapshot
-  totalPkr: number;                 // total net wealth in PKR (whole rupees)
+  date: string; // ISO date of the snapshot
+  totalPkr: number; // total net wealth in PKR (whole rupees)
   perHoldingBreakdown: {
     holdingId: string;
     label: string;
     valuePkr: number;
-    changeVsYesterday: number;      // PKR change since yesterday's snapshot
-    changeMtd: number;              // PKR change since start of month
+    changeVsYesterday: number; // PKR change since yesterday's snapshot
+    changeMtd: number; // PKR change since start of month
   }[];
-  changeVsYesterday: number;        // total PKR change since yesterday
-  changeMtd: number;                // total PKR change since start of month
-  mainReason: string;               // plain-language, e.g. "NAV movement"
-  interpretation: string[];          // ordered lines in Sprout's voice
-  trend: WealthTrendPoint[];       // recent days for the sparkline/chart
-  provenanceSummary: string;        // e.g. "Al Meezan prices valid 7 Jul 2026; FX from Xe"
+  changeVsYesterday: number; // total PKR change since yesterday
+  changeMtd: number; // total PKR change since start of month
+  mainReason: string; // plain-language, e.g. "NAV movement"
+  interpretation: string[]; // ordered lines in Sprout's voice
+  trend: WealthTrendPoint[]; // recent days for the sparkline/chart
+  provenanceSummary: string; // e.g. "Al Meezan prices valid 7 Jul 2026; FX from Xe"
 };
 
 type WealthTrendPoint = {
@@ -395,13 +425,19 @@ honestly.
 type WealthEvent = {
   id: string;
   date: string;
-  holdingId?: string;       // which holding, if applicable
-  kind: "nav_move" | "fx_move" | "contribution" | "withdrawal"
-      | "bill" | "goal_milestone" | "news_context";
-  magnitudePkr: number;      // signed: positive = up, negative = down
+  holdingId?: string; // which holding, if applicable
+  kind:
+    | "nav_move"
+    | "fx_move"
+    | "contribution"
+    | "withdrawal"
+    | "bill"
+    | "goal_milestone"
+    | "news_context";
+  magnitudePkr: number; // signed: positive = up, negative = down
   direction: "up" | "down" | "flat";
-  plainWhy: string;         // e.g. "Al Meezan pulled back after yesterday's jump (equity NAV correction)."
-  learnMoreId?: string;     // links to a LearnThread for "learn later"
+  plainWhy: string; // e.g. "Al Meezan pulled back after yesterday's jump (equity NAV correction)."
+  learnMoreId?: string; // links to a LearnThread for "learn later"
   severity: "all_good" | "heads_up" | "worth_doing" | "needs_attention";
 };
 ```
@@ -422,10 +458,10 @@ from the event and from the Money/depth surface.
 
 ```ts
 type LearnThread = {
-  id: string;               // matches WealthEvent.learnMoreId
-  title: string;            // e.g. "Why do fund NAVs move day to day?"
-  summary: string;          // one-line plain-language summary
-  body: string;             // short explanation (2-4 sentences)
+  id: string; // matches WealthEvent.learnMoreId
+  title: string; // e.g. "Why do fund NAVs move day to day?"
+  summary: string; // one-line plain-language summary
+  body: string; // short explanation (2-4 sentences)
   relatedEventId: string;
   createdAt: string;
 };
@@ -446,9 +482,9 @@ type DailyBriefing = {
   greeting: string;
   summary: string;
   health: GardenHealthScore;
-  wealthSnapshot: WealthSnapshot;        // NEW — the Today hero
-  wealthEvents: WealthEvent[];           // NEW — "what happened" with yesterday-continuity
-  recommendedAction: BriefingAction;     // goal-relative next-step (see §2.6)
+  wealthSnapshot: WealthSnapshot; // NEW — the Today hero
+  wealthEvents: WealthEvent[]; // NEW — "what happened" with yesterday-continuity
+  recommendedAction: BriefingAction; // goal-relative next-step (see §2.6)
   glanceTiles: GlanceTile[];
   findings: Finding[];
   sourceSummary: BriefingSourceSummary;
@@ -461,6 +497,36 @@ Backward compatibility: the existing `TodayResponse` is adapted into
 `wealthEvents`) are additive; existing consumers that don't read them still
 work. The `recommendedAction` `completionKind` loses `"check_in"` — opening
 the app no longer changes health.
+
+## GoalContribution
+
+```ts
+type GoalContribution = {
+  id: string;
+  userId: string;
+  goalId: string;
+  amountPkr: number;
+  contributionDate: string;
+  source: "opening_balance" | "manual" | "quick_add" | "occurrence_yes";
+  idempotencyKey?: string;
+  createdAt: string;
+};
+```
+
+Every existing goal is seeded with at most one synthetic `opening_balance`
+entry equal to its current amount. The ledger is immutable and is the source
+for contribution-history calculations. Adding a ledger entry updates goal
+progress transactionally but never changes wealth, cash, or account balances:
+goals are tracking, not accounts (`I47`).
+
+## WorldFact and PersonalInsight
+
+Canonical contracts, required provenance, deterministic joins, cache keys,
+and quiet-state behavior are defined in
+[Insight Engine Spec](insight_engine_spec.md). `WorldFact` is shared across
+users; `PersonalInsight` contains user-specific relevance and copy. AI output
+may populate only optional presentation fields and never replaces the
+deterministic fallback.
 
 ## MarketSnapshot
 
@@ -487,7 +553,8 @@ type UserProfile = {
   id: string;
   displayName: string;
   nameSource: "typed" | "nickname" | "default";
-  incomeType?: "salary" | "freelance" | "business" | "irregular" | "student" | "other";
+  incomeType?:
+    "salary" | "freelance" | "business" | "irregular" | "student" | "other";
   salaryDate?: number;
   goals: Goal[];
   memory: UserMemory;
@@ -549,7 +616,13 @@ type PlanningAssumption = {
 
 type AskHistoryItem = {
   id: string;
-  topic: "salary_date" | "income_type" | "additional_goal" | "bill_timing" | "category_correction" | "source_connection";
+  topic:
+    | "salary_date"
+    | "income_type"
+    | "additional_goal"
+    | "bill_timing"
+    | "category_correction"
+    | "source_connection";
   askedAt: string;
   status: "answered" | "skipped" | "deferred";
   nextEligibleAskAt?: string;
@@ -585,7 +658,15 @@ Streak rules:
 type DataSource = {
   id: string;
   label: string;
-  kind: "manual" | "email" | "statement" | "sms_android" | "bank_partner" | "wise" | "investment" | "official_data";
+  kind:
+    | "manual"
+    | "email"
+    | "statement"
+    | "sms_android"
+    | "bank_partner"
+    | "wise"
+    | "investment"
+    | "official_data";
   status: "connected" | "not_connected" | "needs_review" | "error" | "manual";
   confidence: "high" | "medium" | "low";
   lastSyncedAt?: string;

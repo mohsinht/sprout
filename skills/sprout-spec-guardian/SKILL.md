@@ -9,6 +9,9 @@ description: Use when working on the Sprout Financial repo for any product, UI, 
 
 You are building Sprout: the 30-second daily money check-in for Pakistani earners. It is a calm mascot-led check-in with one glance, one sentence, and one small action. It is not a generic finance dashboard, bank app, budgeting spreadsheet, or chart wall.
 
+For insight, scoring, or briefing work also read
+`spec/insight_engine_spec.md` and `spec/insight_engine_execution_plan.md`.
+
 Restraint is the product. Build exactly what the relevant spec says and no more. Unrequested features, screens, UI elements, tabs, charts, filters, feeds, or settings are bugs, not bonuses.
 
 ## Required Pre-Code Ritual

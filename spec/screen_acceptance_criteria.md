@@ -109,10 +109,14 @@
 - Every card taps to a detail drawer with personal meaning, plain-language
   explanation, optional real action, and source.
 - Quiet-week state is calm and does not fill with generic market noise.
+- Each item can expose its fact/event id, deterministic template version,
+  source, and as-of date for audit; AI wording is never required to render it.
 - Thin-data state shows only relevant items.
 - Offline cached state is labelled.
 - Copy avoids FOMO, guaranteed returns, investment pressure, shame, and panic.
 - Light and dark mode remain legible at 1.3x text scale.
+- AI budget/provider failure is visually identical to a successful
+  deterministic briefing except for internal telemetry.
 
 ## Navigation
 

@@ -1,0 +1,2 @@
+ALTER TABLE "personal_insights" ADD COLUMN "stable_key" text NOT NULL;--> statement-breakpoint
+ALTER TABLE "personal_insights" ADD CONSTRAINT "personal_insights_stable_key_unique" UNIQUE("stable_key");

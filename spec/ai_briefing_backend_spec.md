@@ -86,8 +86,10 @@ The nightly job follows this sequence (mirroring the canonical automation exampl
 
 ## Insights Generation
 
-Insights use the same nightly gather → AI writes → validator saves model as
-the daily briefing, but scoped to personally-relevant world/market facts.
+Insights follow the shared-fact → deterministic personal join → optional
+budgeted rewrite architecture in [Insight Engine Spec](insight_engine_spec.md).
+AI is a presentation layer, never the source of facts, math, relevance, or
+action priority.
 
 Pipeline:
 
@@ -95,11 +97,14 @@ Pipeline:
    car/goal price context, and market moves only when they can affect the
    user's holdings, goals, cash, or currencies.
 2. Join candidates against the user's actual holdings, goals, and balances.
-3. The model writes the world→user framing: what happened, what it means for
-   this user, optional action, and calm explanation.
-4. The validator drops any item without personal relevance, provenance, date,
-   or safe tone.
-5. The UI receives a finite list, usually 3–6 items, plus a quiet-week state
+3. Versioned deterministic templates write the world→user framing: what
+   happened, what it means for this user, optional action, and calm explanation.
+4. Only notable events, milestones, `needs_attention` items, and the monthly
+   recap may receive an AI rewrite. Rewrites are cached by canonical input hash
+   and skipped when the daily cost cap is reached.
+5. The validator drops any item without personal relevance, provenance, date,
+   safe tone, or deterministic fallback text.
+6. The UI receives a finite list, usually 3–6 items, plus a quiet-week state
    when nothing meaningful applies.
 
 Validation:

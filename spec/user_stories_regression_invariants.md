@@ -561,6 +561,18 @@ Must always:
 - `I54`: The raster/static mascot path is the performance-safe baseline.
   Animated Rive is enabled only on profiles where measured performance passes;
   reduce-motion and failure always retain the same information and mood.
+- `I55`: Partial expense capture never produces a numeric cash-buffer claim;
+  the app states that it is using only logged expenses.
+- `I56`: Contribution consistency respects monthly/payday cadence and never
+  penalizes a monthly saver for not contributing every week.
+- `I57`: Goal contribution ledger entries never alter wealth or account
+  balances, and an opening balance never counts as a new contribution.
+- `I58`: Every personalized Insight is reproducible from dated WorldFact IDs,
+  user data, and a versioned deterministic template; quiet states are never
+  padded with generic news.
+- `I59`: AI cannot invent facts, formulas, relevance, or actions. Every AI
+  rewrite has deterministic fallback copy, an input-hash cache key, and is
+  skipped safely when its daily cost cap is exhausted.
 
 ## Regression Discipline
 
@@ -573,14 +585,14 @@ Must always:
 
 ## Coverage Matrix
 
-| Persona | Trust | Info Gathering | Data | Resilience | Dignity | A11y/Perf | Wealth |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| P1 Ayesha | I1-I5 | I7-I12 | I12 | I18-I19 | | | I35-I37 |
-| P2 Bilal | | I7-I10 | I13-I14, I42, I51 | I18-I19 | | I27-I29, I54 | I42, I51 |
-| P3 Mahnoor | I3-I5 | I7-I10 | I15-I17 | I20-I22 | | | I35-I36 |
-| P4 Usman | | I10 | I13 | I18 | I26 | | I38 |
-| P5 Fatima | | I12 | I13 | | I25 | | |
-| P6 Sara | | | | I20 | I23-I26 | | I39 |
-| P7 Mohsin | | | I38, I43, I52-I53 | I53 | I39 | I54 | I35-I41, I52-I53 |
+| Persona    | Trust | Info Gathering | Data              | Resilience | Dignity | A11y/Perf    | Wealth           |
+| ---------- | ----- | -------------- | ----------------- | ---------- | ------- | ------------ | ---------------- |
+| P1 Ayesha  | I1-I5 | I7-I12         | I12               | I18-I19    |         |              | I35-I37          |
+| P2 Bilal   |       | I7-I10         | I13-I14, I42, I51 | I18-I19    |         | I27-I29, I54 | I42, I51         |
+| P3 Mahnoor | I3-I5 | I7-I10         | I15-I17           | I20-I22    |         |              | I35-I36          |
+| P4 Usman   |       | I10            | I13               | I18        | I26     |              | I38              |
+| P5 Fatima  |       | I12            | I13               |            | I25     |              |                  |
+| P6 Sara    |       |                |                   | I20        | I23-I26 |              | I39              |
+| P7 Mohsin  |       |                | I38, I43, I52-I53 | I53        | I39     | I54          | I35-I41, I52-I53 |
 
 Any invariant with no persona exercising it needs a synthetic test case.

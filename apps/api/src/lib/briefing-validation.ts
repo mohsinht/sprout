@@ -16,8 +16,10 @@ export function checkGuardrails(briefing: WealthBriefing): string[] {
   }
 
   // No "check-in" action
-  if (briefing.recommendedAction.completionKind === "check_in" as never) {
-    violations.push("Check-in action selected — opening the app is not an action");
+  if (briefing.recommendedAction.completionKind === ("check_in" as never)) {
+    violations.push(
+      "Check-in action selected — opening the app is not an action",
+    );
   }
 
   // No shame/guilt/panic language
@@ -47,7 +49,10 @@ export function checkGuardrails(briefing: WealthBriefing): string[] {
   }
 
   // No exclamation marks on gains (hype check)
-  if (briefing.wealthSnapshot.changeVsYesterday > 0 && briefing.summary.includes("!")) {
+  if (
+    briefing.wealthSnapshot.changeVsYesterday > 0 &&
+    briefing.summary.includes("!")
+  ) {
     violations.push("Exclamation mark on a gain — no hype");
   }
 
@@ -59,11 +64,16 @@ export function checkGuardrails(briefing: WealthBriefing): string[] {
   }
 
   // changeVsYesterday and changeMtd both present (always shown together)
-  if (briefing.wealthSnapshot.changeVsYesterday === undefined || briefing.wealthSnapshot.changeMtd === undefined) {
+  if (
+    briefing.wealthSnapshot.changeVsYesterday === undefined ||
+    briefing.wealthSnapshot.changeMtd === undefined
+  ) {
     violations.push("WealthSnapshot missing changeVsYesterday or changeMtd");
   }
 
-  const hasMovement = briefing.wealthSnapshot.changeVsYesterday !== 0 || briefing.wealthSnapshot.changeMtd !== 0;
+  const hasMovement =
+    briefing.wealthSnapshot.changeVsYesterday !== 0 ||
+    briefing.wealthSnapshot.changeMtd !== 0;
   if (hasMovement) {
     const reason = briefing.wealthSnapshot.mainReason.trim().toLowerCase();
     if (!reason || !briefing.summary.toLowerCase().includes(reason)) {
@@ -77,26 +87,78 @@ export function checkGuardrails(briefing: WealthBriefing): string[] {
 /** Select the recommended action per scoring_model.md priority order. */
 export function selectRecommendedAction(params: {
   score: { attentionFactors: { id: string; contribution: number }[] };
-  goals: { id: string; name: string; targetAmount: number; currentAmount: number; remainingToTarget: number }[];
+  goals: {
+    id: string;
+    name: string;
+    targetAmount: number;
+    currentAmount: number;
+    remainingToTarget: number;
+    suggestion:
+      | { kind: "amount"; amount: number }
+      | { kind: "add_without_amount" }
+      | { kind: "review_deadline" };
+  }[];
   holdings: { id: string; label: string; valuePkr: number }[];
   unconfirmedCount: number;
   stalePriceCount: number;
+  paydayPriority?: boolean;
 }): WealthBriefingAction {
   const { score, goals, holdings, unconfirmedCount, stalePriceCount } = params;
 
-  // Priority 1: needs_attention bill coverage or cash runway
-  if (score.attentionFactors.some((f) => f.id === "cash_buffer" && f.contribution < 5)) {
-    const emergencyGoal = goals.find((g) => g.name.toLowerCase().includes("emergency"));
-    if (emergencyGoal) {
+  const goalAction = (goal: (typeof goals)[number]): WealthBriefingAction => {
+    if (goal.suggestion.kind === "review_deadline") {
       return {
-        id: "action-emergency",
-        label: `Add PKR 10,000 to your ${emergencyGoal.name}`,
+        id: `action-goal-review-${goal.id}`,
+        label: "This goal's deadline may need a review",
+        severity: "worth_doing",
+        effect: `Review the timeline for your ${goal.name}`,
+        xp: 15,
+        completionKind: "review",
+        targetId: goal.id,
+        goalRelativeNote: `PKR ${goal.remainingToTarget.toLocaleString()} to go`,
+      };
+    }
+    const amount =
+      goal.suggestion.kind === "amount" ? goal.suggestion.amount : null;
+    return {
+      id: `action-goal-${goal.id}`,
+      label:
+        amount == null
+          ? `Add to your ${goal.name}`
+          : `Add ${formatPkr(amount)} to your ${goal.name}`,
+      severity: "worth_doing",
+      effect: `PKR ${goal.remainingToTarget.toLocaleString()} to go`,
+      xp: 20,
+      completionKind: "contribute_to_goal",
+      targetId: goal.id,
+      goalRelativeNote:
+        amount == null
+          ? `Add to your ${goal.name}`
+          : `${formatPkr(amount)} to your ${goal.name}`,
+    };
+  };
+
+  const activeGoal = goals.find((goal) => goal.remainingToTarget > 0);
+  if (params.paydayPriority && activeGoal) return goalAction(activeGoal);
+
+  // Priority 1: needs_attention bill coverage or cash runway
+  if (
+    score.attentionFactors.some(
+      (f) =>
+        (f.id === "cashBuffer" || f.id === "billCoverage") &&
+        f.contribution < 5,
+    )
+  ) {
+    const emergencyGoal = goals.find((g) =>
+      g.name.toLowerCase().includes("emergency"),
+    );
+    if (emergencyGoal) {
+      const action = goalAction(emergencyGoal);
+      return {
+        ...action,
         severity: "needs_attention",
         effect: "Strengthens your cash buffer",
         xp: 25,
-        completionKind: "contribute_to_goal",
-        targetId: emergencyGoal.id,
-        goalRelativeNote: `PKR ${emergencyGoal.remainingToTarget.toLocaleString()} to go`,
       };
     }
   }
@@ -125,18 +187,8 @@ export function selectRecommendedAction(params: {
   }
 
   // Priority 3: worth_doing goal contribution
-  const activeGoal = goals.find((g) => g.remainingToTarget > 0);
   if (activeGoal) {
-    return {
-      id: `action-goal-${activeGoal.id}`,
-      label: `Add PKR 25,000 to your ${activeGoal.name}`,
-      severity: "worth_doing",
-      effect: `PKR ${activeGoal.remainingToTarget.toLocaleString()} to go`,
-      xp: 20,
-      completionKind: "contribute_to_goal",
-      targetId: activeGoal.id,
-      goalRelativeNote: `PKR ${activeGoal.remainingToTarget.toLocaleString()} to your ${activeGoal.name}`,
-    };
+    return goalAction(activeGoal);
   }
 
   // Priority 4: worth_doing rebalance suggestion
@@ -165,6 +217,12 @@ export function selectRecommendedAction(params: {
   };
 }
 
+function formatPkr(amount: number): string {
+  if (amount >= 100_000 && amount % 100_000 === 0)
+    return `PKR ${amount / 100_000} lakh`;
+  return `PKR ${amount.toLocaleString("en-PK")}`;
+}
+
 /** Deterministic fallback interpretation when AI is unavailable. */
 export function deterministicInterpretation(params: {
   changeVsYesterday: number;
@@ -175,14 +233,15 @@ export function deterministicInterpretation(params: {
   const lines: string[] = [];
   const { changeVsYesterday, changeMtd, mainReason } = params;
 
-  const todayDir = changeVsYesterday > 0 ? "Up" : changeVsYesterday < 0 ? "Down" : "Steady";
+  const todayDir =
+    changeVsYesterday > 0 ? "Up" : changeVsYesterday < 0 ? "Down" : "Steady";
   const mtdDir = changeMtd > 0 ? "up" : changeMtd < 0 ? "down" : "flat";
 
   lines.push(
-    `${todayDir} PKR ${Math.abs(changeVsYesterday).toLocaleString()} today — ${mainReason.toLowerCase()}.`
+    `${todayDir} PKR ${Math.abs(changeVsYesterday).toLocaleString()} today — ${mainReason.toLowerCase()}.`,
   );
   lines.push(
-    `Still ${mtdDir} PKR ${Math.abs(changeMtd).toLocaleString()} this month.`
+    `Still ${mtdDir} PKR ${Math.abs(changeMtd).toLocaleString()} this month.`,
   );
 
   if (changeVsYesterday < 0) {
@@ -199,7 +258,8 @@ export function deterministicInterpretation(params: {
 /** Deterministic fallback greeting. */
 export function deterministicGreeting(name: string, mood: string): string {
   const hour = new Date().getHours();
-  const timeGreeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const timeGreeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return `${timeGreeting}, ${name}`;
 }
 
@@ -210,12 +270,14 @@ export function deterministicSummary(params: {
   mainReason: string;
 }): string {
   const { changeVsYesterday, changeMtd, mainReason } = params;
-  const todayDir = changeVsYesterday > 0 ? "Up" : changeVsYesterday < 0 ? "Down" : "Steady";
-  const mtdPhrase = changeMtd > 0
-    ? `still up PKR ${Math.abs(changeMtd).toLocaleString()} this month`
-    : changeMtd < 0
-      ? `still down PKR ${Math.abs(changeMtd).toLocaleString()} this month`
-      : "steady this month";
+  const todayDir =
+    changeVsYesterday > 0 ? "Up" : changeVsYesterday < 0 ? "Down" : "Steady";
+  const mtdPhrase =
+    changeMtd > 0
+      ? `still up PKR ${Math.abs(changeMtd).toLocaleString()} this month`
+      : changeMtd < 0
+        ? `still down PKR ${Math.abs(changeMtd).toLocaleString()} this month`
+        : "steady this month";
 
   if (changeVsYesterday < 0) {
     return `${todayDir} PKR ${Math.abs(changeVsYesterday).toLocaleString()} today — ${mainReason.toLowerCase()}, not a crash. ${mtdPhrase}.`;

@@ -11,3 +11,4 @@ export * from "./mock-grow.js";
 export * from "./wealth.js";
 export * from "./scoring.js";
 export * from "./mock-wealth.js";
+export * from "./insights.js";

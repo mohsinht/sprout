@@ -60,6 +60,22 @@ Daily WealthSnapshot writes use a stable user + `Asia/Karachi` date key.
 Retries update/confirm the same canonical snapshot rather than appending a
 second history point.
 
+Shared WorldFact writes use a stable source + kind + observed date + affected
+instrument/currency key. PersonalInsight writes use a stable user + fact/event
+
+- template-version key. Goal contributions accept a client idempotency key;
+  the progress update and immutable ledger insert commit in one transaction.
+
+## AI Cost and Degradation Gate
+
+- All score, relevance, pace, affordability, and action decisions run without AI.
+- Optional rewrites are cached by a privacy-safe canonical input hash.
+- Enforce a hard daily spend/call cap before dispatch, with a separate monthly-recap budget.
+- Budget exhaustion, provider error, timeout, or schema rejection serves the
+  reviewed deterministic template and never fails the briefing.
+- Record model, prompt/template version, estimated cost, cache hit, and
+  degradation reason without logging financial descriptions or credentials.
+
 ## Valuation Pipeline Gate
 
 Treat NAV/redemption-price and FX fetchers as production parsers:
@@ -120,6 +136,8 @@ Track:
 - Stale/unavailable valuation rate by holding and user snapshot.
 - Primary-vs-validation disagreement and quarantine rate.
 - Snapshot gaps, duplicate PKT dates, and market-calendar version.
+- WorldFact duplicate rate, join/template version, insight quiet-state rate.
+- AI rewrite calls, cache hits, estimated cost, cap exhaustion, and fallback reason.
 - Open-to-close duration, D7/D30 return without notification prompting, and
   user correction rate as beta trust/habit indicators.
 
@@ -135,3 +153,5 @@ Track:
 - Real valuation sources pass the headless burn-in and review gate.
 - Disputed or failed valuations degrade visibly; no job silently publishes a
   questionable value as fresh.
+- AI cap exhaustion and provider failure pass with deterministic copy.
+- Shared facts, personal insights, and goal contributions are retry-safe.

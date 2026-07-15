@@ -21,6 +21,8 @@ This folder is the working spec package for Sprout. It translates the high-level
 - [Data Model Contract](data_model_contract.md): typed daily briefing contract plus Holding, PriceQuote/FxRate, WealthSnapshot, WealthEvent, LearnThread, transaction, goal, account, finding, and support models.
 - [Scoring Model](scoring_model.md): deterministic v0 wealth-health score (goal pace, buffer, diversification, contribution consistency, trend stability), finding detection, thresholds, and recommended-action selection. Check-in is removed.
 - [AI Briefing Backend Spec](ai_briefing_backend_spec.md): nightly wealth job inputs, cadence, severity model, WealthSnapshot + events + provenance validation, output contract, fallback behavior, and guardrails.
+- [Insight Engine Spec](insight_engine_spec.md): shared sourced facts, deterministic personal joins, reviewed templates, bounded optional AI, and required states.
+- [Insight Engine Execution Plan](insight_engine_execution_plan.md): phased delivery from deterministic scoring through WorldFacts, bounded AI, delight, and valuation gates.
 - [Market Personalization Spec](market_personalization_spec.md): when market context appears (only to explain the user's own movement or goal), how it is sourced, and how it becomes personally relevant.
 - [Navigation IA](navigation_ia.md): regression-protected 4-tab shell plus center quick-add action: Today · Money · [＋] · Insights · Settings. Money is the holdings + trend + provenance depth surface.
 - [Copy Tone Guide](copy_tone_guide.md): Sprout voice rules, wealth movement phrasing, goal-relative step phrasing, provenance phrasing, and example strings.
