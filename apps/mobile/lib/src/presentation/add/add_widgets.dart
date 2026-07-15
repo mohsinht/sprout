@@ -1,8 +1,14 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../data/mock_sprout_data.dart';
+import '../../data/manual_money_store.dart';
+import '../../data/statement_import_service.dart';
 import '../../domain/sprout_models.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_tokens.dart';
@@ -468,58 +474,126 @@ class _IncomeFormState extends State<IncomeForm> {
   }
 }
 
-/// Mock import stepper. Cycles uploaded → processing → needs review → completed.
-class ImportStatementCard extends StatefulWidget {
+/// CSV statement import with an explicit review-before-counting step.
+class ImportStatementCard extends ConsumerStatefulWidget {
   const ImportStatementCard({super.key});
 
   @override
-  State<ImportStatementCard> createState() => _ImportStatementCardState();
+  ConsumerState<ImportStatementCard> createState() =>
+      _ImportStatementCardState();
 }
 
-enum _ImportState { idle, uploaded, processing, needsReview, completed }
+enum _ImportState { idle, picking, needsReview, importing, completed }
 
-class _ImportStatementCardState extends State<ImportStatementCard> {
+class _ImportStatementCardState extends ConsumerState<ImportStatementCard> {
   _ImportState _state = _ImportState.idle;
+  List<SproutTransaction> _transactions = const [];
+  String? _error;
 
   String get _status => switch (_state) {
-        _ImportState.idle => AddStrings.importIdle,
-        _ImportState.uploaded => AddStrings.importUploaded,
-        _ImportState.processing => AddStrings.importProcessing,
-        _ImportState.needsReview => AddStrings.importNeedsReview,
-        _ImportState.completed => AddStrings.importCompleted,
+        _ImportState.idle =>
+          'Choose a CSV with date, amount, and category columns.',
+        _ImportState.picking => 'Opening your files…',
+        _ImportState.needsReview =>
+          '${_transactions.length} transactions are ready for your review.',
+        _ImportState.importing => 'Saving confirmed transactions…',
+        _ImportState.completed =>
+          '${_transactions.length} transactions imported. Your source file was not stored.',
       };
 
   String get _cta => switch (_state) {
-        _ImportState.idle => AddStrings.importCta,
-        _ImportState.uploaded => 'Read transactions',
-        _ImportState.processing => 'Reading…',
-        _ImportState.needsReview => 'Review now',
+        _ImportState.idle => 'Choose CSV',
+        _ImportState.picking => 'Opening…',
+        _ImportState.needsReview => 'Import ${_transactions.length}',
+        _ImportState.importing => 'Saving…',
         _ImportState.completed => 'Import another',
       };
 
-  bool get _busy => _state == _ImportState.processing;
+  bool get _busy =>
+      _state == _ImportState.picking || _state == _ImportState.importing;
 
-  void _advance() {
+  Future<void> _advance() async {
     if (_busy) return;
+    if (_state == _ImportState.needsReview) {
+      await _import();
+      return;
+    }
+    if (_state == _ImportState.completed) {
+      setState(() {
+        _state = _ImportState.idle;
+        _transactions = const [];
+        _error = null;
+      });
+      return;
+    }
     setState(() {
-      switch (_state) {
-        case _ImportState.idle:
-          _state = _ImportState.uploaded;
-        case _ImportState.uploaded:
-          _state = _ImportState.processing;
-        case _ImportState.processing:
-          return;
-        case _ImportState.needsReview:
-          _state = _ImportState.completed;
-        case _ImportState.completed:
-          _state = _ImportState.idle;
-      }
+      _state = _ImportState.picking;
+      _error = null;
     });
-    if (_state == _ImportState.processing) {
-      Future.delayed(const Duration(milliseconds: 1400), () {
-        if (mounted) setState(() => _state = _ImportState.needsReview);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['csv'],
+        withData: true,
+      );
+      if (!mounted) return;
+      if (result == null) {
+        setState(() => _state = _ImportState.idle);
+        return;
+      }
+      final bytes = result.files.single.bytes;
+      if (bytes == null) {
+        throw const StatementImportException(
+          'Sprout could not read this file on your device.',
+        );
+      }
+      final parsed =
+          const StatementImportService().parseCsv(utf8.decode(bytes));
+      setState(() {
+        _transactions = parsed;
+        _state = _ImportState.needsReview;
+      });
+    } on StatementImportException catch (error) {
+      setState(() {
+        _state = _ImportState.idle;
+        _error = error.message;
+      });
+    } catch (_) {
+      setState(() {
+        _state = _ImportState.idle;
+        _error = 'Sprout could not read this CSV. Nothing was imported.';
       });
     }
+  }
+
+  Future<void> _import() async {
+    setState(() {
+      _state = _ImportState.importing;
+      _error = null;
+    });
+    final accounts = ref.read(accountsProvider);
+    final account = accounts.firstOrNull;
+    for (final transaction in _transactions) {
+      final withAccount = SproutTransaction(
+        id: transaction.id,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        type: transaction.type,
+        category: transaction.category,
+        merchant: transaction.merchant,
+        note: transaction.note,
+        date: transaction.date,
+        source: transaction.source,
+        needsReview: false,
+        confidence: 1,
+        accountId: account?.id,
+      );
+      if (account != null) {
+        await ref.read(accountsProvider.notifier).applyTransaction(withAccount);
+      }
+      await ref.read(manualTransactionsProvider.notifier).add(withAccount);
+    }
+    if (mounted) setState(() => _state = _ImportState.completed);
   }
 
   @override
@@ -527,9 +601,9 @@ class _ImportStatementCardState extends State<ImportStatementCard> {
     final colors = SproutColorScheme.of(context);
     final progress = switch (_state) {
       _ImportState.idle => 0.0,
-      _ImportState.uploaded => 0.25,
-      _ImportState.processing => 0.6,
+      _ImportState.picking => 0.25,
       _ImportState.needsReview => 0.85,
+      _ImportState.importing => 0.92,
       _ImportState.completed => 1.0,
     };
     return SproutRaisedPanel(
@@ -551,7 +625,9 @@ class _ImportStatementCardState extends State<ImportStatementCard> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              const _DemoPill(),
+              if (_state == _ImportState.completed)
+                const Icon(Icons.check_circle_rounded,
+                    color: SproutColors.seed),
             ],
           ),
           const SizedBox(height: SproutSpacing.sm),
@@ -565,8 +641,8 @@ class _ImportStatementCardState extends State<ImportStatementCard> {
             runSpacing: 8,
             children: [
               _formatBadge('CSV', SproutColors.tintMint, SproutColors.leaf),
-              _formatBadge('PDF', SproutColors.tintSky, SproutColors.sky),
-              _formatBadge('XLSX', SproutColors.tintGold, SproutColors.goldInk),
+              _formatBadge('Review before import', SproutColors.tintSky,
+                  SproutColors.sky),
             ],
           ),
           const SizedBox(height: SproutSpacing.md),
@@ -583,6 +659,28 @@ class _ImportStatementCardState extends State<ImportStatementCard> {
             const SizedBox(height: SproutSpacing.md),
           ],
           Text(_status, style: Theme.of(context).textTheme.bodyMedium),
+          if (_state == _ImportState.needsReview) ...[
+            const SizedBox(height: SproutSpacing.md),
+            for (final transaction in _transactions.take(3))
+              Padding(
+                padding: const EdgeInsets.only(bottom: SproutSpacing.sm),
+                child: Text(
+                  '${SproutFormat.date(transaction.date)} · ${transaction.category} · ${SproutFormat.currency(transaction.amount)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            if (_transactions.length > 3)
+              Text('+ ${_transactions.length - 3} more',
+                  style: Theme.of(context).textTheme.bodySmall),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: SproutSpacing.md),
+            Text(_error!,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: SproutColors.tomato)),
+          ],
           const SizedBox(height: SproutSpacing.lg),
           SizedBox(
             width: double.infinity,
@@ -709,28 +807,6 @@ class ConnectEmailCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DemoPill extends StatelessWidget {
-  const _DemoPill();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: SproutColors.lilac.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(SproutRadius.pill),
-      ),
-      child: Text(
-        'Demo',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: SproutColors.lilac,
-              fontWeight: FontWeight.w800,
-            ),
       ),
     );
   }

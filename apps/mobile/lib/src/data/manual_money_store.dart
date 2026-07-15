@@ -12,11 +12,16 @@ import 'mock_sprout_data.dart';
 const _useMock =
     String.fromEnvironment('SPROUT_ENV', defaultValue: 'production') == 'dev';
 
+bool _hasRemoteSession(Ref ref) {
+  final session = ref.read(authSessionProvider);
+  return session != null && !session.isGuest;
+}
+
 final accountsProvider =
     StateNotifierProvider<AccountsNotifier, List<SproutAccount>>((ref) {
   final notifier = AccountsNotifier(ref);
   ref.listen(authSessionProvider, (_, session) {
-    if (session != null) notifier.syncFromServer();
+    if (session != null && !session.isGuest) notifier.syncFromServer();
   });
   return notifier;
 });
@@ -49,11 +54,11 @@ class AccountsNotifier extends StateNotifier<List<SproutAccount>> {
             .toList();
       } catch (_) {}
     }
-    if (_ref.read(authSessionProvider) != null) await syncFromServer();
+    if (_hasRemoteSession(_ref)) await syncFromServer();
   }
 
   Future<void> syncFromServer() async {
-    if (_useMock || _ref.read(authSessionProvider) == null) return;
+    if (_useMock || !_hasRemoteSession(_ref)) return;
     try {
       var rows = ((_ref.read(apiClientProvider).get('/v1/accounts')));
       var response = await rows;
@@ -90,6 +95,16 @@ class AccountsNotifier extends StateNotifier<List<SproutAccount>> {
         if (a.id == id) _copyAccount(a, balance: newBalance) else a
     ];
     await _persist();
+    if (_useMock || !_hasRemoteSession(_ref) || !_isRemoteId(id)) return;
+    try {
+      await _ref.read(apiClientProvider).patch('/v1/accounts/$id', {
+        'balance': newBalance,
+      });
+      await syncFromServer();
+    } catch (_) {
+      // The visible local edit remains available; a later sync preserves the
+      // server ledger until the user retries rather than fabricating success.
+    }
   }
 
   Future<void> applyTransaction(SproutTransaction transaction) async {
@@ -118,12 +133,31 @@ class AccountsNotifier extends StateNotifier<List<SproutAccount>> {
           isManual: a.isManual);
 }
 
+SproutTransaction _copyTransaction(SproutTransaction tx,
+        {required bool needsReview}) =>
+    SproutTransaction(
+      id: tx.id,
+      amount: tx.amount,
+      currency: tx.currency,
+      type: tx.type,
+      category: tx.category,
+      merchant: tx.merchant,
+      note: tx.note,
+      date: tx.date,
+      source: tx.source,
+      needsReview: needsReview,
+      confidence: needsReview ? tx.confidence : 1,
+      accountId: tx.accountId,
+    );
+
+bool _isRemoteId(String id) => RegExp(r'^[0-9a-f-]{36}$').hasMatch(id);
+
 final manualTransactionsProvider =
     StateNotifierProvider<ManualTransactionsNotifier, List<SproutTransaction>>(
         (ref) {
   final notifier = ManualTransactionsNotifier(ref);
   ref.listen(authSessionProvider, (_, session) {
-    if (session != null) notifier.syncFromServer();
+    if (session != null && !session.isGuest) notifier.syncFromServer();
   });
   return notifier;
 });
@@ -147,13 +181,13 @@ class ManualTransactionsNotifier
             .toList();
       } catch (_) {}
     }
-    if (_ref.read(authSessionProvider) != null) await syncFromServer();
+    if (_hasRemoteSession(_ref)) await syncFromServer();
   }
 
   Future<void> add(SproutTransaction transaction) async {
     state = [transaction, ...state];
     await _persist();
-    if (_useMock || _ref.read(authSessionProvider) == null) return;
+    if (_useMock || !_hasRemoteSession(_ref)) return;
     try {
       final created = await _push(transaction);
       state = [
@@ -170,7 +204,7 @@ class ManualTransactionsNotifier
   }
 
   Future<void> syncFromServer() async {
-    if (_useMock || _ref.read(authSessionProvider) == null) return;
+    if (_useMock || !_hasRemoteSession(_ref)) return;
     try {
       // Local-first entries have non-UUID IDs. Retry them before replacing the
       // local account picture with the server picture, so reconnecting cannot
@@ -203,6 +237,35 @@ class ManualTransactionsNotifier
     } catch (_) {}
   }
 
+  Future<void> confirm(String id) async {
+    state = [
+      for (final tx in state)
+        if (tx.id == id) _copyTransaction(tx, needsReview: false) else tx,
+    ];
+    await _persist();
+    if (!_hasRemoteSession(_ref) || !_isRemoteId(id)) return;
+    try {
+      await _ref
+          .read(apiClientProvider)
+          .patch('/v1/transactions/$id/confirm', {});
+      await _ref.read(accountsProvider.notifier).syncFromServer();
+      await _ref
+          .read(apiClientProvider)
+          .post('/v1/briefing/refresh', {'contextChanged': true});
+      _ref.read(briefingRevisionProvider.notifier).state++;
+    } catch (_) {}
+  }
+
+  Future<void> remove(String id) async {
+    state = state.where((tx) => tx.id != id).toList();
+    await _persist();
+    if (!_hasRemoteSession(_ref) || !_isRemoteId(id)) return;
+    try {
+      await _ref.read(apiClientProvider).delete('/v1/transactions/$id');
+      await _ref.read(accountsProvider.notifier).syncFromServer();
+    } catch (_) {}
+  }
+
   bool _isRemoteId(String id) => RegExp(r'^[0-9a-f-]{36}$').hasMatch(id);
 
   Future<Map<String, dynamic>> _push(SproutTransaction transaction) {
@@ -216,8 +279,8 @@ class ManualTransactionsNotifier
       'merchant': transaction.merchant,
       'note': transaction.note,
       'occurredAt': transaction.date.toUtc().toIso8601String(),
-      'source': 'manual',
-      'confidence': 1,
+      'source': transaction.source.name,
+      'confidence': transaction.confidence ?? 1,
       if (accountId != null) 'accountId': accountId,
     });
   }
@@ -299,7 +362,10 @@ SproutTransaction _transactionFromJson(Map<String, dynamic> json) =>
         date: DateTime.tryParse(
                 (json['occurredAt'] ?? json['date']) as String? ?? '') ??
             DateTime.now(),
-        source: TransactionSource.manual,
+        source: TransactionSource.values
+                .where((source) => source.name == json['source'])
+                .firstOrNull ??
+            TransactionSource.manual,
         needsReview: json['needsReview'] as bool? ?? false,
         confidence: double.tryParse('${json['confidence'] ?? 1}'),
         accountId: json['accountId'] as String?);
@@ -312,6 +378,7 @@ Map<String, dynamic> _transactionToJson(SproutTransaction tx) => {
       'merchant': tx.merchant,
       'note': tx.note,
       'date': tx.date.toIso8601String(),
+      'source': tx.source.name,
       'needsReview': tx.needsReview,
       'confidence': tx.confidence,
       'accountId': tx.accountId

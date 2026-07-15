@@ -158,13 +158,58 @@ await request("/v1/transactions", {
 });
 const accounts = await request("/v1/accounts");
 check(accounts.data.accounts[0].balance === 158800, "income and expense update the account exactly once");
+await request(`/v1/accounts/${account.data.id}`, {
+  method: "PATCH",
+  body: { balance: 200000 },
+});
+const editedAccounts = await request("/v1/accounts");
+check(
+  editedAccounts.data.accounts[0].balance === 200000,
+  "a visible balance edit updates the server ledger without double-counting transactions",
+);
+await request(`/v1/accounts/${account.data.id}`, {
+  method: "PATCH",
+  body: { balance: 158800 },
+});
+
+const uncertain = await request("/v1/transactions", {
+  method: "POST",
+  expected: 201,
+  body: {
+    amount: 800,
+    currency: "PKR",
+    type: "expense",
+    category: "Other",
+    merchant: "Unclear statement row",
+    occurredAt: new Date(Date.now() + 122000).toISOString(),
+    source: "statement",
+    confidence: 0.45,
+    needsReview: true,
+    reviewReason: "Merchant was unclear",
+    accountId: account.data.id,
+  },
+});
+let reviewedAccounts = await request("/v1/accounts");
+check(reviewedAccounts.data.accounts[0].balance === 158800, "uncertain transactions do not change balances before review");
+await request(`/v1/transactions/${uncertain.data.id}/confirm`, { method: "PATCH", body: {} });
+reviewedAccounts = await request("/v1/accounts");
+check(reviewedAccounts.data.accounts[0].balance === 158000, "confirming an uncertain transaction updates its account once");
+await request(`/v1/transactions/${uncertain.data.id}`, { method: "DELETE" });
+reviewedAccounts = await request("/v1/accounts");
+check(reviewedAccounts.data.accounts[0].balance === 158800, "removing a reviewed transaction restores the account picture");
 
 const secondGoal = await request("/v1/goals", {
   method: "POST",
   expected: 201,
   body: { name: "Laptop", type: "custom", targetAmount: 250000, currentAmount: 50000, isPrimary: true },
 });
-await request(`/v1/goals/${secondGoal.data.id}/contribute`, { method: "POST", body: { amount: 25000 } });
+await request(`/v1/goals/${secondGoal.data.id}/contribute`, {
+  method: "POST",
+  body: {
+    amount: 25000,
+    idempotencyKey: `e2e-goal-${secondGoal.data.id}`,
+  },
+});
 const goals = await request("/v1/goals");
 const reorderedIds = goals.data.goals.map((goal) => goal.id).reverse();
 await request("/v1/goals/reorder", { method: "POST", body: { ids: reorderedIds } });

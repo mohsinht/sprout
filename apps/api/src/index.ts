@@ -52,7 +52,14 @@ app.use(
 app.use(
   "*",
   cors({
-    origin: config.corsOrigins,
+    origin: config.isProduction
+      ? config.corsOrigins
+      : (origin) =>
+          /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+            ? origin
+            : config.corsOrigins.includes(origin)
+              ? origin
+              : "",
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   }),

@@ -48,7 +48,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
       if (mounted) context.go(_postAuthRoute!);
     } on SproutApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (mounted) setState(() => _error = error.userMessage);
     } catch (_) {
       if (mounted) {
         setState(() => _error =
@@ -57,6 +57,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _continueLocally() async {
+    final session = await ref.read(authSessionProvider.notifier).startGuest();
+    if (!mounted) return;
+    context.go(session.onboardingComplete ? '/today' : '/onboarding');
   }
 
   @override
@@ -136,8 +142,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   ),
                   const SizedBox(height: 8),
                   TextButton(
-                    onPressed: () => context.go('/today'),
-                    child: const Text('Continue without an account'),
+                    onPressed: _saving ? null : _continueLocally,
+                    child: const Text('Use Sprout on this device'),
                   ),
                 ],
               ),

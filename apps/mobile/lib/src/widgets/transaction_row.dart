@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/manual_money_store.dart';
 import '../domain/sprout_models.dart';
 import '../theme/sprout_strings.dart';
 import '../theme/sprout_theme.dart';
@@ -9,7 +11,7 @@ import 'sprout_helpers.dart';
 /// One row in a recent-transactions list. Shows the source as a small badge
 /// and, when the source is uncertain, a calm "Needs review" tag instead of a
 /// scary warning. Dark-mode aware via [SproutColorScheme].
-class TransactionRow extends StatelessWidget {
+class TransactionRow extends ConsumerWidget {
   const TransactionRow(
       {required this.transaction, this.balanceVisible = true, super.key});
 
@@ -17,14 +19,14 @@ class TransactionRow extends StatelessWidget {
   final bool balanceVisible;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = SproutColorScheme.of(context);
     final isIncome = transaction.type == TransactionType.income;
     final amountColor = isIncome ? SproutColors.seed : colors.ink;
     final sign = isIncome ? '+' : '−';
     final srcColor = sourceColor(transaction.source);
 
-    return Padding(
+    final row = Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,6 +107,66 @@ class TransactionRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    if (!transaction.needsReview) return row;
+    return Semantics(
+      button: true,
+      label: 'Review ${transaction.merchant}',
+      child: InkWell(
+        onTap: () => _review(context, ref),
+        borderRadius: BorderRadius.circular(SproutRadius.tile),
+        child: row,
+      ),
+    );
+  }
+
+  Future<void> _review(BuildContext context, WidgetRef ref) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Is this transaction correct?',
+                style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: SproutSpacing.sm),
+            Text(
+              'Sprout is unsure, so it waits for your tap before trusting it.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: SproutSpacing.lg),
+            Text('${transaction.merchant} · ${transaction.category}'),
+            Text(SproutFormat.currency(transaction.amount)),
+            const SizedBox(height: SproutSpacing.lg),
+            FilledButton(
+              onPressed: () async {
+                await ref
+                    .read(manualTransactionsProvider.notifier)
+                    .confirm(transaction.id);
+                if (sheetContext.mounted) Navigator.pop(sheetContext);
+              },
+              child: const Text('Yes, count it'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(sheetContext),
+              child: const Text('Not now'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await ref
+                    .read(manualTransactionsProvider.notifier)
+                    .remove(transaction.id);
+                if (sheetContext.mounted) Navigator.pop(sheetContext);
+              },
+              child: const Text('This is not mine'),
+            ),
+          ],
+        ),
       ),
     );
   }

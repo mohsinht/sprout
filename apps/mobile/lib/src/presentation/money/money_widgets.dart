@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../data/manual_money_store.dart';
-import '../../data/mock_sprout_data.dart';
 import '../../domain/sprout_models.dart';
+import '../../domain/today_models.dart';
 import '../../theme/sprout_strings.dart';
 import '../../theme/sprout_copy_guard.dart';
 import '../../theme/sprout_theme.dart';
@@ -34,13 +34,6 @@ class _MoneyStrings {
   static const healthComfortable = 'Looking comfortable. Nice pace.';
   static const healthOkay = 'Looks okay. One small action can improve this.';
   static const healthNear = 'Nearly there. Small adjustments keep it calm.';
-
-  static const investmentsNote =
-      'Investment values are estimates until updated.';
-  static const mutualFunds = 'Mutual funds';
-  static const cashBuffer = 'Cash buffer';
-  static const foreignCurrency = 'Foreign currency savings';
-  static const lastUpdated = 'Last updated';
 
   static const editAccount = 'Edit account';
   static const editAccountHint = 'Update the balance. Sprout saves your edit.';
@@ -668,70 +661,62 @@ class _AllTransactionsSheet extends StatelessWidget {
 
 /// A basic investments snapshot — no portfolio graphs.
 class InvestmentsPanel extends StatelessWidget {
-  const InvestmentsPanel({required this.balanceVisible, super.key});
+  const InvestmentsPanel({
+    required this.balanceVisible,
+    required this.holdings,
+    required this.loading,
+    super.key,
+  });
 
   final bool balanceVisible;
+  final List<Holding> holdings;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
-    final funds = mockInvestments.firstWhere(
-      (a) => a.id == 'al-meezan',
-      orElse: () => mockInvestments.first,
-    );
-    final buffer = mockInvestments.firstWhere(
-      (a) => a.id == 'cash-buffer',
-      orElse: () => mockInvestments.first,
-    );
-    final fx = mockInvestments.firstWhere(
-      (a) => a.id == 'wise-usd',
-      orElse: () => mockInvestments.first,
-    );
-    final lastUpdatedValue = funds.lastUpdatedLabel;
+    final investments = holdings
+        .where((holding) =>
+            holding.kind != HoldingKind.cash || holding.currency != 'PKR')
+        .toList();
 
     return SproutRaisedPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _MoneyStrings.investmentsSnapshot,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: colors.ink),
-          ),
+          Text(_MoneyStrings.investmentsSnapshot,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: colors.ink)),
           const SizedBox(height: SproutSpacing.md),
-          _InvestmentLine(
-            label: _MoneyStrings.mutualFunds,
-            value: funds.balance,
-            visible: balanceVisible,
-          ),
-          _InvestmentLine(
-            label: _MoneyStrings.cashBuffer,
-            value: buffer.balance,
-            visible: balanceVisible,
-          ),
-          _InvestmentLine(
-            label: _MoneyStrings.foreignCurrency,
-            value: fx.balance,
-            visible: balanceVisible,
-          ),
-          const SizedBox(height: SproutSpacing.md),
-          Text(
-            '${_MoneyStrings.lastUpdated}: $lastUpdatedValue',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(fontSize: 12, color: colors.muted),
-          ),
-          const SizedBox(height: SproutSpacing.xs),
-          Text(
-            _MoneyStrings.investmentsNote,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(fontSize: 12, color: colors.muted),
-          ),
+          if (loading)
+            const LinearProgressIndicator(minHeight: 3)
+          else if (investments.isEmpty)
+            Text(
+              'No investments tracked yet. Your cash picture still works on its own.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: colors.muted),
+            )
+          else
+            for (final holding in investments) ...[
+              _InvestmentLine(
+                label: holding.label,
+                value: holding.valuePkr,
+                visible: balanceVisible,
+              ),
+              Text(
+                '${holding.priceSource} · ${holding.priceAsOf}${holding.freshness == 'stale' ? ' · updated earlier' : ''}',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: colors.muted),
+              ),
+              if (holding.id != investments.last.id)
+                const SizedBox(height: SproutSpacing.md),
+            ],
         ],
       ),
     );

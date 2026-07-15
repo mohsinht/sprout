@@ -29,7 +29,7 @@ accountsRoute.get("/", async (c) => {
       currency: schema.accounts.currency,
       isManual: schema.accounts.isManual,
       createdAt: schema.accounts.createdAt,
-      transactionBalance: sql<number>`coalesce(sum(case when ${schema.transactions.type} = 'income' then ${schema.transactions.amount} when ${schema.transactions.type} = 'expense' then -${schema.transactions.amount} else 0 end), 0)`,
+      transactionBalance: sql<number>`coalesce(sum(case when ${schema.transactions.needsReview} = false and ${schema.transactions.type} = 'income' then ${schema.transactions.amount} when ${schema.transactions.needsReview} = false and ${schema.transactions.type} = 'expense' then -${schema.transactions.amount} else 0 end), 0)`,
     })
     .from(schema.accounts)
     .leftJoin(schema.transactions, eq(schema.transactions.accountId, schema.accounts.id))
@@ -59,16 +59,35 @@ accountsRoute.post("/", async (c) => {
 accountsRoute.patch("/:id", async (c) => {
   const userId = c.get("userId") as string;
   const accountId = c.req.param("id");
-  const body = AccountSchema.partial().safeParse(await c.req.json());
+  const body = AccountSchema.partial().extend({
+    // A user edits the balance they can see, not the hidden opening-balance
+    // ledger input. The route translates it without double-counting history.
+    balance: z.number().int().optional(),
+  }).safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid input", details: body.error.flatten() }, 400);
+
+  const { balance, ...fields } = body.data;
+  let openingBalance = fields.openingBalance;
+  if (balance !== undefined) {
+    const [movement] = await db
+      .select({
+        total: sql<number>`coalesce(sum(case when ${schema.transactions.needsReview} = false and ${schema.transactions.type} = 'income' then ${schema.transactions.amount} when ${schema.transactions.needsReview} = false and ${schema.transactions.type} = 'expense' then -${schema.transactions.amount} else 0 end), 0)`,
+      })
+      .from(schema.transactions)
+      .where(and(
+        eq(schema.transactions.userId, userId),
+        eq(schema.transactions.accountId, accountId),
+      ));
+    openingBalance = balance - Number(movement?.total ?? 0);
+  }
 
   const [account] = await db
     .update(schema.accounts)
-    .set({ ...body.data, updatedAt: new Date() })
+    .set({ ...fields, ...(openingBalance === undefined ? {} : { openingBalance }), updatedAt: new Date() })
     .where(and(eq(schema.accounts.id, accountId), eq(schema.accounts.userId, userId)))
     .returning();
   if (!account) return c.json({ error: "Account not found" }, 404);
-  return c.json(account);
+  return c.json({ ...account, balance: balance ?? account.openingBalance });
 });
 
 accountsRoute.delete("/:id", async (c) => {

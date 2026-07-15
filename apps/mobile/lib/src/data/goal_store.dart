@@ -8,10 +8,15 @@ import 'api/sprout_api_client.dart';
 import 'auth_store.dart';
 import 'context_refresh.dart';
 
+bool _hasRemoteSession(Ref ref) {
+  final session = ref.read(authSessionProvider);
+  return session != null && !session.isGuest;
+}
+
 final goalStoreProvider = StateNotifierProvider<GoalStore, List<Goal>>((ref) {
   final store = GoalStore(ref);
   ref.listen(authSessionProvider, (_, session) {
-    if (session != null) store.syncFromServer();
+    if (session != null && !session.isGuest) store.syncFromServer();
   });
   return store;
 });
@@ -67,7 +72,7 @@ class GoalStore extends StateNotifier<List<Goal>> {
         state = const [];
       }
     }
-    if (_ref.read(authSessionProvider) != null) await syncFromServer();
+    if (_hasRemoteSession(_ref)) await syncFromServer();
   }
 
   Future<void> _persist() async {
@@ -77,7 +82,7 @@ class GoalStore extends StateNotifier<List<Goal>> {
   }
 
   Future<void> syncFromServer() async {
-    if (_useMock || _ref.read(authSessionProvider) == null) return;
+    if (_useMock || !_hasRemoteSession(_ref)) return;
     try {
       final response = await _ref.read(apiClientProvider).get('/v1/goals');
       final remote = (response['goals'] as List? ?? const [])
@@ -96,7 +101,7 @@ class GoalStore extends StateNotifier<List<Goal>> {
     }
     state = [...state, goal];
     await _persist();
-    if (_useMock || _ref.read(authSessionProvider) == null) return;
+    if (_useMock || !_hasRemoteSession(_ref)) return;
     try {
       final created = await _ref.read(apiClientProvider).post('/v1/goals', {
         'name': goal.name,
@@ -217,8 +222,7 @@ class GoalStore extends StateNotifier<List<Goal>> {
   }
 
   bool _isRemoteId(String id) =>
-      RegExp(r'^[0-9a-f-]{36}$').hasMatch(id) &&
-      _ref.read(authSessionProvider) != null;
+      RegExp(r'^[0-9a-f-]{36}$').hasMatch(id) && _hasRemoteSession(_ref);
 
   Goal _withAmount(Goal g, int amount) {
     final current = amount.clamp(0, g.targetAmount);

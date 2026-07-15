@@ -65,6 +65,13 @@ test("OPS-03 headers, request IDs, sanitized errors, and boot refusal", async ()
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.ok(response.headers.get("x-request-id"));
   }
+  const localWeb = await fetch(`${apiBaseUrl}/ready`, {
+    headers: { Origin: "http://127.0.0.1:8090" },
+  });
+  assert.equal(
+    localWeb.headers.get("access-control-allow-origin"),
+    "http://127.0.0.1:8090",
+  );
   const boot = spawnSync(process.execPath, ["apps/api/dist/config.js"], {
     cwd: repoRoot,
     env: {

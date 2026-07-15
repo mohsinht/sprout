@@ -5,6 +5,16 @@ import { MockAiService } from "../services/ai-service.js";
 const userId = "00000000-0000-4000-8000-0000000000d6";
 await pool.query(`insert into users(id,email,password_hash) values($1,'valuation-mechanics@audit.invalid','disabled') on conflict(id) do nothing`, [userId]);
 await pool.query(`insert into profiles(user_id,name,onboarding_complete) values($1,'Valuation mechanics',true) on conflict do nothing`, [userId]);
+// Keep the burn-in fixture deterministic across calendar days and repeat runs.
+// These rows belong only to the fixed audit user and audit-only sources.
+await pool.query(`delete from daily_briefings where user_id=$1`, [userId]);
+await pool.query(`delete from wealth_events where user_id=$1`, [userId]);
+await pool.query(`delete from wealth_snapshots where user_id=$1`, [userId]);
+await pool.query(`delete from baselines where user_id=$1`, [userId]);
+await pool.query(`delete from job_runs where user_id=$1`, [userId]);
+await pool.query(`delete from nav_cross_validations where validation_source='Audit MUFAP'`);
+await pool.query(`delete from price_quotes where source='Audit Al Meezan'`);
+await pool.query(`delete from fx_rates where source='Audit FX'`);
 await pool.query(`insert into holdings(user_id,kind,institution,label,fund_code,currency,units,value_pkr,freshness)
   select $1,'mutual_fund','Audit Al Meezan','Audit Fund','AMMF','PKR',100,0,'unavailable'
   where not exists(select 1 from holdings where user_id=$1 and fund_code='AMMF')`, [userId]);

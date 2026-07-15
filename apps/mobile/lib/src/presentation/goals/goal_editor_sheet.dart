@@ -14,18 +14,23 @@ import '../../theme/sprout_theme.dart';
 /// Goals are tracking, not accounts — completing or deleting a goal never
 /// implies the user's money changed. Copy makes that clear.
 class GoalEditorSheet extends ConsumerStatefulWidget {
-  const GoalEditorSheet({this.goal, super.key});
+  const GoalEditorSheet({this.goal, this.onContributed, super.key});
 
   /// The goal to edit. If null, opens in "add new goal" mode.
   final Goal? goal;
+  final VoidCallback? onContributed;
 
   /// Opens the goal editor as a bottom sheet.
-  static void open(BuildContext context, {Goal? goal}) {
+  static void open(BuildContext context,
+      {Goal? goal, VoidCallback? onContributed}) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => GoalEditorSheet(goal: goal),
+      builder: (context) => GoalEditorSheet(
+        goal: goal,
+        onContributed: onContributed,
+      ),
     );
   }
 
@@ -105,10 +110,14 @@ class _GoalEditorSheetState extends ConsumerState<GoalEditorSheet> {
     Navigator.pop(context);
   }
 
-  void _contribute(int amount) {
+  Future<void> _contribute(int amount) async {
     if (widget.goal == null) return;
     HapticFeedback.lightImpact();
-    ref.read(goalStoreProvider.notifier).contribute(widget.goal!.id, amount);
+    await ref
+        .read(goalStoreProvider.notifier)
+        .contribute(widget.goal!.id, amount);
+    if (!mounted) return;
+    widget.onContributed?.call();
     Navigator.pop(context);
   }
 

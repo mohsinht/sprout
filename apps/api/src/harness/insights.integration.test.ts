@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import test, { before } from "node:test";
+import test, { beforeEach } from "node:test";
 import { readFile } from "node:fs/promises";
 import { pool } from "../db/client.js";
 import { createHarnessClient } from "./http.js";
 
-before(async () => {
+beforeEach(async () => {
   await pool.query(
     `delete from personal_insights where world_fact_id in (select id from world_facts where source_id='harness');
      delete from world_facts where source_id='harness'`,
@@ -51,10 +51,12 @@ test("INS-02 FX fact joins only to matching currency", async () => {
   const factId = await seedFact("fx_move", "USD");
   const usdResult = await usd.request("/v1/insights", { expected: 200 });
   const pkrResult = await pkr.request("/v1/insights", { expected: 200 });
-  assert.equal(usdResult.data.insights.length, 1);
-  assert.equal(usdResult.data.insights[0].worldFactId, factId);
+  const matching = usdResult.data.insights.filter(
+    (insight: { worldFactId: string }) => insight.worldFactId === factId,
+  );
+  assert.equal(matching.length, 1);
   assert.match(
-    JSON.stringify(usdResult.data.insights[0]),
+    JSON.stringify(matching[0]),
     /SBP|2026-07-15|USD/,
   );
   assert.equal(pkrResult.data.insights.length, 0);

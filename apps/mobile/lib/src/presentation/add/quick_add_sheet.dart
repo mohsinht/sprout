@@ -53,7 +53,9 @@ enum _IncomeKind {
 }
 
 class QuickAddSheet extends ConsumerStatefulWidget {
-  const QuickAddSheet({super.key});
+  const QuickAddSheet({this.startWithImport = false, super.key});
+
+  final bool startWithImport;
 
   static void open(BuildContext context) {
     final colors = SproutColorScheme.of(context);
@@ -65,6 +67,19 @@ class QuickAddSheet extends ConsumerStatefulWidget {
       useSafeArea: true,
       barrierColor: colors.ink.withValues(alpha: 0.45),
       builder: (_) => const QuickAddSheet(),
+    );
+  }
+
+  static void openImport(BuildContext context) {
+    final colors = SproutColorScheme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      useRootNavigator: true,
+      useSafeArea: true,
+      barrierColor: colors.ink.withValues(alpha: 0.45),
+      builder: (_) => const QuickAddSheet(startWithImport: true),
     );
   }
 
@@ -90,6 +105,7 @@ class _QuickAddSheetState extends ConsumerState<QuickAddSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.startWithImport) _step = _QuickAddStep.import;
     _customAmount.addListener(_rebuildForAmountText);
     _incomeAmount.addListener(_rebuildForAmountText);
   }

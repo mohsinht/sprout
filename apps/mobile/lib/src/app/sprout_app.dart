@@ -15,6 +15,8 @@ import '../presentation/today/today_controller.dart';
 import '../data/auth_store.dart';
 import '../data/api/sprout_api_client.dart';
 import '../data/reminder_service.dart';
+import '../data/backend_availability.dart';
+import '../data/reduce_motion_store.dart';
 import '../theme/sprout_theme.dart';
 import 'theme_mode_controller.dart';
 import 'app_lock_gate.dart';
@@ -73,17 +75,20 @@ GoRouter buildSproutRouter(AuthSession? session) => GoRouter(
               pageBuilder: (context, state) =>
                   const NoTransitionPage(child: SettingsScreen()),
             ),
-            // Learn is reachable by deep-link but is NOT a shell tab.
-            // Learning content folds into Sprout Explains per spec.
-            GoRoute(
-              path: '/learn',
-              pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: LearnScreen()),
-            ),
+            // The lesson path is a development fixture, not a production
+            // promise. Production learning stays inside Sprout Explains.
+            if (useSproutMocks)
+              GoRoute(
+                path: '/learn',
+                pageBuilder: (context, state) =>
+                    const NoTransitionPage(child: LearnScreen()),
+              ),
           ],
         ),
       ],
     );
+
+final sproutMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 class SproutApp extends ConsumerWidget {
   const SproutApp({super.key});
@@ -99,6 +104,7 @@ class SproutApp extends ConsumerWidget {
       }
     });
     final themeMode = ref.watch(themeModeProvider);
+    final reduceMotion = ref.watch(reduceMotionProvider);
     final effectiveSession = useSproutMocks && session == null
         ? const AuthSession(
             accessToken: 'dev',
@@ -111,22 +117,78 @@ class SproutApp extends ConsumerWidget {
     ReminderService.instance.initialize(onOpen: router.go);
     return MaterialApp.router(
       title: 'Sprout',
+      scaffoldMessengerKey: sproutMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: buildSproutTheme(brightness: Brightness.light),
       darkTheme: buildSproutTheme(brightness: Brightness.dark),
       themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) {
-        final content = AppLockGate(child: child ?? const SizedBox.shrink());
-        if (!useSproutSweepHarness) return content;
+        final content = BackendAvailabilityNotice(
+          child: AppLockGate(child: child ?? const SizedBox.shrink()),
+        );
         final media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(
-            textScaler: TextScaler.linear(sproutSweepTextScale),
+            disableAnimations: reduceMotion || media.disableAnimations,
+            textScaler: useSproutSweepHarness
+                ? TextScaler.linear(sproutSweepTextScale)
+                : media.textScaler,
           ),
           child: content,
         );
       },
     );
+  }
+}
+
+class BackendAvailabilityNotice extends ConsumerWidget {
+  const BackendAvailabilityNotice({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(backendAvailabilityProvider);
+    ref.listen<BackendAvailability>(backendAvailabilityProvider,
+        (previous, next) {
+      final messenger = sproutMessengerKey.currentState;
+      if (messenger == null || previous == next) return;
+      if (next == BackendAvailability.warming) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(
+            key: ValueKey('backend-warming-toast'),
+            content: Text(
+              'Sprout is waking up. Saved entries are still available.',
+            ),
+            duration: Duration(seconds: 8),
+            behavior: SnackBarBehavior.floating,
+          ));
+      } else if (next == BackendAvailability.unavailable) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(
+            key: ValueKey('backend-unavailable-toast'),
+            content: Text(
+              'Sprout cannot sync yet. Changes stay on this device for now.',
+            ),
+            duration: Duration(seconds: 8),
+            behavior: SnackBarBehavior.floating,
+          ));
+      } else if (next == BackendAvailability.ready &&
+          previous != null &&
+          previous != BackendAvailability.checking) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(
+            key: ValueKey('backend-ready-toast'),
+            content: Text('Sprout is ready. New changes can sync now.'),
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ));
+      }
+    });
+    return child;
   }
 }

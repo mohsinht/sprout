@@ -362,12 +362,14 @@ class SproutDataSource {
     required this.detail,
     required this.connected,
     this.comingSoon = false,
+    this.remoteId,
   });
 
   final String id;
   final String label;
   final String detail;
   final bool connected;
+  final String? remoteId;
 
   /// When true, the source is not yet available — rendered as "Soon" and
   /// not tappable for connect/disconnect.

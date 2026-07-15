@@ -8,7 +8,7 @@ final balancesVisibleProvider =
     StateNotifierProvider<BalancePrivacyStore, bool>((ref) {
   final store = BalancePrivacyStore(ref);
   ref.listen(authSessionProvider, (_, session) {
-    if (session != null) store.refreshFromProfile();
+    if (session != null && !session.isGuest) store.refreshFromProfile();
   });
   return store;
 });
@@ -24,7 +24,7 @@ class BalancePrivacyStore extends StateNotifier<bool> {
   Future<void> _restore() async {
     final prefs = await SharedPreferences.getInstance();
     state = prefs.getBool(_key) ?? true;
-    if (_ref.read(authSessionProvider) != null) await refreshFromProfile();
+    if (_hasRemoteSession) await refreshFromProfile();
   }
 
   Future<void> refreshFromProfile() async {
@@ -38,7 +38,7 @@ class BalancePrivacyStore extends StateNotifier<bool> {
   Future<void> setVisible(bool visible) async {
     state = visible;
     await _persist();
-    if (_ref.read(authSessionProvider) == null) return;
+    if (!_hasRemoteSession) return;
     try {
       await _ref
           .read(apiClientProvider)
@@ -51,5 +51,10 @@ class BalancePrivacyStore extends StateNotifier<bool> {
   Future<void> _persist() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_key, state);
+  }
+
+  bool get _hasRemoteSession {
+    final session = _ref.read(authSessionProvider);
+    return session != null && !session.isGuest;
   }
 }

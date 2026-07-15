@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { authMiddleware } from "../auth/middleware.js";
 import {
@@ -99,4 +99,18 @@ briefingRoute.get("/sources", async (c) => {
       lastError: failedJobs[0]?.error ?? null,
     },
   });
+});
+
+briefingRoute.delete("/sources/:id", async (c) => {
+  const userId = c.get("userId") as string;
+  const sourceId = c.req.param("id");
+  const [deleted] = await db
+    .delete(schema.dataSources)
+    .where(and(
+      eq(schema.dataSources.userId, userId),
+      eq(schema.dataSources.id, sourceId),
+    ))
+    .returning({ id: schema.dataSources.id });
+  if (!deleted) return c.json({ error: "Data source not found" }, 404);
+  return c.json({ ok: true, message: "Source disconnected. Manual entries remain." });
 });

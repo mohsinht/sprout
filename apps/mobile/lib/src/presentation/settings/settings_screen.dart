@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
 import '../../app/theme_mode_controller.dart';
@@ -11,6 +12,7 @@ import '../../data/goal_store.dart';
 import '../../data/balance_privacy_store.dart';
 import '../../data/app_lock_store.dart';
 import '../../data/reminder_service.dart';
+import '../../data/reduce_motion_store.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../data/api/sprout_api_client.dart';
 import '../../data/auth_store.dart';
@@ -21,6 +23,7 @@ import '../../widgets/sprout_page.dart';
 import '../../widgets/sprout_panel.dart';
 import '../../widgets/trust_badge.dart';
 import '../goals/goal_editor_sheet.dart';
+import '../add/quick_add_sheet.dart';
 import '../today/today_widgets.dart';
 import 'settings_widgets.dart';
 
@@ -109,8 +112,8 @@ class _SettingsStrings {
 
 /// Settings — a calm trust center for privacy, data sources, and control.
 ///
-/// Dark mode is wired to [themeModeProvider]. All other toggles hold local
-/// state so the screen responds immediately without a backend.
+/// Dark mode is wired to [themeModeProvider]. Profile and preference edits are
+/// cached locally first, then synced when an authenticated backend is ready.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -119,6 +122,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  static const _localProfileKey = 'settings.profile.v1';
   final _dataSourcesKey = GlobalKey();
 
   String _incomeType = 'other';
@@ -171,8 +175,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         SproutDataSource(
             id: 'email',
             label: 'Email connection',
-            detail: 'Not connected',
-            connected: false),
+            detail: 'Not available yet',
+            connected: false,
+            comingSoon: true),
         SproutDataSource(
             id: 'statement',
             label: 'Statement imports',
@@ -189,39 +194,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _loadProfile() async {
+    final session = ref.read(authSessionProvider);
+    if (session?.isGuest == true) {
+      await _loadLocalProfile();
+      return;
+    }
     try {
       final profile = await ref.read(apiClientProvider).get('/v1/profile');
-      if (!mounted) return;
-      setState(() {
-        _profileName = profile['name'] as String? ?? 'friend';
-        final salaryDay = profile['salaryDate'] as int?;
-        _salaryDate = salaryDay == null ? 'Not set' : 'Day $salaryDay';
-        _incomeType = profile['incomeType'] as String? ?? 'other';
-        _currency = profile['displayCurrency'] as String? ?? 'PKR';
-        _language = profile['locale'] as String? ?? 'en';
-        _prefs[_SettingsStrings.reducedMotion] =
-            profile['reduceMotion'] as bool? ?? false;
-        _prefs[_SettingsStrings.soundEffects] =
-            profile['soundEffects'] as bool? ?? true;
-        _prefs[_SettingsStrings.haptics] = profile['haptics'] as bool? ?? true;
-        final notifications =
-            profile['notificationPreferences'] as Map<String, dynamic>? ??
-                const {};
-        _notifications[_SettingsStrings.dailyReminder] =
-            notifications['dailyCheckIn'] as bool? ?? true;
-        _notifications[_SettingsStrings.billReminder] =
-            notifications['billReminders'] as bool? ?? true;
-        _notifications[_SettingsStrings.salaryReminder] =
-            notifications['salaryIncomeReminders'] as bool? ?? true;
-        _notifications[_SettingsStrings.weeklySummary] =
-            notifications['weeklySummary'] as bool? ?? true;
-        _notifications[_SettingsStrings.streakProtection] =
-            notifications['streakProtection'] as bool? ?? true;
-      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localProfileKey, jsonEncode(profile));
+      _applyProfile(profile);
       await _loadProjectedIncome();
     } catch (_) {
-      // Settings remains usable with local preferences while offline.
+      await _loadLocalProfile();
     }
+  }
+
+  Future<void> _loadLocalProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = prefs.getString(_localProfileKey);
+    if (encoded == null) return;
+    try {
+      _applyProfile(jsonDecode(encoded) as Map<String, dynamic>);
+    } catch (_) {
+      // A damaged local preference cache is ignored; defaults remain usable.
+    }
+  }
+
+  void _applyProfile(Map<String, dynamic> profile) {
+    if (!mounted) return;
+    setState(() {
+      _profileName = profile['name'] as String? ?? _profileName;
+      final salaryDay = profile['salaryDate'] as int?;
+      if (profile.containsKey('salaryDate')) {
+        _salaryDate = salaryDay == null ? 'Not set' : 'Day $salaryDay';
+      }
+      _incomeType = profile['incomeType'] as String? ?? _incomeType;
+      _currency = profile['displayCurrency'] as String? ?? _currency;
+      _language = profile['locale'] as String? ?? _language;
+      final reduceMotion = profile['reduceMotion'] as bool?;
+      if (reduceMotion != null) {
+        _prefs[_SettingsStrings.reducedMotion] = reduceMotion;
+        ref.read(reduceMotionProvider.notifier).setEnabled(reduceMotion);
+      }
+      final notifications =
+          profile['notificationPreferences'] as Map<String, dynamic>? ??
+              const {};
+      _notifications[_SettingsStrings.dailyReminder] =
+          notifications['dailyCheckIn'] as bool? ??
+              _notifications[_SettingsStrings.dailyReminder]!;
+      _notifications[_SettingsStrings.billReminder] =
+          notifications['billReminders'] as bool? ?? false;
+      _notifications[_SettingsStrings.salaryReminder] =
+          notifications['salaryIncomeReminders'] as bool? ??
+              _notifications[_SettingsStrings.salaryReminder]!;
+      _notifications[_SettingsStrings.weeklySummary] =
+          notifications['weeklySummary'] as bool? ??
+              _notifications[_SettingsStrings.weeklySummary]!;
+      _notifications[_SettingsStrings.streakProtection] =
+          notifications['streakProtection'] as bool? ??
+              _notifications[_SettingsStrings.streakProtection]!;
+    });
   }
 
   Future<void> _loadSources() async {
@@ -236,6 +269,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final synced = source['lastSyncedAt'] as String?;
         return SproutDataSource(
           id: kind,
+          remoteId: source['id'] as String?,
           label: _sourceLabel(kind),
           detail: synced == null
               ? 'Connected — not synced yet'
@@ -255,8 +289,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SproutDataSource(
                 id: 'email',
                 label: 'Email connection',
-                detail: 'Not connected',
-                connected: false),
+                detail: 'Not available yet',
+                connected: false,
+                comingSoon: true),
           if (!live.any((s) => s.id == 'statement'))
             const SproutDataSource(
                 id: 'statement',
@@ -283,10 +318,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       };
 
   Future<void> _patchProfile(Map<String, dynamic> values) async {
+    final prefs = await SharedPreferences.getInstance();
+    var local = <String, dynamic>{};
+    final encoded = prefs.getString(_localProfileKey);
+    if (encoded != null) {
+      try {
+        local = jsonDecode(encoded) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+    local.addAll(values);
+    await prefs.setString(_localProfileKey, jsonEncode(local));
+    if (ref.read(authSessionProvider)?.isGuest == true) return;
     try {
       await ref.read(apiClientProvider).patch('/v1/profile', values);
     } catch (_) {
-      _showSnack('Saved on this device. Sprout will sync when you are online.');
+      _showSnack('Saved on this device. Try again when Sprout is connected.');
     }
   }
 
@@ -454,7 +500,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _openSourceSheet(SproutDataSource source) async {
     final isManual = source.id == 'manual';
-    await SproutBottomSheet.show(
+    if (source.id == 'statement' && !source.connected) {
+      QuickAddSheet.openImport(context);
+      return;
+    }
+    await SproutActionSheet.show(
       context,
       title: source.label,
       rows: [
@@ -486,6 +536,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             icon: Icons.link_rounded,
             label: 'Connect',
             value: 'Tap below to connect this source.',
+          ),
+      ],
+      actions: [
+        if (source.connected && !isManual)
+          SheetAction(
+            label: 'Disconnect source',
+            icon: Icons.link_off_rounded,
+            onTap: () async {
+              Navigator.of(context).pop();
+              try {
+                await ref.read(apiClientProvider).delete(
+                    '/v1/briefing/sources/${source.remoteId ?? source.id}');
+                await _loadSources();
+                if (mounted) {
+                  _showSnack('Source disconnected. Manual entries remain.');
+                }
+              } catch (_) {
+                if (mounted) {
+                  _showSnack('Could not disconnect this source right now.');
+                }
+              }
+            },
           ),
       ],
     );
@@ -1070,7 +1142,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _notificationsSection(SproutColorScheme colors) {
     final labels = [
       _SettingsStrings.dailyReminder,
-      _SettingsStrings.billReminder,
       _SettingsStrings.salaryReminder,
       _SettingsStrings.weeklySummary,
       _SettingsStrings.streakProtection,
@@ -1090,6 +1161,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             if (i != labels.length - 1) _rowDivider,
           ],
+          _rowDivider,
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            enabled: false,
+            leading: Icon(Icons.event_busy_rounded),
+            title: Text('Bill reminders'),
+            subtitle: Text(
+              'Available after bill tracking is added. Nothing is scheduled yet.',
+            ),
+          ),
         ],
       ),
     );
@@ -1199,48 +1280,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             leading: const Icon(Icons.language_rounded),
             title: const Text('Language'),
             subtitle: Text(_language == 'ur' ? 'Urdu' : 'English'),
-            trailing: DropdownButton<String>(
-              value: _language,
-              underline: const SizedBox.shrink(),
-              items: const [
-                DropdownMenuItem(value: 'en', child: Text('English')),
-                DropdownMenuItem(value: 'ur', child: Text('Urdu')),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() => _language = value);
-                _patchProfile({'locale': value});
-              },
+            trailing: SizedBox(
+              width: 104,
+              child: DropdownButton<String>(
+                value: _language,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                items: const [
+                  DropdownMenuItem(value: 'en', child: Text('English')),
+                  DropdownMenuItem(
+                      value: 'ur', enabled: false, child: Text('Urdu · later')),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _language = value);
+                  _patchProfile({'locale': value});
+                },
+              ),
             ),
           ),
           _rowDivider,
           PreferenceToggle(
             label: _SettingsStrings.reducedMotion,
-            value: _prefs[_SettingsStrings.reducedMotion] ?? false,
+            value: ref.watch(reduceMotionProvider),
             icon: Icons.animation_rounded,
             onChanged: (v) {
               setState(() => _prefs[_SettingsStrings.reducedMotion] = v);
+              ref.read(reduceMotionProvider.notifier).setEnabled(v);
               _patchProfile({'reduceMotion': v});
-            },
-          ),
-          _rowDivider,
-          PreferenceToggle(
-            label: _SettingsStrings.soundEffects,
-            value: _prefs[_SettingsStrings.soundEffects] ?? true,
-            icon: Icons.volume_up_rounded,
-            onChanged: (v) {
-              setState(() => _prefs[_SettingsStrings.soundEffects] = v);
-              _patchProfile({'soundEffects': v});
-            },
-          ),
-          _rowDivider,
-          PreferenceToggle(
-            label: _SettingsStrings.haptics,
-            value: _prefs[_SettingsStrings.haptics] ?? true,
-            icon: Icons.vibration_rounded,
-            onChanged: (v) {
-              setState(() => _prefs[_SettingsStrings.haptics] = v);
-              _patchProfile({'haptics': v});
             },
           ),
           _rowDivider,
@@ -1255,18 +1322,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.local_fire_department_rounded),
-            title: const Text('Streak freeze and repair'),
+            title: const Text('Streak protection'),
             subtitle: Text(
               (_notifications[_SettingsStrings.streakProtection] ?? true)
-                  ? 'Protection reminders are on. No repair is needed today.'
-                  : 'Protection reminders are off. A repair option still appears after an eligible missed day.',
-            ),
-            trailing: Switch(
-              value: _notifications[_SettingsStrings.streakProtection] ?? true,
-              onChanged: (value) => _setNotificationPreference(
-                _SettingsStrings.streakProtection,
-                value,
-              ),
+                  ? 'A gentle check-in reminder is on. Money results never break a streak.'
+                  : 'The reminder is off. Money results never break a streak.',
             ),
           ),
         ],

@@ -22,26 +22,31 @@ class AuthSession {
     required this.refreshToken,
     required this.userId,
     required this.onboardingComplete,
+    this.isGuest = false,
   });
 
   final String accessToken;
   final String refreshToken;
   final String userId;
   final bool onboardingComplete;
+  final bool isGuest;
 }
 
 class SproutApiClient {
-  SproutApiClient({String? baseUrl, String? authToken})
+  SproutApiClient({String? baseUrl, String? authToken, http.Client? httpClient})
       : _baseUrl = baseUrl ?? _defaultBaseUrl,
-        _authToken = authToken;
+        _authToken = authToken,
+        _httpClient = httpClient ?? http.Client();
 
   final String _baseUrl;
+  final http.Client _httpClient;
   String? _authToken;
   String? _refreshToken;
   String? _deviceId;
   String? _deviceName;
   Future<void> Function(String accessToken, String refreshToken)?
       _onSessionRefreshed;
+  Future<void> Function()? _onSessionInvalid;
 
   static String get _defaultBaseUrl {
     const url = String.fromEnvironment('API_BASE_URL',
@@ -53,10 +58,12 @@ class SproutApiClient {
     String accessToken,
     String refreshToken, {
     Future<void> Function(String accessToken, String refreshToken)? onRefreshed,
+    Future<void> Function()? onInvalid,
   }) {
     _authToken = accessToken;
     _refreshToken = refreshToken;
     _onSessionRefreshed = onRefreshed;
+    _onSessionInvalid = onInvalid;
   }
 
   void setDeviceIdentity(String deviceId, String deviceName) {
@@ -69,6 +76,25 @@ class SproutApiClient {
     _authToken = null;
     _refreshToken = null;
     _onSessionRefreshed = null;
+    _onSessionInvalid = null;
+  }
+
+  /// Lightweight, unauthenticated readiness probe used by the global
+  /// backend-warming notice. It deliberately bypasses session refresh.
+  Future<bool> isBackendReady() async {
+    if (useSproutSweepHarness && sproutSweepOffline) return false;
+    try {
+      final response = await _httpClient
+          .get(Uri.parse('$_baseUrl/ready'))
+          .timeout(const Duration(seconds: 3));
+      if (response.statusCode != 200) return false;
+      final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> &&
+          decoded['ok'] == true &&
+          decoded['database'] == 'ready';
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<AuthSession> register(
@@ -158,13 +184,17 @@ class SproutApiClient {
   Future<Map<String, dynamic>> get(String path) async {
     _throwIfSweepOffline(path);
     try {
-      var res = await http
+      var res = await _httpClient
           .get(Uri.parse('$_baseUrl$path'), headers: _headers)
           .timeout(const Duration(seconds: 10));
-      if (res.statusCode == 401 && await _refreshSession()) {
-        res = await http
-            .get(Uri.parse('$_baseUrl$path'), headers: _headers)
-            .timeout(const Duration(seconds: 10));
+      if (res.statusCode == 401 && _authToken != null) {
+        if (await _refreshSession()) {
+          res = await _httpClient
+              .get(Uri.parse('$_baseUrl$path'), headers: _headers)
+              .timeout(const Duration(seconds: 10));
+        } else {
+          await _onSessionInvalid?.call();
+        }
       }
       return _decodeResponse(path, res, expectedStatus: 200);
     } on SproutApiException {
@@ -186,7 +216,7 @@ class SproutApiClient {
   ) async {
     _throwIfSweepOffline(path);
     try {
-      var res = await http
+      var res = await _httpClient
           .post(
             Uri.parse('$_baseUrl$path'),
             headers: _headers,
@@ -195,11 +225,15 @@ class SproutApiClient {
           .timeout(const Duration(seconds: 15));
       if (res.statusCode == 401 &&
           path != '/v1/auth/refresh' &&
-          await _refreshSession()) {
-        res = await http
-            .post(Uri.parse('$_baseUrl$path'),
-                headers: _headers, body: jsonEncode(body))
-            .timeout(const Duration(seconds: 15));
+          _authToken != null) {
+        if (await _refreshSession()) {
+          res = await _httpClient
+              .post(Uri.parse('$_baseUrl$path'),
+                  headers: _headers, body: jsonEncode(body))
+              .timeout(const Duration(seconds: 15));
+        } else {
+          await _onSessionInvalid?.call();
+        }
       }
       return _decodeResponse(path, res);
     } on SproutApiException {
@@ -223,8 +257,12 @@ class SproutApiClient {
     _throwIfSweepOffline(path);
     try {
       var response = await _sendOnce(method, path, body);
-      if (response.statusCode == 401 && await _refreshSession()) {
-        response = await _sendOnce(method, path, body);
+      if (response.statusCode == 401 && _authToken != null) {
+        if (await _refreshSession()) {
+          response = await _sendOnce(method, path, body);
+        } else {
+          await _onSessionInvalid?.call();
+        }
       }
       return _decodeResponse(path, response);
     } on SproutApiException {
@@ -256,7 +294,7 @@ class SproutApiClient {
     final refreshToken = _refreshToken;
     if (refreshToken == null) return false;
     try {
-      final response = await http
+      final response = await _httpClient
           .post(
             Uri.parse('$_baseUrl/v1/auth/refresh'),
             headers: const {'Content-Type': 'application/json'},
@@ -290,9 +328,15 @@ class SproutApiClient {
         ? response.statusCode == expectedStatus
         : response.statusCode >= 200 && response.statusCode < 300;
     if (!statusIsValid) {
+      String? apiMessage;
+      try {
+        final body = jsonDecode(response.body);
+        if (body is Map<String, dynamic>) apiMessage = body['error'] as String?;
+      } catch (_) {}
       throw SproutApiException(
         'API returned HTTP ${response.statusCode} for $path',
         statusCode: response.statusCode,
+        apiMessage: apiMessage,
       );
     }
 
@@ -305,10 +349,25 @@ class SproutApiClient {
 }
 
 class SproutApiException implements Exception {
-  const SproutApiException(this.message, {this.statusCode});
+  const SproutApiException(this.message, {this.statusCode, this.apiMessage});
 
   final String message;
   final int? statusCode;
+  final String? apiMessage;
+
+  String get userMessage {
+    if (statusCode == 401) return 'That email or password did not match.';
+    if (statusCode == 409) return 'That email already has an account.';
+    if (statusCode == 429) {
+      return 'A few attempts happened quickly. Wait a moment, then try again.';
+    }
+    if (statusCode == 400) {
+      return apiMessage == 'Invalid input'
+          ? 'Check the details and try once more.'
+          : (apiMessage ?? 'Check the details and try once more.');
+    }
+    return 'Sprout may still be waking up. Please try again in a moment.';
+  }
 
   @override
   String toString() => message;

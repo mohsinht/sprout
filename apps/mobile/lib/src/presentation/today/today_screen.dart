@@ -61,7 +61,7 @@ class _TodayContent extends ConsumerStatefulWidget {
 class _TodayContentState extends ConsumerState<_TodayContent> {
   var _showCompletionReward = false;
 
-  void _completeToday(RecommendedAction action, bool reducedMotion) {
+  void _recordCompletion(RecommendedAction action, bool reducedMotion) {
     if (!reducedMotion) {
       HapticFeedback.mediumImpact();
       SystemSound.play(SystemSoundType.click);
@@ -71,12 +71,40 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       });
     }
 
-    if (action.completionKind == 'contributeToGoal' &&
-        action.targetId != null) {
-      ref.read(goalStoreProvider.notifier).contribute(action.targetId!, 25000);
-    }
-
     ref.read(todayQuestCompletedProvider.notifier).complete(action);
+  }
+
+  void _startTodayAction(RecommendedAction action, bool reducedMotion) {
+    switch (action.completionKind) {
+      case 'logCash':
+        QuickAddSheet.open(context);
+        return;
+      case 'setGoal':
+        GoalEditorSheet.open(context);
+        return;
+      case 'contributeToGoal':
+        final goal = ref
+            .read(goalStoreProvider)
+            .where((item) => item.id == action.targetId)
+            .firstOrNull;
+        if (goal == null) {
+          GoalEditorSheet.open(context);
+          return;
+        }
+        GoalEditorSheet.open(
+          context,
+          goal: goal,
+          onContributed: () => _recordCompletion(action, reducedMotion),
+        );
+        return;
+      case 'confirmTransaction':
+      case 'moveMoney':
+      case 'review':
+      case 'rebalance':
+      default:
+        context.go('/money');
+        return;
+    }
   }
 
   @override
@@ -197,7 +225,7 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
         impactOverride: isZeroData ? 'Start with money you can see' : null,
         onComplete: isZeroData
             ? () => QuickAddSheet.open(context)
-            : () => _completeToday(
+            : () => _startTodayAction(
                   data.health.recommendedAction,
                   reducedMotion,
                 ),
@@ -472,15 +500,8 @@ class _WealthHero extends StatelessWidget {
                     label: 'Update with a new statement',
                     icon: Icons.upload_file_rounded,
                     onTap: () {
-                      // In production this opens an upload/re-anchor flow.
-                      // On mock, show a brief confirmation.
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                              'Statement upload coming soon. Your wealth stays estimated.'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                      Navigator.of(context).pop();
+                      QuickAddSheet.openImport(context);
                     },
                   ),
                   SheetAction(
@@ -762,8 +783,7 @@ class _OneStep extends StatelessWidget {
               children: [
                 Text(
                   actionLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 3,
                   textAlign: TextAlign.center,
                   style: SproutType.body(
                     color: Colors.white,
@@ -777,8 +797,7 @@ class _OneStep extends StatelessWidget {
                   completed
                       ? 'Nice. Your car fund moved closer.'
                       : impactOverride ?? action.impact,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
                   textAlign: TextAlign.center,
                   style: SproutType.body(
                     color: Colors.white.withValues(alpha: 0.88),
@@ -909,10 +928,9 @@ class _WhatsHappening extends ConsumerWidget {
             ],
             actions: [
               SheetAction(
-                  label: 'Got it',
+                  label: 'Close',
                   icon: Icons.check_circle_outline_rounded,
-                  onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Marked as read.'))),
+                  onTap: () => Navigator.of(context).pop(),
                   isPrimary: true),
             ],
           );
@@ -1043,13 +1061,6 @@ class _WhatsHappening extends ConsumerWidget {
                 icon: Icons.account_balance_rounded,
                 onTap: () => context.go('/money'),
                 isPrimary: true),
-            SheetAction(
-                label: 'Learn why this moves',
-                icon: Icons.menu_book_rounded,
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Learn thread opened from the mock briefing.')))),
           ],
         );
       },
@@ -1400,13 +1411,6 @@ class _HoldingRow extends StatelessWidget {
                 icon: Icons.account_balance_rounded,
                 onTap: () => context.go('/money'),
                 isPrimary: true),
-            SheetAction(
-                label: 'Learn why this moves',
-                icon: Icons.menu_book_rounded,
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Learn thread opened from the holding detail.')))),
           ],
         );
       },
@@ -1768,10 +1772,9 @@ class _LearnLater extends StatelessWidget {
                 ],
                 actions: [
                   SheetAction(
-                      label: 'Got it',
+                      label: 'Close',
                       icon: Icons.check_circle_outline_rounded,
-                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Marked as read.'))),
+                      onTap: () => Navigator.of(context).pop(),
                       isPrimary: true),
                 ],
               );
@@ -1988,7 +1991,7 @@ class QuickActionGrid extends StatelessWidget {
               label: action.$1,
               icon: action.$2,
               color: action.$3,
-              onTap: () {},
+              onTap: () => QuickAddSheet.open(context),
             );
           },
         ),

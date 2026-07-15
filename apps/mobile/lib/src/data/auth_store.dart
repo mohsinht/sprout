@@ -22,6 +22,7 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
   static const _userIdKey = 'auth.userId';
   static const _onboardingKey = 'auth.onboardingComplete';
   static const _deviceIdKey = 'auth.deviceId.v1';
+  static const _guestKey = 'auth.guest.v1';
   static const _secureStorage = FlutterSecureStorage();
   final SproutApiClient _client;
 
@@ -29,6 +30,16 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     final prefs = await SharedPreferences.getInstance();
     final deviceId = await _deviceId(prefs);
     _client.setDeviceIdentity(deviceId, _deviceName);
+    if (prefs.getBool(_guestKey) == true) {
+      state = AuthSession(
+        accessToken: '',
+        refreshToken: '',
+        userId: 'local-guest',
+        onboardingComplete: prefs.getBool('onboarding.complete') ?? false,
+        isGuest: true,
+      );
+      return;
+    }
     String? access;
     String? refresh;
     if (kIsWeb) {
@@ -55,7 +66,12 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     }
     final userId = prefs.getString(_userIdKey);
     if (access != null && refresh != null && userId != null) {
-      _client.setAuthSession(access, refresh, onRefreshed: _saveRefreshed);
+      _client.setAuthSession(
+        access,
+        refresh,
+        onRefreshed: _saveRefreshed,
+        onInvalid: _expireLocalSession,
+      );
       state = AuthSession(
           accessToken: access,
           refreshToken: refresh,
@@ -78,8 +94,26 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
     await _save(result);
   }
 
+  /// Starts Sprout without an account. This is a real local-only session,
+  /// not a route shortcut, so onboarding and manual entries survive restart.
+  Future<AuthSession> startGuest() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_guestKey, true);
+    _client.clearAuthToken();
+    final session = AuthSession(
+      accessToken: '',
+      refreshToken: '',
+      userId: 'local-guest',
+      onboardingComplete: prefs.getBool('onboarding.complete') ?? false,
+      isGuest: true,
+    );
+    state = session;
+    return session;
+  }
+
   Future<void> _save(AuthSession session) async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_guestKey);
     await _writeTokens(session.accessToken, session.refreshToken);
     await prefs.setString(_userIdKey, session.userId);
     await prefs.setBool(_onboardingKey, session.onboardingComplete);
@@ -87,6 +121,7 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
       session.accessToken,
       session.refreshToken,
       onRefreshed: _saveRefreshed,
+      onInvalid: _expireLocalSession,
     );
     state = session;
   }
@@ -106,13 +141,28 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
 
   Future<void> logout() async {
     final session = state;
-    if (session != null) {
+    if (session != null && !session.isGuest) {
       try {
         await _client.logout(session.refreshToken);
       } catch (_) {
         // Local sign-out must remain available while offline or expired.
       }
     }
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      await _secureStorage.delete(key: _accessKey);
+      await _secureStorage.delete(key: _refreshKey);
+    } catch (_) {}
+    await prefs.remove(_accessKey);
+    await prefs.remove(_refreshKey);
+    await prefs.remove(_userIdKey);
+    await prefs.remove(_onboardingKey);
+    await prefs.remove(_guestKey);
+    _client.clearAuthToken();
+    state = null;
+  }
+
+  Future<void> _expireLocalSession() async {
     final prefs = await SharedPreferences.getInstance();
     try {
       await _secureStorage.delete(key: _accessKey);
@@ -134,8 +184,15 @@ class AuthSessionStore extends StateNotifier<AuthSession?> {
       refreshToken: current.refreshToken,
       userId: current.userId,
       onboardingComplete: true,
+      isGuest: current.isGuest,
     );
-    await _save(completed);
+    if (current.isGuest) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_guestKey, true);
+      state = completed;
+    } else {
+      await _save(completed);
+    }
   }
 
   Future<void> _writeTokens(String accessToken, String refreshToken) async {

@@ -16,6 +16,7 @@ import '../../widgets/sprout_page.dart';
 import '../../widgets/sprout_states.dart';
 import '../goals/goal_editor_sheet.dart';
 import '../today/today_screen.dart' show QuickActionGrid;
+import '../today/today_controller.dart';
 import 'money_widgets.dart';
 
 /// Money — a calm overview of the user's financial picture.
@@ -35,6 +36,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
     final accounts = ref.watch(accountsProvider);
     final transactions = ref.watch(visibleTransactionsProvider);
     final budget = ref.watch(adjustedBudgetProvider);
+    final today = ref.watch(todayControllerProvider);
     final balancesVisible = ref.watch(balancesVisibleProvider);
     // Cash/bank/wallet only here; investment + Wise live in the Investments
     // snapshot so a balance is never counted twice on the same screen.
@@ -142,7 +144,11 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen> {
         const SizedBox(height: SproutSpacing.xl),
         const MoneySectionHeader(title: 'Investments snapshot'),
         const SizedBox(height: SproutSpacing.sm),
-        InvestmentsPanel(balanceVisible: balancesVisible),
+        InvestmentsPanel(
+          balanceVisible: balancesVisible,
+          holdings: today.asData?.value.wealthSnapshot.holdings ?? const [],
+          loading: today.isLoading,
+        ),
       ],
     );
   }
