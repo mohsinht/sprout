@@ -1,7 +1,11 @@
 import { eq, and, desc, count, gte } from "drizzle-orm";
 import { db, schema } from "../db/client.js";
 import { config } from "../config.js";
-import { generateBriefing, storeBriefing, getLatestBriefing } from "./briefing-pipeline.js";
+import {
+  generateBriefing,
+  storeBriefing,
+  getLatestBriefing,
+} from "./briefing-pipeline.js";
 import { localDateAt } from "../lib/recurring.js";
 
 /**
@@ -16,10 +20,57 @@ export interface JobResult {
   aiMode?: "deterministic" | "cache" | "ai" | "fallback";
 }
 
+async function claimJobRun(params: {
+  userId: string;
+  type: "daily" | "on_demand";
+  startedAt: Date;
+  idempotencyKey: string;
+}) {
+  const [inserted] = await db
+    .insert(schema.jobRuns)
+    .values({
+      userId: params.userId,
+      type: params.type,
+      status: "running",
+      startedAt: params.startedAt,
+      idempotencyKey: params.idempotencyKey,
+    })
+    .onConflictDoNothing({ target: schema.jobRuns.idempotencyKey })
+    .returning();
+  if (inserted) return inserted;
+
+  // A failed idempotent job is the same logical job being retried, not a new
+  // row. Claim it atomically so concurrent retries cannot both execute it.
+  const [retried] = await db
+    .update(schema.jobRuns)
+    .set({
+      status: "running",
+      startedAt: params.startedAt,
+      finishedAt: null,
+      error: null,
+    })
+    .where(
+      and(
+        eq(schema.jobRuns.idempotencyKey, params.idempotencyKey),
+        eq(schema.jobRuns.status, "failed"),
+      ),
+    )
+    .returning();
+  return retried;
+}
+
 /** Run the daily briefing job for a user. Idempotent. */
-export async function runDailyBriefingJob(userId: string, date?: string): Promise<JobResult> {
-  const [profile] = await db.select({ timezone: schema.profiles.timezone }).from(schema.profiles).where(eq(schema.profiles.userId, userId)).limit(1);
-  const briefingDate = date ?? localDateAt(new Date(), profile?.timezone ?? "Asia/Karachi");
+export async function runDailyBriefingJob(
+  userId: string,
+  date?: string,
+): Promise<JobResult> {
+  const [profile] = await db
+    .select({ timezone: schema.profiles.timezone })
+    .from(schema.profiles)
+    .where(eq(schema.profiles.userId, userId))
+    .limit(1);
+  const briefingDate =
+    date ?? localDateAt(new Date(), profile?.timezone ?? "Asia/Karachi");
   const idempotencyKey = `daily:${userId}:${briefingDate}`;
 
   // Check for existing job run with same idempotency key
@@ -33,17 +84,18 @@ export async function runDailyBriefingJob(userId: string, date?: string): Promis
     return { briefingId: existingJob[0].id, status: "skipped" };
   }
 
-  // Create job run record
-  const [jobRun] = await db
-    .insert(schema.jobRuns)
-    .values({
-      userId,
-      type: "daily",
-      status: "running",
-      startedAt: new Date(),
-      idempotencyKey,
-    })
-    .returning();
+  const jobRun = await claimJobRun({
+    userId,
+    type: "daily",
+    startedAt: new Date(),
+    idempotencyKey,
+  });
+  if (!jobRun) {
+    return {
+      briefingId: existingJob[0]?.id ?? "already_running",
+      status: "skipped",
+    };
+  }
 
   try {
     const result = await generateBriefing({ userId, date: briefingDate });
@@ -71,7 +123,10 @@ export async function runDailyBriefingJob(userId: string, date?: string): Promis
 }
 
 /** Run on-demand briefing refresh. Rate-limited per user per hour. */
-export async function runOnDemandBriefing(userId: string, contextChanged = false): Promise<JobResult> {
+export async function runOnDemandBriefing(
+  userId: string,
+  contextChanged = false,
+): Promise<JobResult> {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
   const idempotencyKey = contextChanged
@@ -90,7 +145,7 @@ export async function runOnDemandBriefing(userId: string, contextChanged = false
         // Keep the limiter hourly; counting the user's lifetime refreshes
         // would permanently disable refresh after the first few uses.
         gte(schema.jobRuns.startedAt, oneHourAgo),
-      )
+      ),
     );
 
   const recentCount = recentJobs[0]?.count ?? 0;
@@ -106,20 +161,26 @@ export async function runOnDemandBriefing(userId: string, contextChanged = false
     .where(eq(schema.jobRuns.idempotencyKey, idempotencyKey))
     .limit(1);
 
-  if (!contextChanged && existingJob.length > 0 && existingJob[0].status === "succeeded") {
+  if (
+    !contextChanged &&
+    existingJob.length > 0 &&
+    existingJob[0].status === "succeeded"
+  ) {
     return { briefingId: existingJob[0].id, status: "skipped" };
   }
 
-  const [jobRun] = await db
-    .insert(schema.jobRuns)
-    .values({
-      userId,
-      type: "on_demand",
-      status: "running",
-      startedAt: now,
-      idempotencyKey,
-    })
-    .returning();
+  const jobRun = await claimJobRun({
+    userId,
+    type: "on_demand",
+    startedAt: now,
+    idempotencyKey,
+  });
+  if (!jobRun) {
+    return {
+      briefingId: existingJob[0]?.id ?? "already_running",
+      status: "skipped",
+    };
+  }
 
   try {
     const result = await generateBriefing({ userId });

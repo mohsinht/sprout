@@ -68,22 +68,6 @@ export async function rewriteBriefingWithinBudget(params: {
       mode: "deterministic",
     };
 
-  const inputHash = canonicalRewriteHash(params.input);
-  const [cached] = await db
-    .select()
-    .from(schema.aiRewriteCache)
-    .where(eq(schema.aiRewriteCache.inputHash, inputHash))
-    .limit(1);
-  if (cached) {
-    const output = validateAiBriefingOutput(cached.outputJson);
-    return {
-      output: { ...output, greeting: params.input.greeting },
-      costCents: 0,
-      model: cached.model,
-      mode: "cache",
-    };
-  }
-
   const cap = config.aiDailyCostCapCents;
   if (cap == null || !Number.isFinite(cap) || cap <= 0)
     return {
@@ -92,20 +76,40 @@ export async function rewriteBriefingWithinBudget(params: {
       model: "deterministic",
       mode: "deterministic",
     };
-  const [usage] = await db
-    .select()
-    .from(schema.aiDailyUsage)
-    .where(eq(schema.aiDailyUsage.usageDate, params.date))
-    .limit(1);
-  if ((usage?.costCents ?? 0) >= cap)
-    return {
-      output: deterministic,
-      costCents: 0,
-      model: "deterministic",
-      mode: "deterministic",
-    };
 
   try {
+    // AI persistence is optional infrastructure. A missing migration, cache
+    // outage, or malformed cached value must never take down the deterministic
+    // briefing path.
+    const inputHash = canonicalRewriteHash(params.input);
+    const [cached] = await db
+      .select()
+      .from(schema.aiRewriteCache)
+      .where(eq(schema.aiRewriteCache.inputHash, inputHash))
+      .limit(1);
+    if (cached) {
+      const output = validateAiBriefingOutput(cached.outputJson);
+      return {
+        output: { ...output, greeting: params.input.greeting },
+        costCents: 0,
+        model: cached.model,
+        mode: "cache",
+      };
+    }
+
+    const [usage] = await db
+      .select()
+      .from(schema.aiDailyUsage)
+      .where(eq(schema.aiDailyUsage.usageDate, params.date))
+      .limit(1);
+    if ((usage?.costCents ?? 0) >= cap)
+      return {
+        output: deterministic,
+        costCents: 0,
+        model: "deterministic",
+        mode: "deterministic",
+      };
+
     const generated = await params.aiService.generateBriefingCopy(params.input);
     const validated = validateAiBriefingOutput(generated.output);
     await db.transaction(async (tx) => {

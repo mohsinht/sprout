@@ -20,6 +20,7 @@ import {
   computeWealthSnapshot,
   detectWealthEvents,
   estimateCashHoldingValue,
+  normalizeAssetBalance,
   type EnrichedHolding,
   type PendingInvestment,
   type ManualAdjustment,
@@ -163,6 +164,12 @@ export async function generateBriefing(params: {
       if (rate) fxCache.set(h.currency, rate);
     }
   }
+  const accountBalanceShortfalls: {
+    accountId: string;
+    label: string;
+    currency: string;
+    amountNative: number;
+  }[] = [];
   for (const account of accountRows) {
     if (account.currency !== "PKR" && !fxCache.has(account.currency)) {
       const rate = await fxSource.fetchRate(`${account.currency}/PKR`);
@@ -317,7 +324,17 @@ export async function generateBriefing(params: {
         if (transaction.type === "expense") return sum - transaction.amount;
         return sum;
       }, 0);
-    const valueNative = account.openingBalance + ledgerChange;
+    const ledgerBalance = account.openingBalance + ledgerChange;
+    const { assetBalance: valueNative, shortfall } =
+      normalizeAssetBalance(ledgerBalance);
+    if (shortfall > 0) {
+      accountBalanceShortfalls.push({
+        accountId: account.id,
+        label: account.label,
+        currency: account.currency,
+        amountNative: shortfall,
+      });
+    }
     const fxRate =
       account.currency === "PKR" ? undefined : fxCache.get(account.currency);
     const freshness =
@@ -424,6 +441,18 @@ export async function generateBriefing(params: {
     priorHoldings: priorHoldingsMap,
     pendingInvestments,
   });
+  for (const shortfall of accountBalanceShortfalls) {
+    wealthEvents.push({
+      id: `event-account-shortfall-${shortfall.accountId}-${date}`,
+      date,
+      holdingId: shortfall.accountId,
+      kind: "withdrawal",
+      magnitudePkr: 0,
+      direction: "down",
+      plainWhy: `${shortfall.label} activity is ${shortfall.amountNative.toLocaleString()} ${shortfall.currency} beyond its last confirmed balance. It is shown as a zero-value asset until you update the balance.`,
+      severity: "heads_up",
+    });
+  }
   for (const holding of enrichedHoldings.filter(
     (item) =>
       item.kind === "cash" &&
@@ -586,6 +615,7 @@ export async function generateBriefing(params: {
   const confidencePenalty =
     unconfirmedCount +
     stalePriceCount +
+    accountBalanceShortfalls.length +
     (expenseBaseline.status === "partial_capture" ? 1 : 0);
   const scoreResult = calculatePresenceScore({
     goalPace:

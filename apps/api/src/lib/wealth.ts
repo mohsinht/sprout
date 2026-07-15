@@ -70,6 +70,16 @@ export interface ManualAdjustment {
   affectsAccount?: string;
 }
 
+export function normalizeAssetBalance(balance: number): {
+  assetBalance: number;
+  shortfall: number;
+} {
+  return {
+    assetBalance: Math.max(0, balance),
+    shortfall: Math.max(0, -balance),
+  };
+}
+
 /** Determine freshness based on how old the price/FX date is. */
 export function determineFreshness(
   priceAsOf: string | null | undefined,
@@ -78,7 +88,9 @@ export function determineFreshness(
 ): "fresh" | "stale" | "manual" | "unavailable" | "estimated" {
   if (!priceAsOf) return "unavailable";
   const ageDays = Math.floor(
-    (new Date(`${referenceDate}T12:00:00Z`).getTime() - new Date(`${priceAsOf}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24)
+    (new Date(`${referenceDate}T12:00:00Z`).getTime() -
+      new Date(`${priceAsOf}T12:00:00Z`).getTime()) /
+      (1000 * 60 * 60 * 24),
   );
   const threshold = kind === "cash" ? config.staleFxDays : config.staleNavDays;
   if (ageDays <= threshold) return "fresh";
@@ -144,7 +156,7 @@ export function estimateCashHoldingValue(params: {
 
   const adjustedNative = adjustments.reduce(
     (sum, a) => sum + (a.currency === currency ? a.amount : 0),
-    confirmedBalanceNative
+    confirmedBalanceNative,
   );
 
   const valuePkr =
@@ -184,11 +196,13 @@ export function computeWealthSnapshot(params: {
 
   const perHoldingBreakdown = holdings.map((h) => {
     const yesterdayValue =
-      params.priorSnapshot?.perHoldingBreakdown.find((p) => p.holdingId === h.id)?.valuePkr ??
-      h.valuePkr;
+      params.priorSnapshot?.perHoldingBreakdown.find(
+        (p) => p.holdingId === h.id,
+      )?.valuePkr ?? h.valuePkr;
     const monthStartValue =
-      params.monthStartSnapshot?.perHoldingBreakdown.find((p) => p.holdingId === h.id)?.valuePkr ??
-      h.valuePkr;
+      params.monthStartSnapshot?.perHoldingBreakdown.find(
+        (p) => p.holdingId === h.id,
+      )?.valuePkr ?? h.valuePkr;
     return {
       holdingId: h.id,
       label: h.label,
@@ -208,20 +222,25 @@ export function computeWealthSnapshot(params: {
     });
   }
 
-  const changeVsYesterday = totalPkr - (params.priorSnapshot?.totalPkr ?? totalPkr);
-  const changeMtd = totalPkr - (params.monthStartSnapshot?.totalPkr ?? totalPkr);
+  const changeVsYesterday =
+    totalPkr - (params.priorSnapshot?.totalPkr ?? totalPkr);
+  const changeMtd =
+    totalPkr - (params.monthStartSnapshot?.totalPkr ?? totalPkr);
 
   const movements = perHoldingBreakdown
     .map((h) => ({ ...h, absChange: Math.abs(h.changeVsYesterday) }))
     .filter((h) => h.absChange > 0)
     .sort((a, b) => b.absChange - a.absChange);
 
-  const mainReason = movements.length > 0
-    ? movements[0].label + " movement"
-    : "No significant movement";
+  const mainReason =
+    movements.length > 0
+      ? movements[0].label + " movement"
+      : "No significant movement";
 
   const sources = new Set<string>();
-  const estimatedHoldings = holdings.filter((h) => h.valuationKind === "estimated");
+  const estimatedHoldings = holdings.filter(
+    (h) => h.valuationKind === "estimated",
+  );
   for (const h of holdings) {
     if (h.priceSource) sources.add(h.priceSource);
   }
@@ -239,7 +258,8 @@ export function computeWealthSnapshot(params: {
       provenanceParts.push(`PKR ${pendingTotal.toLocaleString()} in transit`);
     }
   }
-  const provenanceSummary = provenanceParts.filter(Boolean).join("; ") || "Manual entry";
+  const provenanceSummary =
+    provenanceParts.filter(Boolean).join("; ") || "Manual entry";
 
   return {
     date,
@@ -335,7 +355,7 @@ export interface EstimateWorking {
 
 export function computeEstimateWorking(
   holding: EnrichedHolding,
-  adjustments: ManualAdjustment[]
+  adjustments: ManualAdjustment[],
 ): EstimateWorking {
   if (holding.valuationKind === "confirmed") {
     return {
@@ -349,13 +369,16 @@ export function computeEstimateWorking(
   }
 
   const relevantAdjustments = adjustments.filter(
-    (a) => a.affectsAccount === holding.id || a.currency === holding.currency
+    (a) => a.affectsAccount === holding.id || a.currency === holding.currency,
   );
 
   if (holding.kind === "cash" && holding.currency !== "PKR") {
-    const adjSummary = relevantAdjustments.length > 0
-      ? relevantAdjustments.map((a) => `${a.amount > 0 ? "+" : ""}${a.amount} ${a.currency}`).join(", ")
-      : "no adjustments";
+    const adjSummary =
+      relevantAdjustments.length > 0
+        ? relevantAdjustments
+            .map((a) => `${a.amount > 0 ? "+" : ""}${a.amount} ${a.currency}`)
+            .join(", ")
+        : "no adjustments";
     return {
       holdingId: holding.id,
       label: holding.label,
