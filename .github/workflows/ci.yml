@@ -96,3 +96,85 @@ jobs:
         working-directory: apps/mobile
       - run: flutter test --tags=golden --dart-define=SPROUT_ENV=dev
         working-directory: apps/mobile
+
+  comprehensive-harness:
+    name: Comprehensive E2E and audit harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: postgres://sprout:sprout@127.0.0.1:5432/sprout
+      JWT_SECRET: ci-only-jwt-secret-at-least-thirty-two-characters
+      CRON_SECRET: ci-only-cron-secret-at-least-thirty-two-characters
+      API_BASE_URL: http://127.0.0.1:8787
+      SPROUT_ENV: production
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          {
+            POSTGRES_USER: sprout,
+            POSTGRES_PASSWORD: sprout,
+            POSTGRES_DB: sprout,
+          }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sprout -d sprout"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: pnpm install --frozen-lockfile
+      - run: flutter pub get
+        working-directory: apps/mobile
+      - run: pnpm --filter @sprout/api db:migrate
+      - run: pnpm build
+      - name: No mocks in production release
+        run: pnpm test:no-mocks && touch /tmp/sprout-harness-precondition-ok
+      - name: Start real API
+        run: |
+          pnpm --filter @sprout/api start >/tmp/sprout-harness-api.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent "$API_BASE_URL/ready" && exit 0
+            sleep 1
+          done
+          cat /tmp/sprout-harness-api.log
+          exit 1
+      - name: FIX-01..09 golden financial fixtures
+        if: always()
+        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:golden
+      - name: LED-01..02 and REC-01..07 money invariants
+        if: always()
+        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:money-invariants
+      - name: INS-01..04 Insights correctness
+        if: always()
+        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:insights
+      - name: AI-01..05 budget and degradation
+        if: always()
+        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:ai-budget
+      - name: P1..P7 persona journeys
+        if: always()
+        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:personas
+      - name: ADV-01..07 adversarial API
+        if: always()
+        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:adversarial
+      - name: OPS-01..03 operations
+        if: always()
+        run: test -f /tmp/sprout-harness-precondition-ok && pnpm test:ops
+      - name: Traceability artifact
+        if: always()
+        run: pnpm traceability:build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sprout-harness-evidence
+          path: |
+            artifacts/harness-report.md
+            artifacts/acceptance-traceability.md
+            artifacts/persona-evidence/
+            artifacts/valuation-burn-in-*.json
