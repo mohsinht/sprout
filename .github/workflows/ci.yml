@@ -167,14 +167,7 @@ jobs:
           profile: pixel_6
           script: |
             test -f /tmp/sprout-harness-precondition-ok
-            cd apps/mobile
-            flutter drive \
-              --driver=test_driver/integration_test.dart \
-              --target=integration_test/persona_journeys_test.dart \
-              -d emulator-5554 \
-              --dart-define=SPROUT_ENV=production \
-              --dart-define=API_BASE_URL=http://10.0.2.2:8787
-            cd ../..
+            cd apps/mobile && flutter drive --driver=test_driver/integration_test.dart --target=integration_test/persona_journeys_test.dart -d emulator-5554 --dart-define=SPROUT_ENV=production --dart-define=API_BASE_URL=http://10.0.2.2:8787
             pnpm test:personas
       - name: ADV-01..07 adversarial API
         if: always()

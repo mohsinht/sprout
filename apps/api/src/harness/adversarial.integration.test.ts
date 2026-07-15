@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { spawnSync } from "node:child_process";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool } from "../db/client.js";
 import { createHarnessClient } from "./http.js";
@@ -177,25 +178,37 @@ test("ADV-06 auth throttle and feature gates fail closed", async () => {
 });
 
 test("ADV-07 regulatory executable grep", () => {
-  const scan = spawnSync(
-    "rg",
-    [
-      "-n",
-      "-i",
-      "--glob",
-      "!apps/api/src/harness/**",
-      "--glob",
-      "!apps/api/src/services/ai-service.ts",
-      "transfer now|pay this bill in sprout|top up .* here|initiate payment|accept customer payments",
-      "apps/api/src",
-      "apps/mobile/lib",
-      "packages/shared/src",
-    ],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
-  assert.equal(
-    scan.status,
-    1,
-    `ADV-07 forbidden regulated copy/code:\n${scan.stdout}`,
+  const forbidden =
+    /transfer now|pay this bill in sprout|top up .* here|initiate payment|accept customer payments/i;
+  const violations: string[] = [];
+  const excluded = new Set(["apps/api/src/services/ai-service.ts"]);
+
+  const scanDirectory = (directory: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolutePath = join(directory, entry.name);
+      const repoPath = relative(repoRoot, absolutePath).replaceAll("\\", "/");
+      if (repoPath.startsWith("apps/api/src/harness/")) continue;
+      if (excluded.has(repoPath)) continue;
+      if (entry.isDirectory()) {
+        scanDirectory(absolutePath);
+        continue;
+      }
+      if (!entry.isFile() || !/\.(?:ts|dart)$/.test(entry.name)) continue;
+      for (const [index, line] of readFileSync(absolutePath, "utf8")
+        .split("\n")
+        .entries()) {
+        if (forbidden.test(line))
+          violations.push(`${repoPath}:${index + 1}:${line.trim()}`);
+      }
+    }
+  };
+
+  for (const root of ["apps/api/src", "apps/mobile/lib", "packages/shared/src"])
+    scanDirectory(join(repoRoot, root));
+
+  assert.deepEqual(
+    violations,
+    [],
+    `ADV-07 forbidden regulated copy/code:\n${violations.join("\n")}`,
   );
 });
