@@ -6,6 +6,7 @@ import '../../data/manual_money_store.dart';
 import '../../data/mock_sprout_data.dart';
 import '../../domain/sprout_models.dart';
 import '../../theme/sprout_strings.dart';
+import '../../theme/sprout_copy_guard.dart';
 import '../../theme/sprout_theme.dart';
 import '../../theme/sprout_tokens.dart';
 import '../../widgets/sprout_helpers.dart';
@@ -28,7 +29,6 @@ class _MoneyStrings {
 
   static const income = 'Income';
   static const safeToSpend = 'Safe to spend';
-  static const leftToSpend = 'Left to spend';
   static const budgetHealth = 'Budget health';
 
   static const healthComfortable = 'Looking comfortable. Nice pace.';
@@ -201,12 +201,16 @@ class AccountRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: SproutSpacing.sm),
-              Text(
-                balanceText,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(color: colors.ink),
+              Flexible(
+                child: Text(
+                  balanceText,
+                  maxLines: 2,
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(color: colors.ink),
+                ),
               ),
               const SizedBox(width: SproutSpacing.sm),
               Icon(Icons.chevron_right_rounded, color: colors.muted, size: 22),
@@ -329,6 +333,38 @@ class BudgetPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = SproutColorScheme.of(context);
+    final hasBudgetData = budget.monthlyIncome > 0 ||
+        budget.spent > 0 ||
+        budget.safeToSpend > 0 ||
+        budget.remaining > 0;
+    if (!hasBudgetData) {
+      const emptyCopy =
+          'No budget picture yet — log income and spending to build one';
+      assert(SproutCopyGuard.isHonestForEmptyFinancialState(emptyCopy));
+      return SproutRaisedPanel(
+        key: const ValueKey('money-budget-empty'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              budget.month,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: colors.ink),
+            ),
+            const SizedBox(height: SproutSpacing.md),
+            Text(
+              emptyCopy,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: colors.muted),
+            ),
+          ],
+        ),
+      );
+    }
     final progress = budget.progress;
     // Calm status copy — never scary red. Gold only when near the limit.
     final Color barColor;
@@ -350,25 +386,33 @@ class BudgetPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(budget.month,
+              Expanded(
+                child: Text(
+                  budget.month,
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
-                      ?.copyWith(color: colors.ink)),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: barColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(SproutRadius.pill),
+                      ?.copyWith(color: colors.ink),
                 ),
-                child: Text(
-                  _MoneyStrings.budgetHealth,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: barColor,
-                        fontSize: 11,
-                      ),
+              ),
+              const SizedBox(width: SproutSpacing.sm),
+              Flexible(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: barColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(SproutRadius.pill),
+                  ),
+                  child: Text(
+                    _MoneyStrings.budgetHealth,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: barColor,
+                          fontSize: 11,
+                        ),
+                  ),
                 ),
               ),
             ],
@@ -388,28 +432,14 @@ class BudgetPanel extends StatelessWidget {
           const SizedBox(height: SproutSpacing.md),
           SproutProgressBar(value: progress, color: barColor, height: 10),
           const SizedBox(height: SproutSpacing.sm),
-          Row(
-            children: [
-              Text(
-                balanceVisible
-                    ? '${SproutFormat.compactCurrency(budget.spent)} of ${SproutFormat.compactCurrency(budget.safeToSpend)}'
-                    : 'Amounts hidden',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: colors.muted),
-              ),
-              const Spacer(),
-              Text(
-                balanceVisible
-                    ? '${_MoneyStrings.leftToSpend}: ${SproutFormat.compactCurrency(budget.remaining)}'
-                    : '••••',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(color: colors.ink),
-              ),
-            ],
+          Text(
+            balanceVisible
+                ? '${SproutFormat.compactCurrency(budget.remaining)} left to spend'
+                : 'Amounts hidden',
+            style: Theme.of(context)
+                .textTheme
+                .labelLarge
+                ?.copyWith(color: colors.ink),
           ),
           const SizedBox(height: SproutSpacing.md),
           Text(status,
@@ -434,17 +464,27 @@ class _BudgetLine extends StatelessWidget {
     final colors = SproutColorScheme.of(context);
     return Row(
       children: [
-        Text(label,
+        Expanded(
+          child: Text(
+            label,
             style: Theme.of(context)
                 .textTheme
                 .bodyMedium
-                ?.copyWith(color: colors.muted)),
-        const Spacer(),
-        Text(value,
+                ?.copyWith(color: colors.muted),
+          ),
+        ),
+        const SizedBox(width: SproutSpacing.sm),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 2,
+            textAlign: TextAlign.end,
             style: Theme.of(context)
                 .textTheme
                 .titleMedium
-                ?.copyWith(color: colors.ink)),
+                ?.copyWith(color: colors.ink),
+          ),
+        ),
       ],
     );
   }

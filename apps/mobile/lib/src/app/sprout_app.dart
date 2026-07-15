@@ -116,8 +116,17 @@ class SproutApp extends ConsumerWidget {
       darkTheme: buildSproutTheme(brightness: Brightness.dark),
       themeMode: themeMode,
       routerConfig: router,
-      builder: (context, child) =>
-          AppLockGate(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) {
+        final content = AppLockGate(child: child ?? const SizedBox.shrink());
+        if (!useSproutSweepHarness) return content;
+        final media = MediaQuery.of(context);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: TextScaler.linear(sproutSweepTextScale),
+          ),
+          child: content,
+        );
+      },
     );
   }
 }

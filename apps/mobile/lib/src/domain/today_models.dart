@@ -1,5 +1,10 @@
 import 'wealth_models.dart' as wealth;
 
+String firstNameFromBriefingGreeting(String greeting) => greeting.replaceFirst(
+      RegExp(r'^(?:Good (?:morning|afternoon|evening)|Salaam),\s*'),
+      '',
+    );
+
 class TodayData {
   const TodayData({
     required this.user,
@@ -499,8 +504,7 @@ TodayData todayDataFromWealthBriefing(wealth.WealthBriefing b) {
 
   return TodayData(
     user: SproutUser(
-      firstName: b.greeting
-          .replaceAll(RegExp(r'^Good (morning|afternoon|evening),\s*'), ''),
+      firstName: firstNameFromBriefingGreeting(b.greeting),
       level: b.level,
       xp: b.xp,
       dayStreak: b.streak,

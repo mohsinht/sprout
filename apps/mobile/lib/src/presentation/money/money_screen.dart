@@ -244,12 +244,15 @@ class _MoneyGoalRow extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      Text(
-                        goal.name,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(color: colors.ink),
+                      Expanded(
+                        child: Text(
+                          goal.name,
+                          maxLines: 2,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: colors.ink),
+                        ),
                       ),
                       if (goal.isPrimary) ...[
                         const SizedBox(width: 8),
@@ -278,12 +281,17 @@ class _MoneyGoalRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text(
-                  '$currentText / $targetText',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: colors.muted),
+                const SizedBox(width: SproutSpacing.sm),
+                Flexible(
+                  child: Text(
+                    '$currentText / $targetText',
+                    maxLines: 2,
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: colors.muted),
+                  ),
                 ),
               ],
             ),

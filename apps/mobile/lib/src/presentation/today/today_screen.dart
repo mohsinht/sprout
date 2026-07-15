@@ -15,7 +15,7 @@ import '../../widgets/sprout_mascot_state.dart';
 import '../../widgets/sprout_states.dart';
 import '../add/quick_add_sheet.dart';
 import '../goals/goal_editor_sheet.dart';
-import '../shell/nav_metrics.dart';
+import '../shell/sprout_tab_scroll_view.dart';
 import 'today_controller.dart';
 import 'today_widgets.dart';
 
@@ -84,6 +84,8 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
     final reducedMotion = MediaQuery.of(context).disableAnimations;
     final data = widget.data;
     final wealth = data.wealthSnapshot;
+    final isZeroData = wealth.totalPkr == 0 &&
+        wealth.holdings.every((holding) => holding.valuePkr == 0);
     final completed = ref.watch(todayQuestCompletedProvider);
     final balancesVisible = ref.watch(balancesVisibleProvider);
     ref
@@ -91,50 +93,41 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
         .load(data.health.recommendedAction);
 
     if (!balancesVisible) {
-      return CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              SproutSpacing.pageHorizontal,
-              SproutSpacing.lg,
-              SproutSpacing.pageHorizontal,
-              NavMetrics.bottomContentPadding(context),
-            ),
-            sliver: SliverList.list(children: [
-              _TodayHeader(data: data),
-              const SizedBox(height: SproutSpacing.lg),
-              _Greeting(data: data),
-              const SizedBox(height: SproutSpacing.xl),
-              const SproutMascot(state: SproutMascotState.idle, size: 112),
-              const SizedBox(height: SproutSpacing.lg),
-              Text(
-                'Your balances are hidden',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: SproutSpacing.sm),
-              Text(
-                'Sprout will keep exact balances, movements, goals, and transaction amounts private until you choose to show them.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(color: SproutColorScheme.of(context).muted),
-              ),
-              const SizedBox(height: SproutSpacing.xl),
-              FilledButton.icon(
-                onPressed: () =>
-                    ref.read(balancesVisibleProvider.notifier).setVisible(true),
-                icon: const Icon(Icons.visibility_rounded),
-                label: const Text('Show balances'),
-              ),
-              const SizedBox(height: SproutSpacing.lg),
-              Text(
-                data.provenanceSummary,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ]),
+      return SproutTabScrollView(
+        topPadding: SproutSpacing.lg,
+        children: [
+          _TodayHeader(data: data),
+          const SizedBox(height: SproutSpacing.lg),
+          _Greeting(data: data),
+          const SizedBox(height: SproutSpacing.xl),
+          const SproutMascot(state: SproutMascotState.idle, size: 112),
+          const SizedBox(height: SproutSpacing.lg),
+          Text(
+            'Your balances are hidden',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: SproutSpacing.sm),
+          Text(
+            'Sprout will keep exact balances, movements, goals, and transaction amounts private until you choose to show them.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(color: SproutColorScheme.of(context).muted),
+          ),
+          const SizedBox(height: SproutSpacing.xl),
+          FilledButton.icon(
+            onPressed: () =>
+                ref.read(balancesVisibleProvider.notifier).setVisible(true),
+            icon: const Icon(Icons.visibility_rounded),
+            label: const Text('Show balances'),
+          ),
+          const SizedBox(height: SproutSpacing.lg),
+          Text(
+            data.provenanceSummary,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       );
@@ -151,36 +144,34 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
     // ── Below-fold: full detail in text ──
     // Holdings breakdown, why it moved, goals, learn later, provenance footer.
     final children = [
-      // Header: streak pill, compact.
-      _TodayHeader(data: data),
-      const SizedBox(height: SproutSpacing.xs),
-      // Greeting
-      _Greeting(data: data),
+      KeyedSubtree(
+        key: const ValueKey('today-part-01-greeting-streak'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _TodayHeader(data: data),
+            const SizedBox(height: SproutSpacing.xs),
+            _Greeting(data: data),
+          ],
+        ),
+      ),
 
       // ── Briefing cluster (tight grouping) ──
-      // Mascot, wealth hero, salary strip, and Sprout's read belong together
+      // Mascot, wealth hero, and Sprout's read belong together
       // as one tight visual cluster — small gaps within, then a standard
       // section gap before the next block.
       const SizedBox(height: SproutSpacing.md),
-      _MascotHero(
-          healthScore: data.health.score,
-          scoreAvailable: data.health.scoreAvailable),
+      const _MascotHero(key: ValueKey('today-part-02-mascot')),
 
       const SizedBox(height: SproutSpacing.md),
-      _WealthHero(wealth: wealth),
-
-      // Salary countdown — slim status strip, part of the briefing cluster.
-      const SizedBox(height: SproutSpacing.md),
-      _SalaryStrip(
-        daysUntilSalary: data.salary.daysUntilSalary,
-        salaryKnown: data.salary.isKnown,
-        upcomingBills: data.snapshot.upcomingBills,
-        nextPayday: data.salary.nextPayday,
-        availableCash: data.snapshot.availableCash,
+      _WealthHero(
+        key: const ValueKey('today-part-03-wealth'),
+        wealth: wealth,
       ),
 
       const SizedBox(height: SproutSpacing.md),
       _SproutRead(
+        key: const ValueKey('today-part-05-read'),
         text: data.health.summary,
         detail: data.wealthSnapshot.interpretation.join(' '),
         actionLabel: 'See what I should do',
@@ -199,87 +190,102 @@ class _TodayContentState extends ConsumerState<_TodayContent> {
       // ── Standard section gap → One step ──
       const SizedBox(height: SproutSpacing.xl),
       _OneStep(
+        key: const ValueKey('today-part-06-action'),
         action: data.health.recommendedAction,
         completed: completed,
-        onComplete: () =>
-            _completeToday(data.health.recommendedAction, reducedMotion),
+        titleOverride: isZeroData ? 'Add your first cash entry' : null,
+        impactOverride: isZeroData ? 'Start with money you can see' : null,
+        onComplete: isZeroData
+            ? () => QuickAddSheet.open(context)
+            : () => _completeToday(
+                  data.health.recommendedAction,
+                  reducedMotion,
+                ),
       ),
 
       // Caption
-      const SizedBox(height: SproutSpacing.sm),
-      Center(
-        child: Text(
-          '20 seconds · one tap closer',
-          style: SproutType.body(
-            color: SproutColorScheme.of(context).muted,
-            size: SproutTypeScale.s14,
-            weight: FontWeight.w500,
-            height: 1.4,
+      if (!isZeroData) ...[
+        const SizedBox(height: SproutSpacing.sm),
+        Center(
+          child: Text(
+            '20 seconds · one tap closer',
+            style: SproutType.body(
+              color: SproutColorScheme.of(context).muted,
+              size: SproutTypeScale.s14,
+              weight: FontWeight.w500,
+              height: 1.4,
+            ),
           ),
         ),
-      ),
+      ],
 
       // ── Standard section gap → What's happening ──
       const SizedBox(height: SproutSpacing.xl),
       _WhatsHappening(
+        key: const ValueKey('today-part-07-whats-happening'),
         events: data.wealthEvents,
         goals: data.goals,
         learnThreads: data.learnThreads,
       ),
 
-      // ── Grey divider band ──
-      const SizedBox(height: SproutSpacing.xl),
-      const _DividerBand(),
-
-      // ── Below-fold: quiet door to depth ──
-      // Standard section gap between every major block.
-
       const SizedBox(height: SproutSpacing.xl),
       _HoldingsBreakdown(
+        key: const ValueKey('today-part-08-holdings'),
         holdings: wealth.holdings,
         events: data.wealthEvents,
       ),
 
+      // ── Quiet door to depth ──
       const SizedBox(height: SproutSpacing.xl),
-      _WhyItMoved(interpretation: wealth.interpretation),
+      const _DividerBand(key: ValueKey('today-part-09-depth-door')),
 
       const SizedBox(height: SproutSpacing.xl),
-      _GoalsSection(goals: data.goals),
-
-      if (data.learnThreads.isNotEmpty) ...[
-        const SizedBox(height: SproutSpacing.xl),
-        _LearnLater(threads: data.learnThreads),
-      ],
+      _WhyItMoved(
+        key: const ValueKey('today-part-10-why'),
+        interpretation: isZeroData
+            ? const [
+                'Nothing to explain yet — add a cash entry and Sprout starts learning'
+              ]
+            : wealth.interpretation,
+      ),
 
       const SizedBox(height: SproutSpacing.xl),
-      _ProvenanceFooter(text: data.provenanceSummary),
+      _GoalsSection(
+        key: const ValueKey('today-part-11-goals'),
+        goals: data.goals,
+      ),
+
+      KeyedSubtree(
+        key: const ValueKey('today-part-12-learn-later'),
+        child: data.learnThreads.isEmpty
+            ? const SizedBox.shrink()
+            : Padding(
+                padding: const EdgeInsets.only(top: SproutSpacing.xl),
+                child: _LearnLater(threads: data.learnThreads),
+              ),
+      ),
+
+      const SizedBox(height: SproutSpacing.xl),
+      _ProvenanceFooter(
+        key: const ValueKey('today-part-13-provenance'),
+        text: data.provenanceSummary,
+      ),
 
       const SizedBox(height: SproutSpacing.lg),
     ];
 
     return Stack(
       children: [
-        CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(
-                SproutSpacing.pageHorizontal,
-                12,
-                SproutSpacing.pageHorizontal,
-                NavMetrics.bottomContentPadding(context),
-              ),
-              sliver: SliverList.list(
-                children: reducedMotion
-                    ? children
-                    : children.asMap().entries.map((entry) {
-                        return entry.value.sproutCardEntrance(
-                          delay: Duration(milliseconds: entry.key * 45),
-                          beginY: 0.035,
-                        );
-                      }).toList(),
-              ),
-            ),
-          ],
+        SproutTabScrollView(
+          topPadding: 12,
+          children: reducedMotion
+              ? children
+              : children.asMap().entries.map((entry) {
+                  return entry.value.sproutCardEntrance(
+                    delay: Duration(milliseconds: entry.key * 45),
+                    beginY: 0.035,
+                  );
+                }).toList(),
         ),
         if (_showCompletionReward && !reducedMotion) ...[
           const Positioned.fill(child: ConfettiBurst()),
@@ -373,10 +379,7 @@ class _Greeting extends StatelessWidget {
 }
 
 class _MascotHero extends StatelessWidget {
-  const _MascotHero({required this.healthScore, required this.scoreAvailable});
-
-  final int healthScore;
-  final bool scoreAvailable;
+  const _MascotHero({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -400,24 +403,15 @@ class _MascotHero extends StatelessWidget {
                     : SproutColors.mint.withValues(alpha: 0.7),
               ),
             ),
-            // The mascot — compact, supporting the wealth number, not dominating.
-            // enableBlink + animate gives it life. The real WOW is a Rive-animated
-            // character with squash/bounce/reactions — that's an asset investment,
-            // not a code change.
-            SproutMascot(
+            // Landing is a calm beat. Celebration and reward motion are reserved
+            // for handoff and completed-action states.
+            const SproutMascot(
               size: 80,
-              state: SproutMascotState.fromHealthScore(
-                  scoreAvailable ? healthScore : 75),
-              animate: true,
-              playOnMount: true,
-              playKey: scoreAvailable ? healthScore : -1,
-              enableBlink: true,
+              state: SproutMascotState.peek,
+              animate: false,
+              playOnMount: false,
+              enableBlink: false,
             ),
-            if (!scoreAvailable)
-              const Padding(
-                padding: EdgeInsets.only(top: SproutSpacing.sm),
-                child: Text('Sprout is still getting to know your money'),
-              ),
           ],
         ),
       ),
@@ -426,7 +420,7 @@ class _MascotHero extends StatelessWidget {
 }
 
 class _WealthHero extends StatelessWidget {
-  const _WealthHero({required this.wealth});
+  const _WealthHero({required this.wealth, super.key});
 
   final WealthSnapshot wealth;
 
@@ -518,6 +512,7 @@ class _WealthHero extends StatelessWidget {
           const SizedBox(height: 8),
           // Movement chips: today + month-to-date
           _MovementChipsRow(
+            key: const ValueKey('today-part-04-movement'),
             wealth: wealth,
             changeVsYesterday: wealth.changeVsYesterday,
             changeMtd: wealth.changeMtd,
@@ -537,6 +532,7 @@ class _MovementChipsRow extends StatelessWidget {
     required this.changeMtd,
     required this.isDown,
     required this.mtdUp,
+    super.key,
   });
 
   final WealthSnapshot wealth;
@@ -610,8 +606,8 @@ class _MovementChip extends StatelessWidget {
             context,
             isDown ? SproutColors.tintGold : SproutColors.tintMint,
           );
-    final arrow = isFlat ? '—' : (isDown ? '▼' : '▲');
-    final formatted = isFlat ? '—' : SproutFormat.compactCurrency(value.abs());
+    final arrow = isDown ? '▼' : '▲';
+    final formatted = SproutFormat.compactCurrency(value.abs());
 
     return SproutButtonPress(
       onTap: () {
@@ -636,7 +632,7 @@ class _MovementChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(SproutRadius.pill),
         ),
         child: Text(
-          '$arrow $formatted $label',
+          isFlat ? 'No movement yet' : '$arrow $formatted $label',
           style: SproutType.metricValue(
             color: color,
             size: SproutTypeScale.s14,
@@ -654,6 +650,7 @@ class _SproutRead extends StatelessWidget {
     required this.detail,
     required this.actionLabel,
     required this.onAction,
+    super.key,
   });
 
   final String text;
@@ -710,154 +707,21 @@ class _SproutRead extends StatelessWidget {
   }
 }
 
-/// Slim salary countdown strip — a calming "what's coming" fact.
-/// One line, small, tinted. NOT a full tile or competing hero.
-/// Degrades gracefully for irregular income (freelancer / no fixed date).
-class _SalaryStrip extends StatelessWidget {
-  const _SalaryStrip({
-    required this.daysUntilSalary,
-    required this.salaryKnown,
-    required this.upcomingBills,
-    required this.nextPayday,
-    required this.availableCash,
-  });
-
-  final int daysUntilSalary;
-  final bool salaryKnown;
-  final int upcomingBills;
-  final DateTime nextPayday;
-  final int availableCash;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = SproutColorScheme.of(context);
-
-    // Irregular income fallback: if no valid salary date, degrade gracefully.
-    // Never show a broken countdown-to-nothing.
-    final salaryLabel = salaryKnown
-        ? 'Salary in $daysUntilSalary days'
-        : 'No salary timing set';
-    if (salaryKnown && daysUntilSalary <= 0) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: _todaySubtleSurface(context),
-          borderRadius: BorderRadius.circular(12),
-          border: _todayHairline(context),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.savings_rounded, color: colors.muted, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Next inflow varies — your income is flexible',
-                style: SproutType.body(
-                  color: colors.muted,
-                  size: SproutTypeScale.s14,
-                  weight: FontWeight.w500,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Calm reassurance: are upcoming bills covered?
-    final billsCovered = upcomingBills > 0;
-    final reassurance =
-        billsCovered ? 'covers your upcoming bills' : 'no bills due soon';
-
-    return SproutButtonPress(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        SproutActionSheet.show(
-          context,
-          title: 'Salary cashflow',
-          rows: [
-            SheetInfoRow(
-                icon: Icons.calendar_today_rounded,
-                label: 'Expected salary',
-                value: 'Arrives ${_formatDate(nextPayday)}'),
-            SheetInfoRow(
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Projected PKR',
-                value:
-                    'About ${SproutFormat.compactCurrency(availableCash)} available now'),
-            SheetInfoRow(
-                icon: Icons.receipt_long_rounded,
-                label: 'Bills this window',
-                value:
-                    'PKR ${SproutFormat.compactCurrency(upcomingBills)} due soon'),
-          ],
-          actions: [
-            SheetAction(
-                label: 'Edit salary date or amount',
-                icon: Icons.edit_rounded,
-                onTap: () => context.go('/settings'),
-                isPrimary: true),
-            SheetAction(
-                label: 'Add a bill I’m expecting',
-                icon: Icons.add_circle_outline_rounded,
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content:
-                            Text('Bill reminder added to your mock plan.')))),
-          ],
-        );
-      },
-      scale: 0.98,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: _todayTint(context, SproutColors.tintWarm),
-          borderRadius: BorderRadius.circular(12),
-          border: _todayHairline(context),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.savings_rounded,
-              color: _todayAccent(context, SproutColors.goldInk),
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '$salaryLabel · $reassurance',
-                style: SproutType.body(
-                  color: _todayAccent(context, SproutColors.goldInk),
-                  size: SproutTypeScale.s14,
-                  weight: FontWeight.w500,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _formatDate(DateTime value) {
-  final day = value.day;
-  final month = value.month;
-  return '$day/${month.toString().padLeft(2, '0')}';
-}
-
 class _OneStep extends StatelessWidget {
   const _OneStep({
     required this.action,
     required this.completed,
     required this.onComplete,
+    this.titleOverride,
+    this.impactOverride,
+    super.key,
   });
 
   final RecommendedAction action;
   final bool completed;
   final VoidCallback onComplete;
+  final String? titleOverride;
+  final String? impactOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -865,7 +729,8 @@ class _OneStep extends StatelessWidget {
     final isDark = colors.brightness == Brightness.dark;
     final fill = isDark ? SproutColors.darkSeed : SproutColors.seed;
     final edgeColor = isDark ? SproutColors.darkMint : SproutColors.leaf;
-    final actionLabel = completed ? 'Done today' : action.title;
+    final actionLabel =
+        completed ? 'Done today' : titleOverride ?? action.title;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -911,7 +776,7 @@ class _OneStep extends StatelessWidget {
                 Text(
                   completed
                       ? 'Nice. Your car fund moved closer.'
-                      : action.impact,
+                      : impactOverride ?? action.impact,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
@@ -943,6 +808,7 @@ class _WhatsHappening extends ConsumerWidget {
     required this.events,
     required this.goals,
     required this.learnThreads,
+    super.key,
   });
 
   final List<WealthEvent> events;
@@ -1077,7 +943,7 @@ class _WhatsHappening extends ConsumerWidget {
             crossAxisCount: 2,
             crossAxisSpacing: SproutSpacing.lg,
             mainAxisSpacing: SproutSpacing.lg,
-            childAspectRatio: 1.76,
+            childAspectRatio: 1.25,
           ),
           itemBuilder: (context, index) {
             return _HappeningTile(tile: tiles[index]);
@@ -1350,7 +1216,7 @@ class _HappeningTile extends StatelessWidget {
 // ──────────────────────────────────────────────────────────────
 
 class _DividerBand extends StatelessWidget {
-  const _DividerBand();
+  const _DividerBand({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1372,6 +1238,7 @@ class _HoldingsBreakdown extends StatelessWidget {
   const _HoldingsBreakdown({
     required this.holdings,
     required this.events,
+    super.key,
   });
 
   final List<Holding> holdings;
@@ -1430,7 +1297,7 @@ class _HoldingsBreakdown extends StatelessWidget {
                   SheetInfoRow(
                     icon: Icons.show_chart_rounded,
                     label: 'Point',
-                    value: 'PKR ${SproutFormat.compactCurrency(point)}',
+                    value: SproutFormat.compactCurrency(point),
                   ),
               ],
               actions: [
@@ -1654,7 +1521,7 @@ class _HoldingIcon extends StatelessWidget {
 }
 
 class _WhyItMoved extends StatelessWidget {
-  const _WhyItMoved({required this.interpretation});
+  const _WhyItMoved({required this.interpretation, super.key});
 
   final List<String> interpretation;
 
@@ -1715,7 +1582,7 @@ class _WhyItMoved extends StatelessWidget {
 }
 
 class _GoalsSection extends StatelessWidget {
-  const _GoalsSection({required this.goals});
+  const _GoalsSection({required this.goals, super.key});
 
   final List<Goal> goals;
 
@@ -1770,25 +1637,35 @@ class _GoalRow extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                goal.name,
-                style: SproutType.body(
-                  color: colors.ink,
-                  size: SproutTypeScale.s14,
-                  weight: FontWeight.w500,
-                  height: 1.2,
+              Expanded(
+                child: Text(
+                  goal.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: SproutType.body(
+                    color: colors.ink,
+                    size: SproutTypeScale.s14,
+                    weight: FontWeight.w500,
+                    height: 1.2,
+                  ),
                 ),
               ),
-              Text(
-                isComplete
-                    ? 'complete ✓'
-                    : '${_formatCompact(goal.currentAmount)} / ${_formatCompact(goal.targetAmount)}',
-                style: SproutType.metricValue(
-                  color: isComplete
-                      ? _todayAccent(context, SproutColors.seed)
-                      : colors.muted,
-                  size: SproutTypeScale.s14,
-                  weight: FontWeight.w500,
+              const SizedBox(width: SproutSpacing.sm),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    isComplete
+                        ? 'complete ✓'
+                        : '${_formatCompact(goal.currentAmount)} / ${_formatCompact(goal.targetAmount)}',
+                    style: SproutType.metricValue(
+                      color: isComplete
+                          ? _todayAccent(context, SproutColors.seed)
+                          : colors.muted,
+                      size: SproutTypeScale.s14,
+                      weight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1956,7 +1833,7 @@ class _LearnLater extends StatelessWidget {
 }
 
 class _ProvenanceFooter extends StatelessWidget {
-  const _ProvenanceFooter({required this.text});
+  const _ProvenanceFooter({required this.text, super.key});
 
   final String text;
 

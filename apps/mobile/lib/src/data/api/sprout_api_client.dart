@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import '../../app/sprout_environment.dart';
+
 /// API client for the Sprout backend.
 ///
 /// Base URL is configured via --dart-define=API_BASE_URL=...
@@ -154,6 +156,7 @@ class SproutApiClient {
   /// GET request. Throws [SproutApiException] on transport, status, or JSON
   /// shape failures so financial data cannot silently become mock data.
   Future<Map<String, dynamic>> get(String path) async {
+    _throwIfSweepOffline(path);
     try {
       var res = await http
           .get(Uri.parse('$_baseUrl$path'), headers: _headers)
@@ -181,6 +184,7 @@ class SproutApiClient {
     String path,
     Map<String, dynamic> body,
   ) async {
+    _throwIfSweepOffline(path);
     try {
       var res = await http
           .post(
@@ -216,6 +220,7 @@ class SproutApiClient {
 
   Future<Map<String, dynamic>> _send(String method, String path,
       {Map<String, dynamic>? body}) async {
+    _throwIfSweepOffline(path);
     try {
       var response = await _sendOnce(method, path, body);
       if (response.statusCode == 401 && await _refreshSession()) {
@@ -228,6 +233,13 @@ class SproutApiClient {
       Error.throwWithStackTrace(
           SproutApiException('Request failed for $method $path: $error'),
           stackTrace);
+    }
+  }
+
+  void _throwIfSweepOffline(String path) {
+    if (useSproutSweepHarness && sproutSweepOffline) {
+      if (sproutSweepOfflineAllowsLogin && path == '/v1/auth/login') return;
+      throw SproutApiException('Sweep offline injector blocked $path');
     }
   }
 

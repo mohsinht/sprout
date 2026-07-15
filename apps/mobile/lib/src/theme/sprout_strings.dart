@@ -162,12 +162,6 @@ class SproutStrings {
 class SproutFormat {
   SproutFormat._();
 
-  static final _compactCurrency = NumberFormat.compactCurrency(
-    locale: 'en_PK',
-    symbol: 'PKR ',
-    decimalDigits: 1,
-  );
-
   static final _currency = NumberFormat.currency(
     locale: 'en_PK',
     symbol: 'PKR ',
@@ -176,8 +170,25 @@ class SproutFormat {
 
   static final _date = DateFormat('MMM d, yyyy');
 
-  /// Compact form for large amounts, e.g. "PKR 168K".
-  static String compactCurrency(num value) => _compactCurrency.format(value);
+  /// Pakistan-natural compact form with whole-rupee zero handling.
+  ///
+  /// Unit fractions such as `2.5 lakh` describe a magnitude; raw rupee
+  /// amounts never render a `.0` suffix.
+  static String compactCurrency(num value) {
+    final rounded = value.round();
+    final absolute = rounded.abs();
+    final sign = rounded < 0 ? '−' : '';
+    if (absolute < 100000) return _currency.format(rounded);
+    if (absolute < 10000000) {
+      return 'PKR $sign${_compactUnit(absolute / 100000)} lakh';
+    }
+    return 'PKR $sign${_compactUnit(absolute / 10000000)} crore';
+  }
+
+  static String _compactUnit(double value) {
+    if (value == value.roundToDouble()) return value.round().toString();
+    return value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
+  }
 
   /// Full form, e.g. "PKR 168,000".
   static String currency(num value) => _currency.format(value);

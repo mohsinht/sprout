@@ -20,7 +20,7 @@ class QuickAddStrings {
   static const expenseHint = 'Tap one. Confirm the usual amount.';
   static const more = 'More';
   static const iGotPaid = 'I got paid';
-  static const import = 'Import statement';
+  static const import = 'Import';
   static const amountHint = 'Most days, this is two taps.';
   static const pocket = 'From';
   static const today = 'Today';
@@ -509,13 +509,13 @@ class _CategoryStep extends StatelessWidget {
               AddExpenseChip(
                 label: category.label,
                 icon: category.icon,
-                tint: category.tint,
+                tint: colors.mint,
                 onTap: () => onCategory(category),
               ),
             AddExpenseChip(
               label: QuickAddStrings.more,
               icon: Icons.add_rounded,
-              tint: colors.line.withValues(alpha: 0.3),
+              tint: colors.mint,
               onTap: onMore,
             ),
           ],
@@ -693,11 +693,9 @@ class _AmountStep extends StatelessWidget {
         ),
         const SizedBox(height: SproutSpacing.lg),
         _DateAffordance(date: date, onTap: onDateTap),
-        if (validation != null) ...[
-          const SizedBox(height: SproutSpacing.md),
-          _ValidationLine(text: validation!),
-        ],
-        const SizedBox(height: SproutSpacing.xl),
+        const SizedBox(height: SproutSpacing.md),
+        _ValidationSlot(text: validation),
+        const SizedBox(height: SproutSpacing.md),
         _PrimaryButton(
           label: labelAmount <= 0
               ? 'Log ${category.label}'
@@ -789,11 +787,9 @@ class _IncomeStep extends StatelessWidget {
               ),
           ],
         ),
-        if (validation != null) ...[
-          const SizedBox(height: SproutSpacing.md),
-          _ValidationLine(text: validation!),
-        ],
-        const SizedBox(height: SproutSpacing.xl),
+        const SizedBox(height: SproutSpacing.md),
+        _ValidationSlot(text: validation),
+        const SizedBox(height: SproutSpacing.md),
         _PrimaryButton(
           label: amount <= 0
               ? 'Save income'
@@ -1268,6 +1264,26 @@ class _ValidationLine extends StatelessWidget {
             color: SproutColors.goldInk,
             fontWeight: FontWeight.w600,
           ),
+    );
+  }
+}
+
+class _ValidationSlot extends StatelessWidget {
+  const _ValidationSlot({required this.text});
+
+  final String? text;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('quick-add-validation-slot'),
+      height: 24,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: text == null
+            ? const SizedBox.shrink()
+            : _ValidationLine(text: text!),
+      ),
     );
   }
 }

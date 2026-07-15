@@ -97,17 +97,27 @@ TodayData _localToday({
   final monthMovement =
       movement(transactions.where((tx) => sameMonth(tx.date)));
   final active = goals.where((goal) => goal.status == 'active').firstOrNull;
-  final action = active == null
+  final hasLocalData = transactions.isNotEmpty ||
+      accounts.any((account) => account.balance != 0) ||
+      goals.isNotEmpty;
+  final action = !hasLocalData
       ? const RecommendedAction(
-          title: 'Add your first goal',
+          title: 'Add your first cash entry',
           xp: 0,
-          impact: 'A goal gives Sprout context for future suggestions.')
-      : RecommendedAction(
-          title: 'Add PKR 25k to ${active.name}',
-          xp: 0,
-          impact: 'This updates your chosen goal only after you confirm.',
-          completionKind: 'contributeToGoal',
-          targetId: active.id);
+          impact: 'Start with money you can see.',
+          completionKind: 'logCash',
+        )
+      : active == null
+          ? const RecommendedAction(
+              title: 'Add your first goal',
+              xp: 0,
+              impact: 'A goal gives Sprout context for future suggestions.')
+          : RecommendedAction(
+              title: 'Add PKR 25k to ${active.name}',
+              xp: 0,
+              impact: 'This updates your chosen goal only after you confirm.',
+              completionKind: 'contributeToGoal',
+              targetId: active.id);
   final holdings = accounts
       .map((account) => Holding(
             id: account.id,
@@ -131,8 +141,9 @@ TodayData _localToday({
     health: FinancialHealthScore(
       score: 0,
       status: 'unavailable',
-      summary:
-          'You are offline. This picture uses entries saved on this device.',
+      summary: hasLocalData
+          ? 'You are offline. This picture uses entries saved on this device.'
+          : 'You are offline. Nothing is saved on this device yet.',
       positiveFactors: const [],
       attentionFactors: const [],
       recommendedAction: action,
@@ -155,16 +166,23 @@ TodayData _localToday({
       holdings: holdings,
       changeVsYesterday: todayMovement,
       changeMtd: monthMovement,
-      mainReason: 'Manual activity saved on this device',
-      interpretation: const [
-        'Live valuation and server analysis are unavailable while offline.'
+      mainReason: hasLocalData
+          ? 'Manual activity saved on this device'
+          : 'No movement yet',
+      interpretation: [
+        hasLocalData
+            ? 'Live valuation and server analysis are unavailable while offline.'
+            : 'Nothing to explain yet — add a cash entry and Sprout starts learning',
       ],
-      provenanceSummary:
-          'Manual entries saved on this device. Waiting to sync.',
+      provenanceSummary: hasLocalData
+          ? 'Manual entries saved on this device. Waiting to sync.'
+          : 'No local entries yet · add one when you are ready',
     ),
     wealthEvents: const [],
     goals: goals,
     learnThreads: const [],
-    provenanceSummary: 'Manual entries saved on this device. Waiting to sync.',
+    provenanceSummary: hasLocalData
+        ? 'Manual entries saved on this device. Waiting to sync.'
+        : 'No local entries yet · add one when you are ready',
   );
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sprout_motion/sprout_motion.dart';
 
-import '../presentation/shell/nav_metrics.dart';
+import '../presentation/shell/sprout_tab_scroll_view.dart';
 import '../theme/sprout_tokens.dart';
 
 class SproutPage extends StatelessWidget {
@@ -20,39 +20,30 @@ class SproutPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: NavMetrics.pagePadding(context),
-          sliver: SliverList.list(
-            children: [
-              Row(
+    return SproutTabScrollView(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(title,
-                            style: Theme.of(context).textTheme.headlineSmall),
-                        const SizedBox(height: SproutSpacing.xs),
-                        Text(subtitle,
-                            style: Theme.of(context).textTheme.bodyMedium),
-                      ],
-                    ),
-                  ),
-                  if (trailing != null) trailing!,
+                  Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: SproutSpacing.xs),
+                  Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
                 ],
               ),
-              const SizedBox(height: SproutSpacing.lg),
-              ...children,
-            ].asMap().entries.map((entry) {
-              return entry.value.sproutCardEntrance(
-                delay: Duration(milliseconds: entry.key * 55),
-              );
-            }).toList(),
-          ),
+            ),
+            if (trailing != null) trailing!,
+          ],
         ),
-      ],
+        const SizedBox(height: SproutSpacing.lg),
+        ...children,
+      ].asMap().entries.map((entry) {
+        return entry.value.sproutCardEntrance(
+          delay: Duration(milliseconds: entry.key * 55),
+        );
+      }).toList(),
     );
   }
 }

@@ -179,6 +179,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget _bottomActions(SproutColorScheme colors) {
     final isGoal = _step == 2;
     final isTarget = _step == 3;
+    final continueLabel = _saving
+        ? 'Saving your little garden…'
+        : isTarget
+            ? 'Plant this goal'
+            : 'Continue';
+    final skipLabel = isGoal
+        ? 'Help me decide later'
+        : _step == 1
+            ? 'Just call me friend'
+            : 'Skip for now';
     return Column(
       children: [
         if (_error != null)
@@ -186,46 +196,49 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             padding: const EdgeInsets.only(bottom: SproutSpacing.md),
             child: Text(_error!, style: SproutType.body(color: colors.muted)),
           ),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _saving
-                ? null
-                : (isGoal
-                    ? _next
-                    : isTarget
-                        ? _finish
-                        : _next),
-            style: FilledButton.styleFrom(
-              backgroundColor: SproutColors.seed,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: SproutSpacing.lg),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(SproutRadius.pill)),
+        Semantics(
+          button: true,
+          label: continueLabel,
+          child: ExcludeSemantics(
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _saving
+                    ? null
+                    : (isGoal
+                        ? _next
+                        : isTarget
+                            ? _finish
+                            : _next),
+                style: FilledButton.styleFrom(
+                  backgroundColor: SproutColors.seed,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: SproutSpacing.lg),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(SproutRadius.pill)),
+                ),
+                child: Text(continueLabel),
+              ),
             ),
-            child: Text(_saving
-                ? 'Saving your little garden…'
-                : isTarget
-                    ? 'Plant this goal'
-                    : 'Continue'),
           ),
         ),
         const SizedBox(height: SproutSpacing.sm),
-        TextButton(
-          onPressed: _saving
-              ? null
-              : (isGoal
-                  ? _skipGoal
-                  : _step == 1
-                      ? _skipName
-                      : _finish),
-          child: Text(
-              isGoal
-                  ? 'Help me decide later'
-                  : _step == 1
-                      ? 'Just call me friend'
-                      : 'Skip for now',
-              style: TextStyle(color: colors.muted)),
+        Semantics(
+          button: true,
+          label: skipLabel,
+          child: ExcludeSemantics(
+            child: TextButton(
+              onPressed: _saving
+                  ? null
+                  : (isGoal
+                      ? _skipGoal
+                      : _step == 1
+                          ? _skipName
+                          : _finish),
+              child: Text(skipLabel, style: TextStyle(color: colors.muted)),
+            ),
+          ),
         ),
       ],
     );

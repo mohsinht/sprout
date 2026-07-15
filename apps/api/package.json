@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate",
     "seed:holdings": "tsx src/scripts/seed-holdings.ts",
     "seed:valuation-mechanics": "tsx src/scripts/seed-valuation-mechanics.ts",
+    "seed:ux-states": "tsx src/scripts/seed-ux-states.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

@@ -27,8 +27,8 @@ void main() {
     // What's happening tiles
     expect(find.text("What's happening"), findsOneWidget);
 
-    // Salary countdown strip
-    expect(find.textContaining('Salary in'), findsOneWidget);
+    // Salary timing is context/depth, never an extra locked Today part.
+    expect(find.textContaining('Salary in'), findsNothing);
 
     // Scroll down to reveal below-fold content.
     await tester.drag(find.byType(Scrollable).first, const Offset(0, -600));

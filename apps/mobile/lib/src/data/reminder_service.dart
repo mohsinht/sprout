@@ -31,25 +31,31 @@ class ReminderService {
       // fallback when a platform cannot report an IANA identifier.
       tz.setLocalLocation(tz.getLocation('Asia/Karachi'));
     }
-    await _plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(
-          requestAlertPermission: false,
-          requestBadgePermission: false,
-          requestSoundPermission: false,
+    try {
+      await _plugin.initialize(
+        settings: const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false,
+          ),
+          macOS: DarwinInitializationSettings(
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false,
+          ),
         ),
-        macOS: DarwinInitializationSettings(
-          requestAlertPermission: false,
-          requestBadgePermission: false,
-          requestSoundPermission: false,
-        ),
-      ),
-      onDidReceiveNotificationResponse: (response) {
-        final payload = response.payload;
-        if (payload != null && payload.startsWith('/')) onOpen(payload);
-      },
-    );
+        onDidReceiveNotificationResponse: (response) {
+          final payload = response.payload;
+          if (payload != null && payload.startsWith('/')) onOpen(payload);
+        },
+      );
+    } catch (_) {
+      // Test harnesses and unsupported desktop targets have no notification
+      // implementation. Reminders remain off; the app and UX sweep continue.
+      return;
+    }
     _initialized = true;
     final launch = await _plugin.getNotificationAppLaunchDetails();
     final payload = launch?.notificationResponse?.payload;

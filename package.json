@@ -23,6 +23,7 @@
     "test:score": "pnpm --filter @sprout/api test",
     "ops:valuation-gate": "node scripts/valuation-burn-in.mjs",
     "test:valuation-mechanics": "pnpm check && pnpm --filter @sprout/api seed:valuation-mechanics",
+    "seed:ux-states": "DATABASE_URL=postgresql://sprout:sprout@localhost:5432/sprout pnpm --filter @sprout/api seed:ux-states",
     "ops:backup": "bash scripts/backup-postgres.sh",
     "ops:restore-smoke": "bash scripts/restore-smoke.sh",
     "format": "prettier --write .",

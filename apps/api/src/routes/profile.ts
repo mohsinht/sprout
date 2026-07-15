@@ -81,6 +81,36 @@ profileRoute.patch("/", async (c) => {
   return c.json({ ok: true });
 });
 
+// Plain, user-owned export. Authentication secrets and refresh sessions are
+// intentionally excluded.
+profileRoute.get("/export", async (c) => {
+  const userId = c.get("userId") as string;
+  const [profile, goals, contributions, accounts, holdings, transactions,
+    projectedIncome, recurringSeries] = await Promise.all([
+    db.select().from(schema.profiles).where(eq(schema.profiles.userId, userId)),
+    db.select().from(schema.goals).where(eq(schema.goals.userId, userId)),
+    db.select().from(schema.goalContributions).where(eq(schema.goalContributions.userId, userId)),
+    db.select().from(schema.accounts).where(eq(schema.accounts.userId, userId)),
+    db.select().from(schema.holdings).where(eq(schema.holdings.userId, userId)),
+    db.select().from(schema.transactions).where(eq(schema.transactions.userId, userId)),
+    db.select().from(schema.projectedIncome).where(eq(schema.projectedIncome.userId, userId)),
+    db.select().from(schema.recurringSeries).where(eq(schema.recurringSeries.userId, userId)),
+  ]);
+
+  auditEvent("user_data_exported", userId);
+  return c.json({
+    exportedAt: new Date().toISOString(),
+    profile: profile[0] ?? null,
+    goals,
+    goalContributions: contributions,
+    accounts,
+    holdings,
+    transactions,
+    projectedIncome,
+    recurringSeries,
+  });
+});
+
 // Delete imported/reconciled material while preserving manual entries.
 profileRoute.delete("/imported-data", async (c) => {
   const userId = c.get("userId") as string;

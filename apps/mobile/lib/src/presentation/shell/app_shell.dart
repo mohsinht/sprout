@@ -43,6 +43,7 @@ class AppShell extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             Container(
+              key: const ValueKey('floating-primary-nav'),
               height: NavMetrics.barHeight,
               margin: const EdgeInsets.fromLTRB(
                   14, 0, 14, NavMetrics.barBottomMargin),

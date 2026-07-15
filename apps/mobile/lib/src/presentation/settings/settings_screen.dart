@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -136,6 +138,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   };
 
   String _currency = _SettingsStrings.pkr;
+  String _language = 'en';
 
   late final Map<String, bool> _prefs = {
     _SettingsStrings.reducedMotion: false,
@@ -195,6 +198,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         _salaryDate = salaryDay == null ? 'Not set' : 'Day $salaryDay';
         _incomeType = profile['incomeType'] as String? ?? 'other';
         _currency = profile['displayCurrency'] as String? ?? 'PKR';
+        _language = profile['locale'] as String? ?? 'en';
         _prefs[_SettingsStrings.reducedMotion] =
             profile['reduceMotion'] as bool? ?? false;
         _prefs[_SettingsStrings.soundEffects] =
@@ -686,6 +690,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         gap,
         _privacySection(colors),
         gap,
+        _balanceVisibilitySection(colors),
+        gap,
         _securitySection(colors),
         gap,
         _notificationsSection(colors),
@@ -750,7 +756,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.calendar_today_rounded),
               title: const Text('Usual salary date'),
-              subtitle: Text(_salaryDate),
+              subtitle: Text(_salaryDate == 'Not set'
+                  ? 'Set your salary date so Sprout can celebrate payday'
+                  : _salaryDate),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: _editSalaryDate,
             ),
@@ -1001,7 +1009,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _privacySection(SproutColorScheme colors) {
-    final balancesVisible = ref.watch(balancesVisibleProvider);
     const icons = <IconData>[
       Icons.lock_rounded,
       Icons.link_rounded,
@@ -1010,8 +1017,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ];
     return SettingsSection(
       header: _SettingsStrings.privacy,
-      tint: colors.mint.withValues(alpha: 0.45),
-      tintBorder: SproutColors.seed.withValues(alpha: 0.16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1031,18 +1036,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ?.copyWith(color: colors.muted),
           ),
           const SizedBox(height: SproutSpacing.md),
-          PreferenceToggle(
-            label: balancesVisible
-                ? 'Balances are visible'
-                : 'Balances are hidden',
-            value: !balancesVisible,
-            icon: balancesVisible
-                ? Icons.visibility_rounded
-                : Icons.visibility_off_rounded,
-            onChanged: (hidden) =>
-                ref.read(balancesVisibleProvider.notifier).setVisible(!hidden),
-          ),
-          _rowDivider,
           for (var i = 0; i < mockPrivacyStatements.length; i++) ...[
             TrustBadge(
               label: mockPrivacyStatements[i],
@@ -1052,6 +1045,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(height: SproutSpacing.md),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _balanceVisibilitySection(SproutColorScheme colors) {
+    final balancesVisible = ref.watch(balancesVisibleProvider);
+    return SettingsSection(
+      header: 'Balance visibility',
+      child: PreferenceToggle(
+        label: balancesVisible ? 'Balances are visible' : 'Balances are hidden',
+        value: !balancesVisible,
+        icon: balancesVisible
+            ? Icons.visibility_rounded
+            : Icons.visibility_off_rounded,
+        onChanged: (hidden) {
+          ref.read(balancesVisibleProvider.notifier).setVisible(!hidden);
+          _patchProfile({'hideBalances': hidden});
+        },
       ),
     );
   }
@@ -1183,6 +1194,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       header: _SettingsStrings.appPreferences,
       child: Column(
         children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.language_rounded),
+            title: const Text('Language'),
+            subtitle: Text(_language == 'ur' ? 'Urdu' : 'English'),
+            trailing: DropdownButton<String>(
+              value: _language,
+              underline: const SizedBox.shrink(),
+              items: const [
+                DropdownMenuItem(value: 'en', child: Text('English')),
+                DropdownMenuItem(value: 'ur', child: Text('Urdu')),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _language = value);
+                _patchProfile({'locale': value});
+              },
+            ),
+          ),
+          _rowDivider,
           PreferenceToggle(
             label: _SettingsStrings.reducedMotion,
             value: _prefs[_SettingsStrings.reducedMotion] ?? false,
@@ -1220,9 +1251,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onChanged: (v) => ref.read(themeModeProvider.notifier).state =
                 v ? ThemeMode.dark : ThemeMode.light,
           ),
+          _rowDivider,
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.local_fire_department_rounded),
+            title: const Text('Streak freeze and repair'),
+            subtitle: Text(
+              (_notifications[_SettingsStrings.streakProtection] ?? true)
+                  ? 'Protection reminders are on. No repair is needed today.'
+                  : 'Protection reminders are off. A repair option still appears after an eligible missed day.',
+            ),
+            trailing: Switch(
+              value: _notifications[_SettingsStrings.streakProtection] ?? true,
+              onChanged: (value) => _setNotificationPreference(
+                _SettingsStrings.streakProtection,
+                value,
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _exportData() async {
+    try {
+      final export =
+          await ref.read(apiClientProvider).get('/v1/profile/export');
+      await Clipboard.setData(
+        ClipboardData(text: const JsonEncoder.withIndent('  ').convert(export)),
+      );
+      _showSnack('Your Sprout data was copied. You choose where to save it.');
+    } catch (_) {
+      _showSnack('Could not export while offline. Try again when connected.');
+    }
   }
 
   Widget _deleteSection(SproutColorScheme colors) {
@@ -1231,6 +1293,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Material(
+            type: MaterialType.transparency,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.download_rounded),
+              title: const Text('Export my data'),
+              subtitle: const Text('Copies a readable record you can save.'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: _exportData,
+            ),
+          ),
+          _rowDivider,
           Padding(
             padding: const EdgeInsets.symmetric(vertical: SproutSpacing.md),
             child: Row(
